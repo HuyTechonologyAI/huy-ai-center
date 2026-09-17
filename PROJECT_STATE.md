@@ -5,10 +5,10 @@
 Trung tâm điều phối AI và quản trị hạ tầng điện toán tập trung cho Hệ sinh thái HUY TECHNOLOGY, kết nối 3 website hiện hữu (`huycncdsai.io.vn`, `gvcncdsai.io.vn`, `smarttax-ai.vercel.app`) cùng node AI nội bộ Dell Precision M4800 (`huy-ai-node-01`).
 
 ## CURRENT_PHASE
-Phase 04: AI Task API Contract (DONE — Sẵn sàng tích hợp cho 3 Website, Mock Worker tested)
+Phase 05: Control Center Web Application (DONE — Sẵn sàng Vercel Preview / Staging, 14 Routes biên dịch thành công)
 
 ## CURRENT_BRANCH
-`feat/ai-task-contract`
+`main` (Tag: `phase-05-control-center-web`)
 
 ---
 
@@ -16,30 +16,21 @@ Phase 04: AI Task API Contract (DONE — Sẵn sàng tích hợp cho 3 Website, 
 - [x] **Phase 01 — System Audit:** Kiểm toán READ-ONLY 3 website hiện hữu, lập tài liệu kiểm kê, kiến trúc hiện tại, rủi ro và gap analysis.
 - [x] **Phase 02 — AI Center Foundation:** Monorepo, 10 Agent Skills, Contracts, Dispatcher HTTP health server, Control Center tinh giản, CI workflow.
 - [x] **Phase 03 — Supabase Control Center Schema:** SQL Migrations cho Identity, Billing, AI Tasks, Registry, GitHub Radar, Nodes, Storage và Postgres Native Queues.
-- [x] **Phase 04 — AI Task API Contract:**
-  - **Hệ thống 5 Endpoints Chuẩn hóa:**
-    - `POST /api/ai/tasks`: Tiếp nhận task (`source_app`, `task_type`, `input`, `options`) và trả về `{"task_id": "...", "status": "queued"}`.
-    - `GET /api/ai/tasks/:id`: Tra cứu trạng thái và tiến độ xử lý.
-    - `POST /api/ai/tasks/:id/cancel`: Hủy tác vụ đang xếp hàng.
-    - `GET /api/ai/tasks/:id/outputs`: Trích xuất kết quả đầu ra có cấu trúc (`AIOutput`).
-    - `GET /api/ai/history`: Tra cứu lịch sử tác vụ có phân trang và bộ lọc.
-  - **Zero-Trust Validation:** Xác thực Authentication & Authorization, kiểm tra hạn mức tín dụng (Credits/Quota check), giới hạn kích thước dữ liệu (Max 1MB).
-  - **Cơ chế Idempotency:** Header `Idempotency-Key` ngăn chặn tạo trùng lặp job khi trình duyệt hoặc client tự động thử lại.
-  - **Chuẩn hóa Error Model:** Thống nhất định dạng lỗi gồm `code`, `message`, `retryable`, `request_id`.
-  - **Tài liệu Kỹ thuật Chuẩn mực:**
-    - [docs/API_CONTRACT.md](docs/API_CONTRACT.md)
-    - [docs/ERROR_MODEL.md](docs/ERROR_MODEL.md)
-  - **Mock Worker Test Suite:**
-    - Hoàn thành suite kiểm thử `tests/ai-task-api.test.ts` mô phỏng đầy đủ chu trình vòng đời tác vụ (queued -> claimed -> completed / cancelled) mà không cần máy chủ Dell thật (6/6 tests PASS).
+- [x] **Phase 04 — AI Task API Contract:** 5 Endpoints API (`/tasks`, `/:id`, `/:id/cancel`, `/:id/outputs`, `/history`), Idempotency key, Standard error model, Mock Worker tests (24/24 tests PASS).
+- [x] **Phase 05 — Control Center Web Application:**
+  - **Kiến trúc AppLayout:** Sidebar điều hướng 7 mục, Header hiển thị số dư ví Credits và avatar, thiết kế responsive trên di động.
+  - **Ứng Dụng Teacher AI Suite (`/apps/teacher-ai`):** Soạn giáo án CV 5512, sinh Slide, Quiz, Mindmap, Phiếu học tập, Video script với form chuẩn sư phạm.
+  - **Job UI (`/tasks/[id]`):** Theo dõi tiến độ thời gian thực qua 4 trạng thái (`Queued`, `Processing`, `Completed`, `Failed`), thông báo thân thiện khi máy chủ Dell offline, giả lập thử nghiệm và hiển thị 4 tab kết quả.
+  - **Bộ Màn Hình Vệ Tinh:** Dashboard (`/`), Danh mục AI Apps (`/apps`), Lịch sử tác vụ (`/history`), Dự án (`/projects`), Kho tệp lưu trữ (`/files`), Hạn mức ví Credits (`/credits`), Hồ sơ quản trị & API Keys (`/account`).
+  - **Biên dịch Sản xuất:** Next.js build 14/14 routes thành công 100%.
 
 ## IN_PROGRESS
-- Không có (Phase 04 đã hoàn thành toàn bộ yêu cầu).
+- Không có (Phase 05 đã hoàn thành trọn vẹn).
 
 ## PENDING
-- [ ] Review & Human Approval cho toàn bộ Phase 04.
-- [ ] Review & Merge branch `feat/ai-task-contract` vào `main`.
-- [ ] Phase 05: Client SDK Integration Helper cho 3 website (hoặc Control Center Dashboard UI hoàn thiện).
-- [ ] Phase 06: Dell Precision M4800 Deployment Runbook & Physical Node Onboarding.
+- [ ] Review & Human Approval cho Phase 05.
+- [ ] Triển khai bản Vercel Preview / Staging cho `app.huycncdsai.io.vn` (khi người dùng cung cấp Vercel token/quyền).
+- [ ] Phase 06: Client SDK Integration Helper cho 3 website hoặc Dell M4800 Deployment & Dispatcher Runbook.
 
 ---
 
@@ -54,10 +45,9 @@ Phase 04: AI Task API Contract (DONE — Sẵn sàng tích hợp cho 3 Website, 
   - `POST /api/ai/tasks/:id/cancel`
   - `GET /api/ai/tasks/:id/outputs`
   - `GET /api/ai/history`
-- Package `@huy-ai/contracts`: Mở rộng thêm `CreateTaskRequestSchema`, `CreateTaskResponseSchema`, `StandardErrorSchema`, `TaskOutputsResponseSchema`, `TaskHistoryQuerySchema`.
 
 ## FRONTEND_STATE
-- `apps/control-center`: Next.js 15, tích hợp đầy đủ các API route handlers, typecheck 0 lỗi.
+- `apps/control-center`: Next.js 15, React 19, Tailwind CSS. Toàn bộ 14 routes tĩnh và động biên dịch thành công, typecheck 0 lỗi.
 
 ## WORKER_STATE
 - `apps/dispatcher`: Sẵn sàng kết nối với Task Queue, có máy chủ HTTP Health check port 8080. Đã kiểm thử thành công qua Mock Worker logic.
@@ -69,15 +59,17 @@ Phase 04: AI Task API Contract (DONE — Sẵn sàng tích hợp cho 3 Website, 
 - **API Logic & Mock Worker Tests:** PASS (6/6 tests).
 - **Dispatcher Health Tests:** PASS (1/1 test).
 - **Shared Backoff Utility Tests:** PASS (3/3 tests).
-- **Tổng cộng:** 24/24 tests PASS (100% Passed).
+- **TypeScript Compile:** PASS (5/5 workspaces).
+- **Next.js Production Build:** PASS (14/14 routes).
+- **Tổng cộng:** 100% Passed.
 
 ## KNOWN_ISSUES
 - Không có.
 
 ## DECISIONS
-1. **Next.js Server Route Handlers Choice:** Triển khai API trực tiếp trên Next.js App Router trong `apps/control-center` để tận dụng hạ tầng Vercel Serverless sẵn có, code chia sẻ type-safe với `@huy-ai/contracts` và không phát sinh thêm chi phí vận hành dịch vụ ngoài.
-2. **Strict Idempotency Mechanism:** Lưu vết Idempotency Key trong bộ nhớ đệm (TTL 10 phút) để bảo đảm việc người dùng bấm gửi nhiều lần hoặc mạng giật không tạo ra nhiều task trùng nhau.
-3. **Mock Worker Isolation:** Toàn bộ kiểm thử logic vòng đời task được thực hiện qua Mock Worker, tuyệt đối không phụ thuộc vào trạng thái vật lý của máy chủ Dell M4800.
+1. **Giao diện Tiếng Việt Ưu tiên Sư phạm:** Thiết kế giao diện thân thiện, chuẩn mực theo ngôn ngữ ngành giáo dục và tài chính tại Việt Nam.
+2. **Offline-Tolerant Banner:** Khi máy chủ Dell M4800 chưa online, hệ thống hiển thị thông báo tiến trình đang xếp hàng an tâm, không báo lỗi giả hay gây hoang mang cho người dùng.
+3. **Mock Preview Switcher:** Tích hợp nút mô phỏng tiến độ ngay trong Job UI giúp kiểm thử toàn bộ trải nghiệm người dùng trước khi kết nối phần cứng thật.
 
 ## NEXT_ACTION
-Báo cáo bàn giao Phase 04 cho người dùng và dừng lại chờ chỉ thị tiếp theo.
+Báo cáo bàn giao Phase 05 theo đúng Rule 12 và dừng lại chờ chỉ thị tiếp theo từ người dùng.
