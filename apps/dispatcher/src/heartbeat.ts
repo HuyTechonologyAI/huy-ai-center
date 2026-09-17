@@ -1,6 +1,6 @@
 import os from 'node:os';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { WorkerHeartbeat, WorkerStatus } from '@huy-ai/contracts';
+import { WorkerStatus } from '@huy-ai/contracts';
 import { Logger } from '@huy-ai/shared';
 
 export interface HeartbeatManagerConfig {
@@ -8,6 +8,7 @@ export interface HeartbeatManagerConfig {
   nodeName: string;
   intervalMs: number;
   capabilities: string[];
+  maxConcurrency?: number;
 }
 
 export class HeartbeatManager {
@@ -30,6 +31,11 @@ export class HeartbeatManager {
 
   setLoad(load: number): void {
     this.currentLoad = Math.max(0, load);
+    if (this.currentLoad > 0) {
+      this.currentStatus = 'busy';
+    } else {
+      this.currentStatus = 'online';
+    }
   }
 
   setStatus(status: WorkerStatus): void {
@@ -37,21 +43,25 @@ export class HeartbeatManager {
   }
 
   async register(): Promise<void> {
-    this.logger.info(`Registering worker node: ${this.config.nodeId} (${this.config.nodeName})`);
+    this.logger.info(`Registering compute node: ${this.config.nodeId} (${this.config.nodeName})`);
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
     const systemSpecs = {
-      ramTotalBytes: os.totalmem(),
-      ramFreeBytes: os.freemem(),
+      ramTotalBytes: totalMem,
+      ramFreeBytes: freeMem,
       cpuCores: os.cpus().length,
       os: `${os.type()} ${os.release()} (${os.arch()})`,
     };
 
-    const { error } = await this.supabase.from('ai_worker_nodes').upsert(
+    const { error } = await this.supabase.from('nodes').upsert(
       {
         node_id: this.config.nodeId,
         name: this.config.nodeName,
         hostname: os.hostname(),
         status: this.currentStatus,
         capabilities: this.config.capabilities,
+        max_concurrency: this.config.maxConcurrency || 2,
+        current_load: this.currentLoad,
         system_specs: systemSpecs,
         last_heartbeat_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -60,9 +70,11 @@ export class HeartbeatManager {
     );
 
     if (error) {
-      this.logger.error('Failed to register worker node in Supabase', error);
+      this.logger.warn('Could not register in nodes table (schema may be pending migration)', {
+        error: error.message,
+      });
     } else {
-      this.logger.info('Worker node registered successfully in Supabase');
+      this.logger.info('Node registered successfully in nodes table.');
     }
   }
 
@@ -75,35 +87,58 @@ export class HeartbeatManager {
   }
 
   async sendHeartbeat(): Promise<void> {
-    const heartbeat: WorkerHeartbeat = {
-      nodeId: this.config.nodeId,
-      status: this.currentStatus,
-      currentLoad: this.currentLoad,
-      systemSpecs: {
-        ramTotalBytes: os.totalmem(),
-        ramFreeBytes: os.freemem(),
-        cpuCores: os.cpus().length,
-        os: `${os.type()} ${os.release()}`,
-      },
-      timestamp: new Date().toISOString(),
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const now = new Date().toISOString();
+
+    const systemSpecs = {
+      ramTotalBytes: totalMem,
+      ramFreeBytes: freeMem,
+      cpuCores: os.cpus().length,
+      os: `${os.type()} ${os.release()}`,
     };
 
-    const { error } = await this.supabase
-      .from('ai_worker_nodes')
-      .update({
-        status: heartbeat.status,
-        current_load: heartbeat.currentLoad,
-        system_specs: heartbeat.systemSpecs,
-        last_heartbeat_at: heartbeat.timestamp,
-        updated_at: heartbeat.timestamp,
-      })
-      .eq('node_id', heartbeat.nodeId);
+    // 1. Update nodes table
+    try {
+      const { error: nodeErr } = await this.supabase
+        .from('nodes')
+        .update({
+          status: this.currentStatus,
+          current_load: this.currentLoad,
+          system_specs: systemSpecs,
+          last_heartbeat_at: now,
+          updated_at: now,
+        })
+        .eq('node_id', this.config.nodeId);
 
-    if (error) {
-      this.logger.warn('Failed to send heartbeat to Supabase', { error: error.message });
-    } else {
-      this.logger.debug('Heartbeat reported', { load: this.currentLoad, status: this.currentStatus });
+      if (nodeErr) {
+        this.logger.debug('Update nodes heartbeat notice', { message: nodeErr.message });
+      }
+    } catch {
+      // Ignored for standalone mode
     }
+
+    // 2. Insert telemetry row in node_heartbeats
+    try {
+      await this.supabase.from('node_heartbeats').insert({
+        node_id: this.config.nodeId,
+        status: this.currentStatus,
+        current_load: this.currentLoad,
+        ram_used_bytes: usedMem,
+        ram_total_bytes: totalMem,
+        system_specs: systemSpecs,
+        recorded_at: now,
+      });
+    } catch {
+      // Ignored if table not populated
+    }
+
+    this.logger.debug('Heartbeat emitted', {
+      nodeId: this.config.nodeId,
+      load: this.currentLoad,
+      status: this.currentStatus,
+    });
   }
 
   async stop(): Promise<void> {
@@ -114,14 +149,14 @@ export class HeartbeatManager {
 
     try {
       await this.supabase
-        .from('ai_worker_nodes')
+        .from('nodes')
         .update({
           status: 'offline',
           last_heartbeat_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('node_id', this.config.nodeId);
-      this.logger.info('Reported offline status before shutdown');
+      this.logger.info('Marked node status offline on shutdown.');
     } catch (err) {
       this.logger.warn('Failed to mark offline on shutdown', { error: String(err) });
     }

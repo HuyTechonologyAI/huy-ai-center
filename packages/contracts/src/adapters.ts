@@ -7,6 +7,7 @@ export const AdapterTypeSchema = z.enum([
   'langflow',
   'n8n',
   'echo',
+  'mock',
 ]);
 export type AdapterType = z.infer<typeof AdapterTypeSchema>;
 
