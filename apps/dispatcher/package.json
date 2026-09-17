@@ -1,0 +1,21 @@
+{
+  "name": "@huy-ai/dispatcher",
+  "version": "1.0.0",
+  "description": "Background AI Queue Dispatcher & Multi-Adapter Worker Daemon",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "dev": "tsc -w"
+  },
+  "dependencies": {
+    "@huy-ai/contracts": "*",
+    "@huy-ai/config": "*",
+    "@huy-ai/shared": "*",
+    "@supabase/supabase-js": "^2.49.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

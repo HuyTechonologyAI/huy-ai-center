@@ -1,0 +1,85 @@
+services:
+  # ----------------------------------------------------------------------------
+  # 1. AI Dispatcher Worker Daemon
+  # ----------------------------------------------------------------------------
+  dispatcher:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dispatcher
+    container_name: huy-ai-dispatcher
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - WORKER_NODE_ID=${WORKER_NODE_ID:-huy-ai-node-01}
+      - WORKER_NODE_NAME=${WORKER_NODE_NAME:-Dell Precision M4800 Primary Node}
+      - WORKER_POLL_INTERVAL_MS=${WORKER_POLL_INTERVAL_MS:-3000}
+      - WORKER_HEARTBEAT_INTERVAL_MS=${WORKER_HEARTBEAT_INTERVAL_MS:-10000}
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-2}
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - LANGFLOW_BASE_URL=http://langflow:7860
+      - LANGFLOW_API_KEY=${LANGFLOW_API_KEY}
+      - N8N_BASE_URL=http://n8n:5678
+      - N8N_API_KEY=${N8N_API_KEY}
+    depends_on:
+      - ollama
+    networks:
+      - huy-ai-internal
+
+  # ----------------------------------------------------------------------------
+  # 2. Ollama Local LLM Service
+  # ----------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: huy-ai-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    networks:
+      - huy-ai-internal
+
+  # ----------------------------------------------------------------------------
+  # 3. LiteLLM Proxy / Router
+  # ----------------------------------------------------------------------------
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: huy-ai-litellm
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4000:4000"
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_API_KEY:-sk-litellm-placeholder}
+    networks:
+      - huy-ai-internal
+
+  # ----------------------------------------------------------------------------
+  # 4. n8n Automation Engine
+  # ----------------------------------------------------------------------------
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: huy-ai-n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-admin123}
+      - WEBHOOK_URL=http://127.0.0.1:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - huy-ai-internal
+
+networks:
+  huy-ai-internal:
+    driver: bridge
+
+volumes:
+  ollama_data:
+  n8n_data:

@@ -1,0 +1,26 @@
+{
+  "name": "huy-ai-center-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Central AI Infrastructure & Task Orchestration Center for HUY TECHNOLOGY Ecosystem",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "verify:safety": "powershell.exe -ExecutionPolicy Bypass -File ./scripts/verify-safety.ps1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "author": "HUY TECHNOLOGY AI Architecture Team",
+  "license": "UNLICENSED"
+}
