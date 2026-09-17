@@ -6,9 +6,9 @@ Trung tâm điều phối AI và quản trị hạ tầng điện toán tập tr
 
 ## 1. Giới thiệu
 
-**HUY TECHNOLOGY AI CENTER** là lớp hạ tầng trung tâm kết nối các dịch vụ frontend hiện hữu với các mô hình AI/LLM và luồng tự động hóa chạy trên cả hạ tầng Cloud lẫn máy chủ nội bộ (Dell Precision M4800).
+**HUY TECHNOLOGY AI CENTER** (`huy-ai-center`) là lớp hạ tầng trung tâm kết nối các dịch vụ frontend hiện hữu với các mô hình AI/LLM và luồng tự động hóa chạy trên cả hạ tầng Cloud (Vercel & Supabase) lẫn máy chủ nội bộ (Dell Precision M4800).
 
-### Hệ sinh thái hiện có:
+### Hệ sinh thái kết nối:
 - **Huy AI Portfolio:** [https://www.huycncdsai.io.vn/](https://www.huycncdsai.io.vn/)
 - **Smart Teacher Schedule:** [https://www.gvcncdsai.io.vn/](https://www.gvcncdsai.io.vn/)
 - **SmartTax AI:** [https://smarttax-ai.vercel.app/](https://smarttax-ai.vercel.app/)
@@ -40,7 +40,7 @@ flowchart TD
     end
 
     subgraph Node["Dell Precision M4800 (huy-ai-node-01)"]
-        Dispatcher["AI Dispatcher Worker"]
+        Dispatcher["AI Dispatcher Worker\n(Health: Port 8080)"]
         Ollama["Ollama (Local LLMs)"]
         LiteLLM["LiteLLM Router"]
         Langflow["Langflow"]
@@ -68,60 +68,56 @@ flowchart TD
 
 ---
 
-## 3. Cấu trúc Repository
+## 3. Cấu trúc Repository Monorepo
 
 ```text
 huy-ai-center/
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # GitHub Actions CI (lint, typecheck, test, build - NO deploy)
 ├── apps/
-│   ├── control-center/     # Next.js Dashboard quản trị task queue & worker
-│   └── dispatcher/         # Node.js/TypeScript worker daemon kết nối AI services
+│   ├── control-center/         # Next.js Dashboard quản trị task queue & worker
+│   └── dispatcher/             # Node.js/TypeScript daemon worker + HTTP health endpoint (8080)
 ├── packages/
-│   ├── contracts/          # Hợp đồng dữ liệu & Zod schemas dùng chung
-│   ├── config/             # Cấu hình eslint, prettier, tsconfig dùng chung
-│   └── shared/             # Thư viện tiện ích, logger, retry helpers
+│   ├── contracts/              # Shared contracts (AITask, AITaskStep, AIOutput, Agent, Tool, Node, etc.)
+│   ├── config/                 # Shared configs & runtime Zod environment validator
+│   └── shared/                 # Logger đa cấp độ và bộ điều phối Exponential Backoff Retry
 ├── supabase/
-│   ├── migrations/         # SQL migration cho AI Task Queue & Worker nodes
-│   ├── functions/          # Edge Functions điều phối
-│   └── seed/               # Dữ liệu khởi tạo kiểm thử
-├── docs/                   # Tài liệu kiến trúc & Sổ tay vận hành (Runbooks)
-├── scripts/                # Scripts kiểm tra an toàn, bảo mật & CI/CD
-├── tests/                  # Test suites tổng hợp
-├── docker/                 # Docker Compose & Dockerfile cho Dell M4800
-├── .agents/skills/         # 10 Agent Skills chuyên biệt hỗ trợ phát triển
-├── .env.example            # Mẫu cấu hình biến môi trường
-├── PROJECT_STATE.md        # Theo dõi tiến độ & trạng thái chuẩn hóa
+│   ├── migrations/             # SQL migrations cho AI Task Queue, Worker nodes, RLS
+│   ├── functions/              # Edge Functions điều phối
+│   └── seed/                   # Dữ liệu khởi tạo kiểm thử
+├── docs/                       # Hệ thống tài liệu kỹ thuật & kiến trúc
+│   ├── SYSTEM_INVENTORY.md     # Kiểm kê toàn bộ hệ sinh thái
+│   ├── CURRENT_ARCHITECTURE.md # Kiến trúc hiện tại
+│   ├── RISK_REGISTER.md        # Quản trị rủi ro & kế hoạch ứng phó
+│   ├── ARCHITECTURE_GAP_ANALYSIS.md # So sánh Current vs Target V1
+│   ├── LOCAL_DEVELOPMENT.md    # Sổ tay lập trình cục bộ
+│   ├── DEPLOYMENT_MODEL.md     # Mô hình triển khai phân tầng
+│   └── ENVIRONMENT_VARIABLES.md # Bảng tra cứu biến môi trường
+├── docker/                     # Docker Compose & Dockerfile cho máy chủ Dell M4800
+├── scripts/                    # Scripts kiểm tra an toàn & bảo mật
+├── .agents/skills/             # 10 Workspace Agent Skills
+├── .env.example                # Mẫu cấu hình biến môi trường
+├── PROJECT_STATE.md            # Bảng theo dõi tiến độ dự án
 └── README.md
 ```
 
 ---
 
-## 4. Bắt đầu phát triển (Quick Start)
+## 4. Tài liệu Tham khảo Nhanh (Quick Links)
 
-### Yêu cầu:
-- Node.js >= 20.0.0 (khuyến nghị v24+)
-- npm >= 10.0.0
-- Docker (dành cho node worker hoặc môi trường test)
-
-### Cài đặt:
-```bash
-# 1. Cài đặt dependencies toàn bộ workspace
-npm install
-
-# 2. Tạo file cấu hình từ template
-cp .env.example .env
-
-# 3. Kiểm tra tính toàn vẹn typecheck
-npm run typecheck
-
-# 4. Chạy kiểm thử
-npm run test
-```
+- [Sổ tay Phát triển Cục bộ (Local Development)](docs/LOCAL_DEVELOPMENT.md)
+- [Mô hình Triển khai Phân tầng (Deployment Model)](docs/DEPLOYMENT_MODEL.md)
+- [Bảng tra cứu Biến môi trường (Environment Variables)](docs/ENVIRONMENT_VARIABLES.md)
+- [Kiểm kê Hệ sinh thái (System Inventory)](docs/SYSTEM_INVENTORY.md)
+- [Quản trị Rủi ro (Risk Register)](docs/RISK_REGISTER.md)
+- [Phân tích Khoảng cách Kiến trúc (Gap Analysis)](docs/ARCHITECTURE_GAP_ANALYSIS.md)
+- [Trạng thái Dự án (Project State)](PROJECT_STATE.md)
 
 ---
 
-## 5. Quy tắc an toàn Production
+## 5. Quy tắc An toàn Tuyệt đối
 
 1. Tuyệt đối không commit file `.env` hoặc bất kỳ Secret/API Key nào lên Git.
 2. Không thực hiện migration phá hủy dữ liệu của các website hiện tại.
-3. Mọi tính năng mới phải đi qua quy trình:
-   `Inspect` → `Plan` → `Branch` → `Implement` → `Test` → `Human Approval` → `Deploy`.
+3. Không tự động deploy production qua CI. Mọi bản phát hành cần sự phê duyệt của con người.

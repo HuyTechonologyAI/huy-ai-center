@@ -9,6 +9,7 @@ export const WorkerEnvSchema = z.object({
   WORKER_HEARTBEAT_INTERVAL_MS: z.coerce.number().positive().default(10000),
   WORKER_CONCURRENCY: z.coerce.number().positive().default(2),
   WORKER_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  DISPATCHER_HEALTH_PORT: z.coerce.number().default(8080),
 
   // Optional AI backends
   OLLAMA_BASE_URL: z.string().url().default('http://127.0.0.1:11434'),

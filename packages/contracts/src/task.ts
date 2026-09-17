@@ -1,15 +1,22 @@
 import { z } from 'zod';
 
+// -----------------------------------------------------------------------------
+// 1. TASK STATUS ENUM
+// -----------------------------------------------------------------------------
 export const TaskStatusSchema = z.enum([
   'queued',
   'claimed',
   'running',
+  'waiting_approval',
   'completed',
   'failed',
-  'timeout',
+  'cancelled',
 ]);
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
+// -----------------------------------------------------------------------------
+// 2. TASK METADATA & PRIORITY
+// -----------------------------------------------------------------------------
 export const TaskPrioritySchema = z.enum(['low', 'normal', 'high', 'urgent']);
 export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
 
@@ -18,6 +25,7 @@ export const TaskTypeSchema = z.enum([
   'rag_query',
   'workflow_automation',
   'model_training',
+  'agent_execution',
 ]);
 export type TaskType = z.infer<typeof TaskTypeSchema>;
 
@@ -30,32 +38,73 @@ export const TaskSourceAppSchema = z.enum([
 ]);
 export type TaskSourceApp = z.infer<typeof TaskSourceAppSchema>;
 
+// -----------------------------------------------------------------------------
+// 3. TASK PAYLOAD & OUTPUT
+// -----------------------------------------------------------------------------
 export const TaskPayloadSchema = z.object({
   prompt: z.string().optional(),
   model: z.string().optional(),
   parameters: z.record(z.unknown()).default({}),
   workflowId: z.string().optional(),
+  agentId: z.string().optional(),
+  toolsAllowed: z.array(z.string()).optional(),
   inputs: z.record(z.unknown()).optional(),
   context: z.record(z.unknown()).optional(),
 });
 export type TaskPayload = z.infer<typeof TaskPayloadSchema>;
 
-export const TaskResultSchema = z.object({
-  output: z.unknown().optional(),
+export const AIOutputSchema = z.object({
   text: z.string().optional(),
-  tokensUsed: z
+  json: z.unknown().optional(),
+  output: z.unknown().optional(), // Alias for json
+  model: z.string().optional(),
+  tokens: z
     .object({
       prompt: z.number().optional(),
       completion: z.number().optional(),
       total: z.number().optional(),
     })
     .optional(),
-  executionTimeMs: z.number().optional(),
+  tokensUsed: z // Alias for tokens
+    .object({
+      prompt: z.number().optional(),
+      completion: z.number().optional(),
+      total: z.number().optional(),
+    })
+    .optional(),
+  latencyMs: z.number().optional(),
+  executionTimeMs: z.number().optional(), // Alias for latencyMs
+  finishReason: z.string().optional(),
   error: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
   meta: z.record(z.unknown()).optional(),
 });
-export type TaskResult = z.infer<typeof TaskResultSchema>;
+export type AIOutput = z.infer<typeof AIOutputSchema>;
 
+// Backward compatibility alias for TaskResult
+export const TaskResultSchema = AIOutputSchema;
+export type TaskResult = AIOutput;
+
+// -----------------------------------------------------------------------------
+// 4. TASK STEPS (Multi-step pipeline execution)
+// -----------------------------------------------------------------------------
+export const AITaskStepSchema = z.object({
+  id: z.string().uuid(),
+  taskId: z.string().uuid(),
+  stepNumber: z.number().int().positive(),
+  name: z.string().min(1),
+  status: TaskStatusSchema,
+  input: z.unknown().optional(),
+  output: z.unknown().optional(),
+  error: z.string().optional(),
+  startedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().optional(),
+});
+export type AITaskStep = z.infer<typeof AITaskStepSchema>;
+
+// -----------------------------------------------------------------------------
+// 5. AI TASK
+// -----------------------------------------------------------------------------
 export const AITaskSchema = z.object({
   id: z.string().uuid(),
   sourceApp: TaskSourceAppSchema,
@@ -63,7 +112,9 @@ export const AITaskSchema = z.object({
   priority: TaskPrioritySchema.default('normal'),
   status: TaskStatusSchema.default('queued'),
   payload: TaskPayloadSchema,
-  result: TaskResultSchema.nullable().optional(),
+  output: AIOutputSchema.nullable().optional(),
+  result: AIOutputSchema.nullable().optional(), // Database alias
+  steps: z.array(AITaskStepSchema).default([]),
   claimedByWorkerId: z.string().nullable().optional(),
   claimedAt: z.string().datetime().nullable().optional(),
   startedAt: z.string().datetime().nullable().optional(),
@@ -85,3 +136,18 @@ export const CreateTaskInputSchema = z.object({
   maxRetries: z.number().int().nonnegative().default(3),
 });
 export type CreateTaskInput = z.infer<typeof CreateTaskInputSchema>;
+
+// -----------------------------------------------------------------------------
+// 6. QUEUE MESSAGE (Decoupled messaging payload)
+// -----------------------------------------------------------------------------
+export const QueueMessageSchema = z.object({
+  messageId: z.string().uuid(),
+  taskId: z.string().uuid(),
+  sourceApp: TaskSourceAppSchema,
+  taskType: TaskTypeSchema,
+  priority: TaskPrioritySchema,
+  enqueuedAt: z.string().datetime(),
+  attempt: z.number().int().nonnegative().default(1),
+  payload: TaskPayloadSchema,
+});
+export type QueueMessage = z.infer<typeof QueueMessageSchema>;

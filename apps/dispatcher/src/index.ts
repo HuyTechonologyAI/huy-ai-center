@@ -8,6 +8,7 @@ import { LangflowAdapter } from './adapters/langflow.js';
 import { N8nAdapter } from './adapters/n8n.js';
 import { HeartbeatManager } from './heartbeat.js';
 import { QueuePoller } from './queue/poller.js';
+import { HealthServer } from './health.js';
 
 async function bootstrap() {
   const logger = rootLogger.child('DispatcherDaemon');
@@ -41,6 +42,21 @@ async function bootstrap() {
   const capabilities = Array.from(adapters.keys());
   logger.info(`Initialized adapters: ${capabilities.join(', ')}`);
 
+  let currentActiveJobs = 0;
+  let isReady = false;
+
+  // Initialize HTTP Health Check Server
+  const healthServer = new HealthServer(
+    {
+      port: env.DISPATCHER_HEALTH_PORT,
+      workerId: env.WORKER_NODE_ID,
+      getActiveJobs: () => currentActiveJobs,
+      isReady: () => isReady,
+    },
+    logger
+  );
+  await healthServer.start();
+
   // Initialize heartbeat manager
   const heartbeat = new HeartbeatManager(
     supabase,
@@ -63,21 +79,27 @@ async function bootstrap() {
       concurrency: env.WORKER_CONCURRENCY,
     },
     logger,
-    (activeCount) => heartbeat.setLoad(activeCount)
+    (activeCount) => {
+      currentActiveJobs = activeCount;
+      heartbeat.setLoad(activeCount);
+    }
   );
 
   // Register worker in DB & start services
   await heartbeat.register();
   heartbeat.start();
   poller.start();
+  isReady = true;
 
   logger.info('Worker is running and listening for AI tasks.');
 
   // Graceful shutdown handling
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Shutting down gracefully...`);
+    isReady = false;
     poller.stop();
     await heartbeat.stop();
+    await healthServer.stop();
     logger.info('Dispatcher stopped. Exiting.');
     process.exit(0);
   };
