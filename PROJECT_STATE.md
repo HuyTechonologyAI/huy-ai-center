@@ -5,81 +5,79 @@
 Trung tâm điều phối AI và quản trị hạ tầng điện toán tập trung cho Hệ sinh thái HUY TECHNOLOGY, kết nối 3 website hiện hữu (`huycncdsai.io.vn`, `gvcncdsai.io.vn`, `smarttax-ai.vercel.app`) cùng node AI nội bộ Dell Precision M4800 (`huy-ai-node-01`).
 
 ## CURRENT_PHASE
-Phase 03: Supabase Control Center Database (DONE — Sẵn sàng cho Staging, KHÔNG áp dụng lên Production)
+Phase 04: AI Task API Contract (DONE — Sẵn sàng tích hợp cho 3 Website, Mock Worker tested)
 
 ## CURRENT_BRANCH
-`feat/supabase-control-center`
+`feat/ai-task-contract`
 
 ---
 
 ## COMPLETED
-- [x] **Phase 01 — System Audit:** Kiểm toán READ-ONLY 3 website hiện hữu, lập tài liệu kiểm kê, kiến trúc hiện tại, quản trị rủi ro và gap analysis.
-- [x] **Phase 02 — AI Center Foundation:** Chuẩn hóa Monorepo, 10 Agent Skills, Contracts (8 thực thể, 7 trạng thái task), Dispatcher HTTP health server, Control Center tinh giản, CI workflow.
-- [x] **Phase 03 — Supabase Control Center Schema:**
-  - **Identity & Multi-tenancy:** Soạn thảo `profiles`, `organizations`, `organization_members` (hỗ trợ `individual`, `organization`, `school`, `business`).
-  - **Billing & Credits:** Soạn thảo `plans`, `subscriptions`, `credit_wallets`, `credit_transactions`.
-  - **AI Tasks & Pipeline:** Soạn thảo `ai_tasks`, `ai_task_steps`, `ai_outputs`.
-  - **AI Registry:** Soạn thảo `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`.
-  - **GitHub Radar:** Soạn thảo `github_projects`, `github_reviews`, `github_versions`.
-  - **Infrastructure:** Soạn thảo `nodes` (Dell M4800 `huy-ai-node-01` & cloud workers), `node_heartbeats`.
-  - **Governance:** Soạn thảo `audit_logs` bất biến.
-  - **Storage Design:** Cấu hình 5 buckets (`user-uploads`, `ai-outputs`, `knowledge`, `tool-assets`, `avatars`) kèm RLS policies.
-  - **PostgreSQL Native Queues (Zero-Redis V1):** Thiết lập `queue_messages` và hàm `claim_queue_message()` cho 4 hàng đợi (`ai-jobs`, `github-scan`, `notifications`, `maintenance`) sử dụng cơ chế `FOR UPDATE SKIP LOCKED`.
-- [x] **Tài liệu Kiến trúc & Thiết kế Phân hệ:**
-  - [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) (kèm Mermaid ER Diagram toàn diện).
-  - [docs/RLS_POLICY_MATRIX.md](docs/RLS_POLICY_MATRIX.md) (ma trận phân quyền chi tiết cho tất cả các bảng).
-  - [docs/STORAGE_DESIGN.md](docs/STORAGE_DESIGN.md) (đặc tả dung lượng, MIME và đường dẫn lưu trữ).
-  - [docs/QUEUE_DESIGN.md](docs/QUEUE_DESIGN.md) (kiến trúc hàng đợi phi tập trung Zero-Redis V1).
-- [x] **Kiểm tra Toàn vẹn Tĩnh (Static Validation):**
-  - Kịch bản `scripts/validate-sql.ps1` kiểm tra cú pháp 5 file SQL migration, bảo đảm UUID, primary key, timestamps, RLS enablement và 0 secret lộ lọt (100% PASS).
+- [x] **Phase 01 — System Audit:** Kiểm toán READ-ONLY 3 website hiện hữu, lập tài liệu kiểm kê, kiến trúc hiện tại, rủi ro và gap analysis.
+- [x] **Phase 02 — AI Center Foundation:** Monorepo, 10 Agent Skills, Contracts, Dispatcher HTTP health server, Control Center tinh giản, CI workflow.
+- [x] **Phase 03 — Supabase Control Center Schema:** SQL Migrations cho Identity, Billing, AI Tasks, Registry, GitHub Radar, Nodes, Storage và Postgres Native Queues.
+- [x] **Phase 04 — AI Task API Contract:**
+  - **Hệ thống 5 Endpoints Chuẩn hóa:**
+    - `POST /api/ai/tasks`: Tiếp nhận task (`source_app`, `task_type`, `input`, `options`) và trả về `{"task_id": "...", "status": "queued"}`.
+    - `GET /api/ai/tasks/:id`: Tra cứu trạng thái và tiến độ xử lý.
+    - `POST /api/ai/tasks/:id/cancel`: Hủy tác vụ đang xếp hàng.
+    - `GET /api/ai/tasks/:id/outputs`: Trích xuất kết quả đầu ra có cấu trúc (`AIOutput`).
+    - `GET /api/ai/history`: Tra cứu lịch sử tác vụ có phân trang và bộ lọc.
+  - **Zero-Trust Validation:** Xác thực Authentication & Authorization, kiểm tra hạn mức tín dụng (Credits/Quota check), giới hạn kích thước dữ liệu (Max 1MB).
+  - **Cơ chế Idempotency:** Header `Idempotency-Key` ngăn chặn tạo trùng lặp job khi trình duyệt hoặc client tự động thử lại.
+  - **Chuẩn hóa Error Model:** Thống nhất định dạng lỗi gồm `code`, `message`, `retryable`, `request_id`.
+  - **Tài liệu Kỹ thuật Chuẩn mực:**
+    - [docs/API_CONTRACT.md](docs/API_CONTRACT.md)
+    - [docs/ERROR_MODEL.md](docs/ERROR_MODEL.md)
+  - **Mock Worker Test Suite:**
+    - Hoàn thành suite kiểm thử `tests/ai-task-api.test.ts` mô phỏng đầy đủ chu trình vòng đời tác vụ (queued -> claimed -> completed / cancelled) mà không cần máy chủ Dell thật (6/6 tests PASS).
 
 ## IN_PROGRESS
-- Không có (Phase 03 đã hoàn thành đầy đủ).
+- Không có (Phase 04 đã hoàn thành toàn bộ yêu cầu).
 
 ## PENDING
-- [ ] Review & Human Approval cho toàn bộ thiết kế Database Schema Phase 03.
-- [ ] Review & Merge branch `feat/supabase-control-center` vào `main`.
-- [ ] Phase 04: Control Center Queue Management & Telemetry UI.
-- [ ] Phase 05: Dell Precision M4800 Onboarding & Local AI Dispatcher Integration.
+- [ ] Review & Human Approval cho toàn bộ Phase 04.
+- [ ] Review & Merge branch `feat/ai-task-contract` vào `main`.
+- [ ] Phase 05: Client SDK Integration Helper cho 3 website (hoặc Control Center Dashboard UI hoàn thiện).
+- [ ] Phase 06: Dell Precision M4800 Deployment Runbook & Physical Node Onboarding.
 
 ---
 
 ## DATABASE_STATE
-- **Production Supabase của 3 Website:** 100% nguyên vẹn (Zero-Touch Rule).
-- **Control Center Migrations (Staging/Dev Ready):**
-  - `20260917000001_create_ai_task_queue.sql`: Hàng đợi tác vụ cơ sở.
-  - `20260917000002_identity_and_billing.sql`: Identity, Multi-tenancy, Plans, Subscriptions, Wallets.
-  - `20260917000003_ai_tasks_and_registry.sql`: AI Tasks, Pipeline Steps, Outputs, Model & Tool Registry.
-  - `20260917000004_radar_infra_governance.sql`: GitHub Radar, Nodes, Telemetry, Audit Logs.
-  - `20260917000005_storage_and_queues.sql`: 5 Storage Buckets & 4 PostgreSQL Native Queues.
-- **Trạng thái:** Toàn bộ SQL nằm ở dạng tệp migration, **chưa áp dụng lên bất kỳ Production DB nào**.
+- **Production Supabase của 3 Website:** 100% nguyên vẹn (Zero-Touch).
+- **AI Task Queue Migrations:** Sẵn sàng cho Staging/Dev, lưu vết tại `supabase/migrations/` (5 tệp migration).
 
 ## API_STATE
-- Package `@huy-ai/contracts`: Đồng bộ 100% với schema `ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `agents`, `tools`.
-- Control Center `/api/tasks`: API route sẵn sàng.
-- Dispatcher `/health`, `/ready`: HTTP server port 8080 hoạt động.
+- Endpoints hoạt động tại `apps/control-center/src/app/api/ai/...`:
+  - `POST /api/ai/tasks`
+  - `GET /api/ai/tasks/:id`
+  - `POST /api/ai/tasks/:id/cancel`
+  - `GET /api/ai/tasks/:id/outputs`
+  - `GET /api/ai/history`
+- Package `@huy-ai/contracts`: Mở rộng thêm `CreateTaskRequestSchema`, `CreateTaskResponseSchema`, `StandardErrorSchema`, `TaskOutputsResponseSchema`, `TaskHistoryQuerySchema`.
 
 ## FRONTEND_STATE
-- `apps/control-center`: Next.js App Router, minimal dependencies, typecheck 0 lỗi.
+- `apps/control-center`: Next.js 15, tích hợp đầy đủ các API route handlers, typecheck 0 lỗi.
 
 ## WORKER_STATE
-- `apps/dispatcher`: 12-factor daemon, 4 AI adapters, health check server, graceful shutdown, typecheck 0 lỗi, tests pass.
+- `apps/dispatcher`: Sẵn sàng kết nối với Task Queue, có máy chủ HTTP Health check port 8080. Đã kiểm thử thành công qua Mock Worker logic.
 
 ---
 
 ## TEST_STATUS
-- **SQL Static Validation:** PASS (5/5 migration files đạt chuẩn UUID, RLS, Indexes, Constraints).
-- **Safety & Secret Scan:** PASS (0 file .env bị theo dõi, 0 secret lộ).
-- **TypeScript Compile:** PASS (0 lỗi trên toàn bộ 5 packages và apps).
-- **Unit Tests:** PASS (12/12 tests passed).
+- **Contracts Unit Tests:** PASS (14/14 tests).
+- **API Logic & Mock Worker Tests:** PASS (6/6 tests).
+- **Dispatcher Health Tests:** PASS (1/1 test).
+- **Shared Backoff Utility Tests:** PASS (3/3 tests).
+- **Tổng cộng:** 24/24 tests PASS (100% Passed).
 
 ## KNOWN_ISSUES
 - Không có.
 
 ## DECISIONS
-1. **Zero-Redis V1 Architecture:** Tận dụng triệt để tính năng `FOR UPDATE SKIP LOCKED` của PostgreSQL trên Supabase cho 4 hàng đợi (`ai-jobs`, `github-scan`, `notifications`, `maintenance`), loại bỏ chi phí vận hành và rủi ro mất kết nối Redis trong giai đoạn V1.
-2. **Modular Migrations:** Chia tách schema thành 5 tệp migration độc lập theo phân hệ chức năng, giúp việc kiểm tra, review và rollback dễ dàng, có cấu trúc rõ ràng.
-3. **No Production Apply:** Tuân thủ tuyệt đối quy tắc an toàn: Không apply SQL migration lên production Supabase khi chưa có sự phê duyệt riêng từ con người.
+1. **Next.js Server Route Handlers Choice:** Triển khai API trực tiếp trên Next.js App Router trong `apps/control-center` để tận dụng hạ tầng Vercel Serverless sẵn có, code chia sẻ type-safe với `@huy-ai/contracts` và không phát sinh thêm chi phí vận hành dịch vụ ngoài.
+2. **Strict Idempotency Mechanism:** Lưu vết Idempotency Key trong bộ nhớ đệm (TTL 10 phút) để bảo đảm việc người dùng bấm gửi nhiều lần hoặc mạng giật không tạo ra nhiều task trùng nhau.
+3. **Mock Worker Isolation:** Toàn bộ kiểm thử logic vòng đời task được thực hiện qua Mock Worker, tuyệt đối không phụ thuộc vào trạng thái vật lý của máy chủ Dell M4800.
 
 ## NEXT_ACTION
-Báo cáo kết quả hoàn thành Phase 03 và dừng lại chờ phê duyệt review từ người dùng.
+Báo cáo bàn giao Phase 04 cho người dùng và dừng lại chờ chỉ thị tiếp theo.
