@@ -24,10 +24,12 @@ ON CONFLICT (id) DO UPDATE SET
     public = EXCLUDED.public;
 
 -- 1.1 Storage RLS Policies: avatars (Public Read, Owner Write)
+DROP POLICY IF EXISTS "Public Read Avatars" ON storage.objects;
 CREATE POLICY "Public Read Avatars"
     ON storage.objects FOR SELECT TO public
     USING (bucket_id = 'avatars');
 
+DROP POLICY IF EXISTS "Users can upload their own avatar" ON storage.objects;
 CREATE POLICY "Users can upload their own avatar"
     ON storage.objects FOR INSERT TO authenticated
     WITH CHECK (
@@ -36,6 +38,7 @@ CREATE POLICY "Users can upload their own avatar"
     );
 
 -- 1.2 Storage RLS Policies: user-uploads (Private: Owner Read & Write)
+DROP POLICY IF EXISTS "Users can read own uploads" ON storage.objects;
 CREATE POLICY "Users can read own uploads"
     ON storage.objects FOR SELECT TO authenticated
     USING (
@@ -43,6 +46,7 @@ CREATE POLICY "Users can read own uploads"
         AND (storage.foldername(name))[1] = auth.uid()::text
     );
 
+DROP POLICY IF EXISTS "Users can upload own files" ON storage.objects;
 CREATE POLICY "Users can upload own files"
     ON storage.objects FOR INSERT TO authenticated
     WITH CHECK (
@@ -51,21 +55,25 @@ CREATE POLICY "Users can upload own files"
     );
 
 -- 1.3 Storage RLS Policies: ai-outputs (Authenticated Read for Task Owner)
+DROP POLICY IF EXISTS "Users can read ai outputs" ON storage.objects;
 CREATE POLICY "Users can read ai outputs"
     ON storage.objects FOR SELECT TO authenticated
     USING (bucket_id = 'ai-outputs');
 
 -- 1.4 Storage RLS Policies: knowledge (Authenticated Read)
+DROP POLICY IF EXISTS "Authenticated users can read knowledge docs" ON storage.objects;
 CREATE POLICY "Authenticated users can read knowledge docs"
     ON storage.objects FOR SELECT TO authenticated
     USING (bucket_id = 'knowledge');
 
 -- 1.5 Storage RLS Policies: tool-assets (Public Read)
+DROP POLICY IF EXISTS "Public can read tool assets" ON storage.objects;
 CREATE POLICY "Public can read tool assets"
     ON storage.objects FOR SELECT TO public
     USING (bucket_id = 'tool-assets');
 
 -- Service role full access to all buckets
+DROP POLICY IF EXISTS "Service role full access on storage" ON storage.objects;
 CREATE POLICY "Service role full access on storage"
     ON storage.objects FOR ALL TO service_role
     USING (true) WITH CHECK (true);
@@ -106,6 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_queue_messages_poll
 ALTER TABLE public.queue_messages ENABLE ROW LEVEL SECURITY;
 
 -- Service role only for queue processing
+DROP POLICY IF EXISTS "Service role full on queue_messages" ON public.queue_messages;
 CREATE POLICY "Service role full on queue_messages"
     ON public.queue_messages FOR ALL TO service_role USING (true);
 
@@ -115,7 +124,11 @@ CREATE OR REPLACE FUNCTION public.claim_queue_message(
     p_worker_id TEXT,
     p_batch_size INTEGER DEFAULT 1
 )
-RETURNS SETOF public.queue_messages AS $$
+RETURNS SETOF public.queue_messages
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
     v_ids UUID[];
 BEGIN
@@ -152,4 +165,4 @@ BEGIN
     END IF;
     RETURN;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;

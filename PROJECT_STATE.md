@@ -29,10 +29,10 @@ DEFERRED
 huy-ai-node-01
 
 ## CURRENT_PHASE
-Authoritative Patch V1.1 Reconciled (Phases 01 → 06 Verified)
+PHASE 06A — ARCHITECTURE RECONCILIATION COMPLETED (Master Architecture V1.1 Reconciled & Verified)
 
 ## CURRENT_BRANCH
-`feat/master-architecture-v1.1-cost-optimized`
+`main`
 
 ---
 
@@ -69,11 +69,15 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
-- [x] **Master Architecture Patch V1.1:**
-  - Kích hoạt `.agents/skills/11-cost-guard/SKILL.md` và `.agents/skills/12-infrastructure-budget-guard/SKILL.md`.
-  - Thiết lập bảng quản trị chi phí `docs/INFRASTRUCTURE_COSTS.md`.
+- [x] **Master Architecture Patch V1.1 & Phase 06A Reconciliation:**
+  - Lập tài liệu Gap Analysis: `docs/HUYAI_CONTROL_CENTER_GAP_ANALYSIS.md`.
+  - Lập tài liệu Security Baseline: `docs/HUYAI_SECURITY_BASELINE.md`.
+  - Lập Báo cáo Reconciliation hoàn chỉnh: `docs/V1_1_RECONCILIATION_REPORT.md`.
+  - Refactor toàn bộ migrations (`20260917000001` - `20260917000005`): bảo đảm tính lũy tích (additive), không phá vỡ dữ liệu cũ, gắn `DROP POLICY IF EXISTS`, bổ sung `SET search_path = public, pg_temp` cho `SECURITY DEFINER` functions.
   - Ban hành `docs/architecture/ADR-001-supabase-control-center.md` (Hủy bỏ `huy-ai-center-prod`, chọn mở rộng `HuyAI` Singapore).
   - Ban hành `docs/architecture/ADR-002-cost-optimized-v1.md` (Hoãn lại Redis, LiteLLM, OpenHands, GPU Cloud, VPS mới).
+  - Kích hoạt `.agents/skills/11-cost-guard/SKILL.md` và `.agents/skills/12-infrastructure-budget-guard/SKILL.md`.
+  - Thiết lập bảng quản trị chi phí `docs/INFRASTRUCTURE_COSTS.md`.
 - [x] **Phase 01 — System Audit:** Kiểm toán READ-ONLY 3 website hiện hữu, lập tài liệu kiểm kê, kiến trúc hiện tại, rủi ro và gap analysis.
 - [x] **Phase 02 — AI Center Foundation:** Monorepo, 12 Agent Skills, Contracts, Dispatcher HTTP health server, Control Center tinh giản, CI workflow.
 - [x] **Phase 03 — Supabase Control Center Schema:** SQL Migrations cho Identity, Billing, AI Tasks, Registry, GitHub Radar, Nodes, Storage và Postgres Native Queues (Zero-Redis).
@@ -85,12 +89,11 @@ WITHIN_BUDGET
   - Production Dockerfile (Alpine, non-root, dumb-init, healthcheck) và hướng dẫn `docs/COOLIFY_DEPLOYMENT.md`.
 
 ## IN_PROGRESS
-- Không có (Toàn bộ điều chỉnh V1.1 đã được đồng bộ).
+- Không có (Toàn bộ điều chỉnh Phase 06A V1.1 đã được đồng bộ & verify).
 
 ## PENDING
-- [ ] Review & Human Approval cho Master Architecture V1.1 Patch.
-- [ ] Merge branch `feat/master-architecture-v1.1-cost-optimized` vào `main`.
-- [ ] Tiến hành bước tiếp theo theo định hướng của Lead Architect / Sponsor.
+- [ ] Review & Human Approval cho Master Architecture V1.1 Patch & Migration Plans.
+- [ ] Tiến hành Phase 07 (Integration & Deployment Preparation) theo chỉ dẫn tiếp theo.
 
 ---
 

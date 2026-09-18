@@ -63,7 +63,9 @@ CREATE INDEX IF NOT EXISTS idx_ai_task_logs_task_id ON public.ai_task_logs (task
 
 -- 4. Atomic Task Claim Procedure (Race condition safe)
 CREATE OR REPLACE FUNCTION public.claim_ai_task(p_worker_id TEXT)
-RETURNS SETOF public.ai_tasks AS $$
+RETURNS SETOF public.ai_tasks 
+SET search_path = public, pg_temp
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
     v_task_id UUID;
 BEGIN
@@ -95,7 +97,7 @@ BEGIN
     END IF;
     RETURN;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 5. Row-Level Security (RLS) Enablement
 ALTER TABLE public.ai_worker_nodes ENABLE ROW LEVEL SECURITY;
@@ -103,15 +105,19 @@ ALTER TABLE public.ai_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_task_logs ENABLE ROW LEVEL SECURITY;
 
 -- Service role has full access
+DROP POLICY IF EXISTS "Service role full access on ai_worker_nodes" ON public.ai_worker_nodes;
 CREATE POLICY "Service role full access on ai_worker_nodes"
     ON public.ai_worker_nodes FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Service role full access on ai_tasks" ON public.ai_tasks;
 CREATE POLICY "Service role full access on ai_tasks"
     ON public.ai_tasks FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Service role full access on ai_task_logs" ON public.ai_task_logs;
 CREATE POLICY "Service role full access on ai_task_logs"
     ON public.ai_task_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- Public read access to worker node statuses (safe metadata only)
+DROP POLICY IF EXISTS "Public read worker nodes" ON public.ai_worker_nodes;
 CREATE POLICY "Public read worker nodes"
     ON public.ai_worker_nodes FOR SELECT TO anon USING (true);

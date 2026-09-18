@@ -199,15 +199,29 @@ ALTER TABLE public.ai_task_steps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_outputs ENABLE ROW LEVEL SECURITY;
 
 -- Registry tables: Public / Authenticated read-only
+DROP POLICY IF EXISTS "Public can view active providers" ON public.ai_providers;
 CREATE POLICY "Public can view active providers" ON public.ai_providers FOR SELECT TO authenticated, anon USING (is_active = true);
+
+DROP POLICY IF EXISTS "Public can view active models" ON public.ai_models;
 CREATE POLICY "Public can view active models" ON public.ai_models FOR SELECT TO authenticated, anon USING (is_active = true);
+
+DROP POLICY IF EXISTS "Public can view active tools" ON public.tools;
 CREATE POLICY "Public can view active tools" ON public.tools FOR SELECT TO authenticated, anon USING (is_active = true);
+
+DROP POLICY IF EXISTS "Public can view tool versions" ON public.tool_versions;
 CREATE POLICY "Public can view tool versions" ON public.tool_versions FOR SELECT TO authenticated, anon USING (is_deprecated = false);
+
+DROP POLICY IF EXISTS "Public can view tool capabilities" ON public.tool_capabilities;
 CREATE POLICY "Public can view tool capabilities" ON public.tool_capabilities FOR SELECT TO authenticated, anon USING (true);
+
+DROP POLICY IF EXISTS "Public can view active agents" ON public.agents;
 CREATE POLICY "Public can view active agents" ON public.agents FOR SELECT TO authenticated, anon USING (is_active = true);
+
+DROP POLICY IF EXISTS "Public can view agent versions" ON public.agent_versions;
 CREATE POLICY "Public can view agent versions" ON public.agent_versions FOR SELECT TO authenticated, anon USING (true);
 
 -- AI Tasks: Users can view their own tasks or their organization tasks
+DROP POLICY IF EXISTS "Users can view own or org tasks" ON public.ai_tasks;
 CREATE POLICY "Users can view own or org tasks"
     ON public.ai_tasks FOR SELECT TO authenticated
     USING (
@@ -215,6 +229,7 @@ CREATE POLICY "Users can view own or org tasks"
         (organization_id IS NOT NULL AND public.is_org_member(organization_id))
     );
 
+DROP POLICY IF EXISTS "Users can insert tasks for own or org" ON public.ai_tasks;
 CREATE POLICY "Users can insert tasks for own or org"
     ON public.ai_tasks FOR INSERT TO authenticated
     WITH CHECK (
@@ -223,6 +238,7 @@ CREATE POLICY "Users can insert tasks for own or org"
     );
 
 -- Task steps & Outputs: Inherit read permission from parent task
+DROP POLICY IF EXISTS "Users can view task steps of own tasks" ON public.ai_task_steps;
 CREATE POLICY "Users can view task steps of own tasks"
     ON public.ai_task_steps FOR SELECT TO authenticated
     USING (EXISTS (
@@ -231,6 +247,7 @@ CREATE POLICY "Users can view task steps of own tasks"
           AND (t.profile_id = auth.uid() OR (t.organization_id IS NOT NULL AND public.is_org_member(t.organization_id)))
     ));
 
+DROP POLICY IF EXISTS "Users can view outputs of own tasks" ON public.ai_outputs;
 CREATE POLICY "Users can view outputs of own tasks"
     ON public.ai_outputs FOR SELECT TO authenticated
     USING (EXISTS (
@@ -240,13 +257,33 @@ CREATE POLICY "Users can view outputs of own tasks"
     ));
 
 -- Full access for service_role
+DROP POLICY IF EXISTS "Service role full on ai_providers" ON public.ai_providers;
 CREATE POLICY "Service role full on ai_providers" ON public.ai_providers FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on ai_models" ON public.ai_models;
 CREATE POLICY "Service role full on ai_models" ON public.ai_models FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on tools" ON public.tools;
 CREATE POLICY "Service role full on tools" ON public.tools FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on tool_versions" ON public.tool_versions;
 CREATE POLICY "Service role full on tool_versions" ON public.tool_versions FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on tool_capabilities" ON public.tool_capabilities;
 CREATE POLICY "Service role full on tool_capabilities" ON public.tool_capabilities FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on agents" ON public.agents;
 CREATE POLICY "Service role full on agents" ON public.agents FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on agent_versions" ON public.agent_versions;
 CREATE POLICY "Service role full on agent_versions" ON public.agent_versions FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on ai_tasks" ON public.ai_tasks;
 CREATE POLICY "Service role full on ai_tasks" ON public.ai_tasks FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on ai_task_steps" ON public.ai_task_steps;
 CREATE POLICY "Service role full on ai_task_steps" ON public.ai_task_steps FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on ai_outputs" ON public.ai_outputs;
 CREATE POLICY "Service role full on ai_outputs" ON public.ai_outputs FOR ALL TO service_role USING (true);
+

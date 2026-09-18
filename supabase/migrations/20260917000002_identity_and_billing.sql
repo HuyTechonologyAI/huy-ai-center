@@ -152,7 +152,12 @@ ALTER TABLE public.credit_transactions ENABLE ROW LEVEL SECURITY;
 
 -- Helper function: check if authenticated user belongs to organization with required roles
 CREATE OR REPLACE FUNCTION public.is_org_member(org_id UUID, required_roles TEXT[] DEFAULT ARRAY['owner', 'admin', 'member'])
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     RETURN EXISTS (
         SELECT 1 FROM public.organization_members
@@ -161,40 +166,48 @@ BEGIN
           AND role = ANY(required_roles)
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+$$;
 
 -- Profiles: Users can view & edit their own profile; public can read basic info
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
     ON public.profiles FOR SELECT TO authenticated USING (id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
     ON public.profiles FOR UPDATE TO authenticated USING (id = auth.uid()) WITH CHECK (id = auth.uid());
 
 -- Organizations: Members can view their organizations
+DROP POLICY IF EXISTS "Members can view their organization" ON public.organizations;
 CREATE POLICY "Members can view their organization"
     ON public.organizations FOR SELECT TO authenticated
     USING (public.is_org_member(id));
 
+DROP POLICY IF EXISTS "Admins can update their organization" ON public.organizations;
 CREATE POLICY "Admins can update their organization"
     ON public.organizations FOR UPDATE TO authenticated
     USING (public.is_org_member(id, ARRAY['owner', 'admin']))
     WITH CHECK (public.is_org_member(id, ARRAY['owner', 'admin']));
 
 -- Organization Members: Members can view who is in their org
+DROP POLICY IF EXISTS "Members can view other members in org" ON public.organization_members;
 CREATE POLICY "Members can view other members in org"
     ON public.organization_members FOR SELECT TO authenticated
     USING (public.is_org_member(organization_id));
 
 -- Plans: Public readable
+DROP POLICY IF EXISTS "Anyone can view active plans" ON public.plans;
 CREATE POLICY "Anyone can view active plans"
     ON public.plans FOR SELECT TO authenticated, anon USING (is_active = true);
 
 -- Credit Wallets: Owners/Members can view their wallet
+DROP POLICY IF EXISTS "Users can view personal credit wallet" ON public.credit_wallets;
 CREATE POLICY "Users can view personal credit wallet"
     ON public.credit_wallets FOR SELECT TO authenticated
     USING (profile_id = auth.uid() OR public.is_org_member(organization_id));
 
 -- Credit Transactions: Read-only for wallet owners
+DROP POLICY IF EXISTS "Users can view credit transactions" ON public.credit_transactions;
 CREATE POLICY "Users can view credit transactions"
     ON public.credit_transactions FOR SELECT TO authenticated
     USING (EXISTS (
@@ -204,10 +217,23 @@ CREATE POLICY "Users can view credit transactions"
     ));
 
 -- Service role bypass on all tables
+DROP POLICY IF EXISTS "Service role full access on profiles" ON public.profiles;
 CREATE POLICY "Service role full access on profiles" ON public.profiles FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on organizations" ON public.organizations;
 CREATE POLICY "Service role full access on organizations" ON public.organizations FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on organization_members" ON public.organization_members;
 CREATE POLICY "Service role full access on organization_members" ON public.organization_members FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on plans" ON public.plans;
 CREATE POLICY "Service role full access on plans" ON public.plans FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on subscriptions" ON public.subscriptions;
 CREATE POLICY "Service role full access on subscriptions" ON public.subscriptions FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on credit_wallets" ON public.credit_wallets;
 CREATE POLICY "Service role full access on credit_wallets" ON public.credit_wallets FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on credit_transactions" ON public.credit_transactions;
 CREATE POLICY "Service role full access on credit_transactions" ON public.credit_transactions FOR ALL TO service_role USING (true);

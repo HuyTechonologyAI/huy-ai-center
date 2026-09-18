@@ -103,23 +103,28 @@ CREATE INDEX IF NOT EXISTS idx_node_heartbeats_node_time ON public.node_heartbea
 -- 3. GOVERNANCE (Tamper-Evident Security Audit Logs)
 -- -----------------------------------------------------------------------------
 
--- 3.1 Audit Logs Table
+-- 3.1 Audit Logs Table (Safely extends existing HuyAI table or creates if absent)
 CREATE TABLE IF NOT EXISTS public.audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    actor_profile_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-    organization_id UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
-    action TEXT NOT NULL,
-    entity_type TEXT NOT NULL,
-    entity_id TEXT,
-    previous_data JSONB,
-    new_data JSONB,
-    ip_address TEXT,
-    user_agent TEXT,
-    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    action_type TEXT,
+    target_resource TEXT,
+    details JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
-COMMENT ON TABLE public.audit_logs IS 'Append-only audit log tracking security, billing, and administrative actions';
+-- Safely extend with AI Center governance columns without overwriting existing data
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS actor_profile_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES public.organizations(id) ON DELETE SET NULL;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS action TEXT;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS entity_type TEXT;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS entity_id TEXT;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS previous_data JSONB;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS new_data JSONB;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS ip_address TEXT;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+COMMENT ON TABLE public.audit_logs IS 'Append-only audit log tracking security, billing, administrative, and AI Center actions';
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON public.audit_logs (actor_profile_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_org ON public.audit_logs (organization_id, created_at DESC);
@@ -137,24 +142,30 @@ ALTER TABLE public.node_heartbeats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- GitHub Radar: Authenticated users can view monitored projects and reviews
+DROP POLICY IF EXISTS "Authenticated users can view github projects" ON public.github_projects;
 CREATE POLICY "Authenticated users can view github projects"
     ON public.github_projects FOR SELECT TO authenticated USING (is_monitored = true);
 
+DROP POLICY IF EXISTS "Authenticated users can view github reviews" ON public.github_reviews;
 CREATE POLICY "Authenticated users can view github reviews"
     ON public.github_reviews FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can view github versions" ON public.github_versions;
 CREATE POLICY "Authenticated users can view github versions"
     ON public.github_versions FOR SELECT TO authenticated USING (true);
 
 -- Nodes: Authenticated can view node status (safe metadata only)
+DROP POLICY IF EXISTS "Authenticated users can view compute nodes" ON public.nodes;
 CREATE POLICY "Authenticated users can view compute nodes"
     ON public.nodes FOR SELECT TO authenticated USING (true);
 
 -- Node Heartbeats: Read-only for authenticated
+DROP POLICY IF EXISTS "Authenticated users can view node telemetry" ON public.node_heartbeats;
 CREATE POLICY "Authenticated users can view node telemetry"
     ON public.node_heartbeats FOR SELECT TO authenticated USING (true);
 
 -- Audit Logs: Members can view logs of their own organization; Users can view their own actor logs
+DROP POLICY IF EXISTS "Users can view relevant audit logs" ON public.audit_logs;
 CREATE POLICY "Users can view relevant audit logs"
     ON public.audit_logs FOR SELECT TO authenticated
     USING (
@@ -163,9 +174,20 @@ CREATE POLICY "Users can view relevant audit logs"
     );
 
 -- Full access for service_role
+DROP POLICY IF EXISTS "Service role full on github_projects" ON public.github_projects;
 CREATE POLICY "Service role full on github_projects" ON public.github_projects FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on github_reviews" ON public.github_reviews;
 CREATE POLICY "Service role full on github_reviews" ON public.github_reviews FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on github_versions" ON public.github_versions;
 CREATE POLICY "Service role full on github_versions" ON public.github_versions FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on nodes" ON public.nodes;
 CREATE POLICY "Service role full on nodes" ON public.nodes FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on node_heartbeats" ON public.node_heartbeats;
 CREATE POLICY "Service role full on node_heartbeats" ON public.node_heartbeats FOR ALL TO service_role USING (true);
+
+DROP POLICY IF EXISTS "Service role full on audit_logs" ON public.audit_logs;
 CREATE POLICY "Service role full on audit_logs" ON public.audit_logs FOR ALL TO service_role USING (true);
