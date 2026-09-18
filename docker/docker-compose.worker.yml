@@ -19,22 +19,20 @@ services:
       - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-2}
       - AI_PROVIDER_MODE=${AI_PROVIDER_MODE:-mock}
       - DISPATCHER_HEALTH_PORT=8080
-    ports:
-      - "127.0.0.1:8080:8080"
       - OLLAMA_BASE_URL=http://ollama:11434
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
       - LANGFLOW_BASE_URL=http://langflow:7860
       - LANGFLOW_API_KEY=${LANGFLOW_API_KEY}
       - N8N_BASE_URL=http://n8n:5678
       - N8N_API_KEY=${N8N_API_KEY}
+    ports:
+      - "127.0.0.1:8080:8080"
     depends_on:
       - ollama
     networks:
       - huy-ai-internal
 
   # ----------------------------------------------------------------------------
-  # 2. Ollama Local LLM Service
+  # 2. Ollama Local LLM Service (Lightweight classification, metadata, RAG)
   # ----------------------------------------------------------------------------
   ollama:
     image: ollama/ollama:latest
@@ -48,21 +46,25 @@ services:
       - huy-ai-internal
 
   # ----------------------------------------------------------------------------
-  # 3. LiteLLM Proxy / Router
+  # 3. Langflow Orchestrator (Visual workflow & agent builder)
   # ----------------------------------------------------------------------------
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    container_name: huy-ai-litellm
+  langflow:
+    image: logspace/langflow:latest
+    container_name: huy-ai-langflow
     restart: unless-stopped
     ports:
-      - "127.0.0.1:4000:4000"
+      - "127.0.0.1:7860:7860"
     environment:
-      - LITELLM_MASTER_KEY=${LITELLM_API_KEY:-sk-litellm-placeholder}
+      - LANGFLOW_HOST=0.0.0.0
+      - LANGFLOW_PORT=7860
+      - LANGFLOW_AUTO_SAVING=true
+    volumes:
+      - langflow_data:/app/langflow
     networks:
       - huy-ai-internal
 
   # ----------------------------------------------------------------------------
-  # 4. n8n Automation Engine
+  # 4. n8n Internal Automation Engine (Internal tasks, cron, backup, monitoring)
   # ----------------------------------------------------------------------------
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
@@ -80,10 +82,25 @@ services:
     networks:
       - huy-ai-internal
 
+  # ----------------------------------------------------------------------------
+  # 5. LiteLLM Proxy [DEFERRED IN V1.1 - UNCOMMENT IN V2 IF REQUIRED]
+  # ----------------------------------------------------------------------------
+  # litellm:
+  #   image: ghcr.io/berriai/litellm:main-latest
+  #   container_name: huy-ai-litellm
+  #   restart: unless-stopped
+  #   ports:
+  #     - "127.0.0.1:4000:4000"
+  #   environment:
+  #     - LITELLM_MASTER_KEY=${LITELLM_API_KEY:-sk-litellm-placeholder}
+  #   networks:
+  #     - huy-ai-internal
+
 networks:
   huy-ai-internal:
     driver: bridge
 
 volumes:
   ollama_data:
+  langflow_data:
   n8n_data:
