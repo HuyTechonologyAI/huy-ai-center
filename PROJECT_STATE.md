@@ -29,7 +29,7 @@ DEFERRED
 huy-ai-node-01
 
 ## CURRENT_PHASE
-PHASE 06A — ARCHITECTURE RECONCILIATION COMPLETED (Master Architecture V1.1 Reconciled & Verified)
+PHASE 06B — HUYAI CONTROL CENTER DATABASE PREPARATION COMPLETED (Pending Human Approval to Apply)
 
 ## CURRENT_BRANCH
 `main`
@@ -49,7 +49,7 @@ PHASE 06A — ARCHITECTURE RECONCILIATION COMPLETED (Master Architecture V1.1 Re
 - Gemini API (Pay-as-you-go, dự báo $0 – $15.00/tháng theo lượng dùng thực tế).
 
 ### Free services:
-- Dell Precision M4800 (`huy-ai-node-01` On-Premises, chi phí phần cứng tự sở hữu)
+- Dell Precision M4800 (`huy-ai-node-01` On-Premises, chi phí phần cứng tự sở hữu - Đã cài Coolify, Traefik, Cloudflare Tunnel, ops.huycncdsai.io.vn)
 - Coolify (Self-hosted trên Dell M4800 - Miễn phí)
 - Langflow (Self-hosted trên Dell M4800 - Miễn phí)
 - n8n Internal (Self-hosted trên Dell M4800 - Miễn phí)
@@ -61,7 +61,7 @@ PHASE 06A — ARCHITECTURE RECONCILIATION COMPLETED (Master Architecture V1.1 Re
 - Biên độ an toàn tối đa: <= $30.00 USD / tháng.
 
 ### New cost introduced in current phase:
-- $0.00 USD (Không phát sinh bất kỳ chi phí mới nào).
+- $0.00 USD (Không phát sinh bất kỳ chi phí mới nào. Zero Redis, Zero new Supabase projects, Zero new databases).
 
 ### Budget status:
 WITHIN_BUDGET
@@ -69,37 +69,46 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] **Phase 06B — HuyAI Control Center Database Preparation:**
+  - Kiểm toán READ-ONLY trực tiếp cơ sở dữ liệu `HuyAI` Singapore (`bdeluacbzbdflxubhpha`): xác định chính xác 13 bảng sản xuất đang chạy (`resources`, `videos`, `contacts`, `leads`, `student_points_balance`, `daily_tasks`, `task_completions`, `user_document_progress`, `user_video_progress`, `knowledge_chunks`, `item_reviews`, `orders`, `audit_logs`).
+  - Xác nhận `pgvector` đang hoạt động, `pgmq` chưa kích hoạt, chưa có lịch sử migration trên HuyAI.
+  - Ban hành 4 tài liệu thiết kế & an toàn bắt buộc:
+    - `docs/HUYAI_FINAL_SCHEMA_PLAN.md` (Kế hoạch schema mở rộng, nguyên tắc chống trùng lặp dữ liệu)
+    - `docs/HUYAI_MIGRATION_PLAN.md` (Trình tự migration an toàn, pre/post-checks, rollback notes chi tiết)
+    - `docs/HUYAI_RLS_MATRIX.md` (Ma trận RLS 100% bảng, kiểm soát quyền server-side, bảo vệ search_path)
+    - `docs/HUYAI_QUEUE_PLAN.md` (Kiến trúc hàng đợi 2 tầng: pgmq ưu tiên + Postgres native queue fallback)
+  - Chuẩn bị 5 tệp SQL migration an toàn, lũy tích, không phá hủy dữ liệu (`supabase/migrations/`):
+    - `20260920000001_ai_operations.sql`
+    - `20260920000002_infrastructure.sql`
+    - `20260920000003_ai_registry.sql`
+    - `20260920000004_github_radar.sql`
+    - `20260920000005_queue_and_governance.sql`
+  - Chống trùng lặp 100%: Tái sử dụng `auth.users`, `student_points_balance`, `orders`, `knowledge_chunks`, mở rộng không phá hủy `audit_logs`.
+  - Xác thực tĩnh SQL (`validate-sql.ps1`) và chạy kiểm thử an toàn (`verify-safety.ps1`): PASS 100% (30/30 unit tests pass, typecheck 5 workspaces pass, 0 secrets).
 - [x] **Master Architecture Patch V1.1 & Phase 06A Reconciliation:**
-  - Lập tài liệu Gap Analysis: `docs/HUYAI_CONTROL_CENTER_GAP_ANALYSIS.md`.
-  - Lập tài liệu Security Baseline: `docs/HUYAI_SECURITY_BASELINE.md`.
-  - Lập Báo cáo Reconciliation hoàn chỉnh: `docs/V1_1_RECONCILIATION_REPORT.md`.
-  - Refactor toàn bộ migrations (`20260917000001` - `20260917000005`): bảo đảm tính lũy tích (additive), không phá vỡ dữ liệu cũ, gắn `DROP POLICY IF EXISTS`, bổ sung `SET search_path = public, pg_temp` cho `SECURITY DEFINER` functions.
-  - Ban hành `docs/architecture/ADR-001-supabase-control-center.md` (Hủy bỏ `huy-ai-center-prod`, chọn mở rộng `HuyAI` Singapore).
-  - Ban hành `docs/architecture/ADR-002-cost-optimized-v1.md` (Hoãn lại Redis, LiteLLM, OpenHands, GPU Cloud, VPS mới).
-  - Kích hoạt `.agents/skills/11-cost-guard/SKILL.md` và `.agents/skills/12-infrastructure-budget-guard/SKILL.md`.
-  - Thiết lập bảng quản trị chi phí `docs/INFRASTRUCTURE_COSTS.md`.
-- [x] **Phase 01 — System Audit:** Kiểm toán READ-ONLY 3 website hiện hữu, lập tài liệu kiểm kê, kiến trúc hiện tại, rủi ro và gap analysis.
-- [x] **Phase 02 — AI Center Foundation:** Monorepo, 12 Agent Skills, Contracts, Dispatcher HTTP health server, Control Center tinh giản, CI workflow.
-- [x] **Phase 03 — Supabase Control Center Schema:** SQL Migrations cho Identity, Billing, AI Tasks, Registry, GitHub Radar, Nodes, Storage và Postgres Native Queues (Zero-Redis).
-- [x] **Phase 04 — AI Task API Contract:** 5 Endpoints API (`/tasks`, `/:id`, `/:id/cancel`, `/:id/outputs`, `/history`), Idempotency key, Standard error model, Mock Worker tests (24/24 tests PASS).
-- [x] **Phase 05 — Control Center Web Application:** Dashboard, Teacher AI form chuẩn CV 5512, Job UI theo dõi 4 trạng thái, các màn hình Projects, Files, Credits, Account (14/14 routes Next.js compile thành công).
-- [x] **Phase 06 — Dell Dispatcher Worker:**
-  - `MockAdapter` sinh giáo án CV 5512, slide, trắc nghiệm 4 mức độ, báo cáo thuế; cấu hình `AI_PROVIDER_MODE=mock`.
-  - Task Router & Result Handler, Queue Poller & Lease Renewal, Node Heartbeat.
-  - Production Dockerfile (Alpine, non-root, dumb-init, healthcheck) và hướng dẫn `docs/COOLIFY_DEPLOYMENT.md`.
+  - Lập Gap Analysis `docs/HUYAI_CONTROL_CENTER_GAP_ANALYSIS.md`, `docs/HUYAI_SECURITY_BASELINE.md`, `docs/V1_1_RECONCILIATION_REPORT.md`.
+  - Ban hành ADR-001 (Consolidate HuyAI) và ADR-002 (Cost-Optimized V1).
+  - Kích hoạt agent skills và bảng chi phí `docs/INFRASTRUCTURE_COSTS.md`.
+- [x] **Phase 01 — System Audit:** Kiểm toán READ-ONLY 3 website hiện hữu.
+- [x] **Phase 02 — AI Center Foundation:** Monorepo, contracts, shared utils, CI workflow.
+- [x] **Phase 03 — Supabase Control Center Schema:** Khung thiết kế sơ bộ các bảng điều khiển trung tâm.
+- [x] **Phase 04 — AI Task API Contract:** 5 Endpoints API, Idempotency key, Standard error model.
+- [x] **Phase 05 — Control Center Web Application:** Dashboard Next.js 15, Teacher AI form chuẩn CV 5512.
+- [x] **Phase 06 — Dell Dispatcher Worker:** Worker daemon, MockAdapter, TaskRouter, ResultHandler, Dockerfile.
 
 ## IN_PROGRESS
-- Không có (Toàn bộ điều chỉnh Phase 06A V1.1 đã được đồng bộ & verify).
+- Không có (Phase 06B hoàn thành toàn diện, đang DỪNG chờ phê duyệt trước khi apply lên database).
 
 ## PENDING
-- [ ] Review & Human Approval cho Master Architecture V1.1 Patch & Migration Plans.
-- [ ] Tiến hành Phase 07 (Integration & Deployment Preparation) theo chỉ dẫn tiếp theo.
+- [ ] Review & Human Approval từ Lead Architect / Sponsor đối với 5 tệp SQL migration và Kế hoạch Migration HuyAI.
+- [ ] Tiến hành bước tiếp theo (Phase 07 — Integration & Deployment Preparation hoặc chỉ thị riêng).
 
 ---
 
 ## DATABASE_STATE
-- **Production Supabase của 3 Website:** 100% nguyên vẹn (Zero-Touch).
-- **HuyAI Singapore Control Center Migrations:** Sẵn sàng cho Staging/Dev, lưu vết tại `supabase/migrations/` (5 tệp migration, sử dụng Postgres Native Queues thay cho Redis).
+- **Production Supabase của 3 Website:** 100% nguyên vẹn (Zero-Touch, chưa chạy bất kỳ lệnh DDL nào).
+- **13 Bảng Sản Xuất Hiện Hữu tại HuyAI:** `resources`, `videos`, `contacts`, `leads`, `student_points_balance`, `daily_tasks`, `task_completions`, `user_document_progress`, `user_video_progress`, `knowledge_chunks`, `item_reviews`, `orders`, `audit_logs`.
+- **HuyAI Control Center Migrations Chuẩn Bị:** 5 tệp SQL an toàn (`20260920000001` - `20260920000005`) tại `supabase/migrations/` sẵn sàng apply ngay sau khi được con người phê duyệt.
 
 ## API_STATE
 - Endpoints hoạt động tại `apps/control-center/src/app/api/ai/...`:
@@ -118,6 +127,7 @@ WITHIN_BUDGET
 ---
 
 ## TEST_STATUS
+- **SQL Migration Static Validation:** PASS (5/5 migrations tuân thủ UUID, timestamps, search_path, RLS, no secrets, non-destructive).
 - **Contracts Unit Tests:** PASS (14/14 tests).
 - **API Logic Tests:** PASS (6/6 tests).
 - **Dispatcher Tests:** PASS (7/7 tests).
@@ -130,9 +140,10 @@ WITHIN_BUDGET
 - Không có.
 
 ## DECISIONS
-1. **Existing HuyAI Consolidation:** Hủy dự án mới `huy-ai-center-prod`, mở rộng dự án `HuyAI` Singapore để giảm chi phí và tránh trùng lặp auth/data.
-2. **Cost-Optimized V1:** Hoãn lại Redis, LiteLLM, OpenHands, GPU Cloud; duy trì ngân sách đám mây <= $30 USD/tháng.
-3. **Dell Precision M4800 Role:** Nút tính toán nội bộ cho điều phối, hàng đợi, tự động hóa, tác vụ AI nhẹ; không ép chạy mô hình nặng cục bộ.
+1. **Existing HuyAI Consolidation:** Không tạo Supabase project mới; chuẩn bị migration mở rộng trực tiếp trên dự án `HuyAI` Singapore (`bdeluacbzbdflxubhpha`).
+2. **Cost-Optimized V1 & Dual Queue:** Ưu tiên `pgmq` queue `ai-jobs` nếu được hỗ trợ, kèm fallback chắc chắn bằng bảng `queue_messages` và `FOR UPDATE SKIP LOCKED` (Zero-Redis, Zero-Upstash, $0 chi phí).
+3. **Chống Trùng Lặp Nghiệp Vụ:** Không tạo bảng `users` (dùng `auth.users`), không tạo bảng ví điểm mới làm sai lệch `student_points_balance`, tái sử dụng `orders` và mở rộng an toàn `audit_logs`.
+4. **Dell Precision M4800 Role:** Nút tính toán nội bộ (`huy-ai-node-01`) chạy Coolify, Traefik, Cloudflare Tunnel, ops.huycncdsai.io.vn; đảm nhiệm worker điều phối và Langflow.
 
 ## NEXT_ACTION
-Báo cáo hoàn thành tích hợp Master Architecture V1.1 Patch cho Lead Architect theo Rule 12.
+DỪNG LẠI và chờ phê duyệt chính thức của Lead Architect trước khi thực hiện bất kỳ lệnh áp dụng nào lên cơ sở dữ liệu HuyAI Singapore.
