@@ -61,24 +61,17 @@ COMMENT ON TABLE public.github_versions IS 'Release tags, changelogs, and versio
 CREATE INDEX IF NOT EXISTS idx_github_versions_project ON public.github_versions (project_id);
 
 -- 4. ROW LEVEL SECURITY (RLS) POLICIES
+-- GitHub Radar tables are server-only: RLS is enabled with zero client policies (service-role access only)
 ALTER TABLE public.github_projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.github_reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.github_versions ENABLE ROW LEVEL SECURITY;
 
--- Authenticated users: Read-only access to monitored projects and reviews
+-- Ensure clean state: Drop any existing client policies
 DROP POLICY IF EXISTS "Authenticated users can view github projects" ON public.github_projects;
-CREATE POLICY "Authenticated users can view github projects"
-    ON public.github_projects FOR SELECT TO authenticated USING (is_monitored = true);
-
 DROP POLICY IF EXISTS "Authenticated users can view github reviews" ON public.github_reviews;
-CREATE POLICY "Authenticated users can view github reviews"
-    ON public.github_reviews FOR SELECT TO authenticated USING (true);
-
 DROP POLICY IF EXISTS "Authenticated users can view github versions" ON public.github_versions;
-CREATE POLICY "Authenticated users can view github versions"
-    ON public.github_versions FOR SELECT TO authenticated USING (true);
 
--- Service role full access
+-- Service role full access only (Server-side & Radar Scanner daemon)
 DROP POLICY IF EXISTS "Service role full on github_projects" ON public.github_projects;
 CREATE POLICY "Service role full on github_projects"
     ON public.github_projects FOR ALL TO service_role USING (true) WITH CHECK (true);
@@ -90,3 +83,4 @@ CREATE POLICY "Service role full on github_reviews"
 DROP POLICY IF EXISTS "Service role full on github_versions" ON public.github_versions;
 CREATE POLICY "Service role full on github_versions"
     ON public.github_versions FOR ALL TO service_role USING (true) WITH CHECK (true);
+

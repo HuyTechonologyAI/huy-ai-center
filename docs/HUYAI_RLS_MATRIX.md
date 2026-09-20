@@ -1,15 +1,15 @@
 # HUYAI ROW-LEVEL SECURITY (RLS) MATRIX & SECURITY BASELINE
-## RECONCILED SPECIFICATION (PHASE 06C)
+## RECONCILED SPECIFICATION (PHASE 06D)
 
-**Trạng thái:** TÀI LIỆU PHÂN TÁCH BẢO MẬT HIỆN TRẠNG & BẢO MẬT MỚI  
+**Trạng thái:** TÀI LIỆU PHÂN TÁCH BẢO MẬT HIỆN TRẠNG & BẢO MẬT MỚI (15 BẢNG MỚI ĐÃ ĐỐI SOÁT)  
 **Dự án:** Supabase `HuyAI` (`bdeluacbzbdflxubhpha`, Singapore)  
-**Quy tắc:** Phân biệt rõ ràng giữa Schema Cũ (Legacy) và Schema Mới (AI Center). Không tự ý can thiệp các chính sách bảo mật cũ khi chưa có phê duyệt riêng.
+**Quy tắc:** Phân biệt rõ ràng giữa Schema Cũ (Legacy: 19 bảng) và Schema Mới (AI Center: 15 bảng mới + 1 bảng mở rộng). Không can thiệp chính sách cũ khi chưa có phê duyệt riêng.
 
 ---
 
 # PHẦN A: LEGACY_SECURITY_BASELINE (HIỆN TRẠNG 19 BẢNG CŨ)
 
-Kiểm toán thực tế cho thấy cơ sở dữ liệu `HuyAI` hiện hữu đang tồn tại các cảnh báo bảo mật và tối ưu hóa sau đây:
+Kiểm toán thực tế cho thấy cơ sở dữ liệu `HuyAI` hiện hữu đang tồn tại các cảnh báo bảo mật và tối ưu hóa sau:
 
 ### 1. Bảng có RLS Bật nhưng CHƯA CÓ Policy nào (RLS Enabled with No Policies)
 *Tình trạng:* Khi bật RLS mà không có chính sách (policy), mọi truy vấn từ anonymous và authenticated users đều bị chặn theo mặc định (chỉ service_role có quyền đọc/ghi).
@@ -19,7 +19,7 @@ Kiểm toán thực tế cho thấy cơ sở dữ liệu `HuyAI` hiện hữu đ
 - `public.user_video_progress`
 
 ### 2. Cảnh báo Mutable Search Path trên Stored Procedure
-- Hàm `public.match_knowledge_chunks`: Đang thiếu khai báo `SET search_path = public, pg_temp;`, có nguy cơ tiềm ẩn về search-path hijacking nếu gọi bởi role có đặc quyền cao.
+- Hàm `public.match_knowledge_chunks`: Đang thiếu khai báo `SET search_path = public, pg_temp;`.
 
 ### 3. Cảnh báo Hiệu Năng & Tối Ưu Hóa (Performance & Permissive Warnings)
 - **Foreign keys without covering indexes:** Một số bảng cũ có khóa ngoại trỏ tới tài nguyên nhưng thiếu chỉ mục B-tree tương ứng.
@@ -32,28 +32,34 @@ Kiểm toán thực tế cho thấy cơ sở dữ liệu `HuyAI` hiện hữu đ
 
 ---
 
-# PHẦN B: AI_CENTER_SECURITY_BASELINE (12 BẢNG MỚI & BẢNG MỞ RỘNG)
+# PHẦN B: AI_CENTER_SECURITY_BASELINE (CHÍNH XÁC 15 BẢNG MỚI + 1 BẢNG MỞ RỘNG)
 
-Tất cả các bảng mới của AI Center V1.1 được áp dụng tiêu chuẩn bảo mật tuyệt đối 100%:
+Tất cả **15 bảng mới** của AI Center V1.1 được áp dụng tiêu chuẩn bảo mật tuyệt đối 100%:
 
-| Tên Bảng | RLS Status | Anon (Khách) | Authenticated (Người dùng) | Service Role (Backend/Worker) | Chỉ Mục Khóa Ngoại |
-| :--- | :---: | :--- | :--- | :--- | :--- |
-| **`ai_tasks`** | **ENABLED** | ❌ Chặn | **SELECT / INSERT**: Chỉ tác vụ của chính mình (`user_id = auth.uid()` hoặc `user_email = auth.jwt()->email`). | **ALL** | `idx_ai_tasks_user_id`, `idx_ai_tasks_queue_poll` |
-| **`ai_task_steps`** | **ENABLED** | ❌ Chặn | **SELECT**: Chỉ xem bước của task thuộc quyền mình. | **ALL** | `idx_ai_task_steps_task` |
-| **`ai_outputs`** | **ENABLED** | ❌ Chặn | **SELECT**: Chỉ xem kết quả thuộc task của mình. | **ALL** | `idx_ai_outputs_task` |
-| **`nodes`** | **ENABLED** | ❌ Chặn | **SELECT**: Đọc thông tin node an toàn (online/offline, capabilities). | **ALL** | `idx_nodes_status` |
-| **`node_heartbeats`** | **ENABLED** | ❌ Chặn | **SELECT**: Đọc telemetry giám sát. | **ALL** | `idx_node_heartbeats_node` |
-| **`ai_providers`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | Khóa chính TEXT |
-| **`ai_models`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | `idx_ai_models_provider` |
-| **`tools`** | **ENABLED** | **SELECT** (`status != 'deprecated'`) | **SELECT** (`status != 'deprecated'`) | **ALL** | Khóa chính TEXT |
-| **`tool_versions`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | `uq_tool_version` |
-| **`tool_capabilities`**| **ENABLED** | **SELECT** | **SELECT** | **ALL** | `uq_tool_capability` |
-| **`agents`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | Khóa ngoại model |
-| **`agent_versions`** | **ENABLED** | **SELECT** | **SELECT** | **ALL** | `uq_agent_version` |
-| **`github_projects`** | **ENABLED** | ❌ Chặn | **SELECT** (`is_monitored = true`) | **ALL** | `idx_github_projects_monitored` |
-| **`github_reviews`** | **ENABLED** | ❌ Chặn | **SELECT** | **ALL** | `idx_github_reviews_project` |
-| **`github_versions`** | **ENABLED** | ❌ Chặn | **SELECT** | **ALL** | `idx_github_versions_project` |
-| **`audit_logs`** *(Mở rộng)* | **ENABLED** | ❌ Chặn | **SELECT**: Chỉ xem log của chính mình (`actor_profile_id = auth.uid()` hoặc `user_email`). | **ALL** | `idx_audit_logs_actor`, `idx_audit_logs_action` |
+| STT | Tên Bảng Mới | RLS Status | Anon (Khách) | Authenticated (Người dùng) | Service Role (Backend/Worker) | Chỉ Mục Khóa Ngoại |
+| :---: | :--- | :---: | :--- | :--- | :--- | :--- |
+| 1 | **`ai_tasks`** | **ENABLED** | ❌ Chặn | **SELECT / INSERT**: Chỉ tác vụ của chính mình (`user_id = auth.uid()` hoặc `user_email = auth.jwt()->email`). | **ALL** | `idx_ai_tasks_user_id`, `idx_ai_tasks_queue_poll` |
+| 2 | **`ai_task_steps`** | **ENABLED** | ❌ Chặn | **SELECT**: Chỉ xem bước của task thuộc quyền mình. | **ALL** | `idx_ai_task_steps_task` |
+| 3 | **`ai_outputs`** | **ENABLED** | ❌ Chặn | **SELECT**: Chỉ xem kết quả thuộc task của mình. | **ALL** | `idx_ai_outputs_task` |
+| 4 | **`nodes`** | **ENABLED** | ❌ Chặn | **SELECT**: Đọc thông tin node an toàn (online/offline, capabilities). | **ALL** | `idx_nodes_status` |
+| 5 | **`node_heartbeats`** | **ENABLED** | ❌ Chặn | **SELECT**: Đọc telemetry giám sát. | **ALL** | `idx_node_heartbeats_node` |
+| 6 | **`ai_providers`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | Khóa chính TEXT |
+| 7 | **`ai_models`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | `idx_ai_models_provider` |
+| 8 | **`tools`** | **ENABLED** | **SELECT** (`status != 'deprecated'`) | **SELECT** (`status != 'deprecated'`) | **ALL** | Khóa chính TEXT |
+| 9 | **`tool_versions`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | `uq_tool_version` |
+| 10 | **`tool_capabilities`**| **ENABLED** | **SELECT** | **SELECT** | **ALL** | `uq_tool_capability` |
+| 11 | **`agents`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | Khóa ngoại model |
+| 12 | **`agent_versions`** | **ENABLED** | **SELECT** | **SELECT** | **ALL** | `uq_agent_version` |
+| 13 | **`github_projects`** | **ENABLED** | ❌ Chặn | ❌ **Chặn (Server-Only)** | **ALL (Service-Role Only)** | `idx_github_projects_monitored` |
+| 14 | **`github_reviews`** | **ENABLED** | ❌ Chặn | ❌ **Chặn (Server-Only)** | **ALL (Service-Role Only)** | `idx_github_reviews_project` |
+| 15 | **`github_versions`** | **ENABLED** | ❌ Chặn | ❌ **Chặn (Server-Only)** | **ALL (Service-Role Only)** | `idx_github_versions_project` |
+| — | **`audit_logs`** *(Mở rộng)* | **ENABLED** | ❌ Chặn | **SELECT**: Chỉ xem log của chính mình (`actor_profile_id = auth.uid()` hoặc `user_email`). | **ALL** | `idx_audit_logs_actor`, `idx_audit_logs_action` |
+
+### Nguyên Tắc Thiết Kế Cho GitHub Radar (Server-Only)
+- 3 bảng `github_projects`, `github_reviews`, `github_versions` được cấu hình **hoàn toàn Server-Side**:
+  - RLS được bật bắt buộc.
+  - **Không cấp quyền cho client** (anon và authenticated đều không có policy SELECT/INSERT/UPDATE/DELETE).
+  - Chỉ backend scanner và dispatcher chạy với `service_role` mới có quyền đọc và cập nhật dữ liệu.
 
 ### Bảo Vệ Stored Procedures AI Center
 Mọi hàm trong migration AI Center đều tuân thủ nguyên tắc search_path:

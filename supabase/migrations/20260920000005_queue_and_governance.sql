@@ -14,11 +14,13 @@
 -- 1.1 Enable pgmq extension if not installed (Postgres available version: 1.5.1)
 CREATE EXTENSION IF NOT EXISTS pgmq;
 
--- 1.2 Create primary queue: ai-jobs idempotently
+-- 1.2 Create primary queue: ai-jobs as a Durable Basic Queue (logged) idempotently
+-- Note: pgmq.create() creates a durable logged Basic Queue (not unlogged).
+-- Queue access is strictly restricted to server-side Dispatcher credentials (not exposed to client/browser roles).
 DO $$
 BEGIN
     PERFORM pgmq.create('ai-jobs');
-    RAISE NOTICE 'PGMQ queue ai-jobs verified/created successfully.';
+    RAISE NOTICE 'PGMQ durable basic queue ai-jobs verified/created successfully.';
 EXCEPTION WHEN OTHERS THEN
     -- Queue already exists or notice
     RAISE NOTICE 'Notice on pgmq.create(ai-jobs): %', SQLERRM;
@@ -70,6 +72,9 @@ COMMENT ON FUNCTION public.claim_ai_task(TEXT) IS 'Atomic claim function for Del
 -- 2. GOVERNANCE & AUDIT LOGS MODULE (REUSE & EXTEND EXISTING)
 -- -----------------------------------------------------------------------------
 
+-- Scoped Reuse: public.audit_logs is used strictly for user, admin, and security events
+-- with a legitimate user identity. Node telemetry is tracked in nodes/node_heartbeats,
+-- and runtime events in structured dispatcher logs. Existing constraints are preserved.
 -- Non-destructive additive extension to existing HuyAI audit_logs table
 ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS actor_profile_id UUID;
 ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS organization_id UUID;

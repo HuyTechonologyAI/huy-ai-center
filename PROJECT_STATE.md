@@ -29,7 +29,7 @@ DEFERRED
 huy-ai-node-01
 
 ## CURRENT_PHASE
-PHASE 06B — HUYAI CONTROL CENTER DATABASE PREPARATION COMPLETED (Pending Human Approval to Apply)
+PHASE 06D — PRE-APPLY BLOCKER FIX COMPLETED (Pending Human Approval to Apply)
 
 ## CURRENT_BRANCH
 `main`
@@ -69,35 +69,28 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] **Phase 06D — Pre-Apply Blocker Fix:**
+  - Đối soát chính xác số lượng bảng mới: **15 bảng mới** (`ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `node_heartbeats`, `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`, `github_projects`, `github_reviews`, `github_versions`) + 1 bảng mở rộng (`audit_logs`).
+  - Kiểm tra an ninh toàn diện 15 bảng mới: **100% PASS** (RLS Enabled, đầy đủ covering indexes).
+  - Cấu hình GitHub Radar Server-Only: RLS bật, không mở policy client (service-role access only).
+  - Bảng `public.orders`: Giữ nguyên 100% mục đích thanh toán hiện tại; **tuyệt đối không dùng cho AI compute usage / token deduction**.
+  - Hệ thống AI Credit: **DEFERRED** trong V1 (không tạo bảng credit/wallet).
+  - Phạm vi `audit_logs`: Tái sử dụng giới hạn cho User/Admin actions; node state đưa vào `nodes`/`node_heartbeats`, worker runtime đưa vào structured logger; giữ nguyên ràng buộc NOT NULL.
+  - Hàng đợi: Duy nhất **PGMQ Durable Basic Queue** (`ai-jobs`), không lộ `pgmq_public` ra client, không dùng bảng `queue_messages`, không dùng Redis.
+  - Báo cáo chính thức ban hành: `docs/HUYAI_FINAL_PREAPPLY_REPORT.md`.
+- [x] **Phase 06C — Final Migration Reconciliation:**
+  - Cập nhật toàn bộ 19 bảng hiện hữu trên `HuyAI` Singapore.
+  - Xóa bỏ 100% dữ liệu seed danh mục mô hình & công cụ trong migration 03.
+  - Phân tách riêng biệt `LEGACY_SECURITY_BASELINE` và chuẩn bị `OPTIONAL_LEGACY_REMEDIATION_PLAN`.
 - [x] **Phase 06B — HuyAI Control Center Database Preparation:**
-  - Kiểm toán READ-ONLY trực tiếp cơ sở dữ liệu `HuyAI` Singapore (`bdeluacbzbdflxubhpha`): xác định chính xác 13 bảng sản xuất đang chạy (`resources`, `videos`, `contacts`, `leads`, `student_points_balance`, `daily_tasks`, `task_completions`, `user_document_progress`, `user_video_progress`, `knowledge_chunks`, `item_reviews`, `orders`, `audit_logs`).
-  - Xác nhận `pgvector` đang hoạt động, `pgmq` chưa kích hoạt, chưa có lịch sử migration trên HuyAI.
-  - Ban hành 4 tài liệu thiết kế & an toàn bắt buộc:
-    - `docs/HUYAI_FINAL_SCHEMA_PLAN.md` (Kế hoạch schema mở rộng, nguyên tắc chống trùng lặp dữ liệu)
-    - `docs/HUYAI_MIGRATION_PLAN.md` (Trình tự migration an toàn, pre/post-checks, rollback notes chi tiết)
-    - `docs/HUYAI_RLS_MATRIX.md` (Ma trận RLS 100% bảng, kiểm soát quyền server-side, bảo vệ search_path)
-    - `docs/HUYAI_QUEUE_PLAN.md` (Kiến trúc hàng đợi 2 tầng: pgmq ưu tiên + Postgres native queue fallback)
-  - Chuẩn bị 5 tệp SQL migration an toàn, lũy tích, không phá hủy dữ liệu (`supabase/migrations/`):
-    - `20260920000001_ai_operations.sql`
-    - `20260920000002_infrastructure.sql`
-    - `20260920000003_ai_registry.sql`
-    - `20260920000004_github_radar.sql`
-    - `20260920000005_queue_and_governance.sql`
-  - Chống trùng lặp 100%: Tái sử dụng `auth.users`, `student_points_balance`, `orders`, `knowledge_chunks`, mở rộng không phá hủy `audit_logs`.
-  - Xác thực tĩnh SQL (`validate-sql.ps1`) và chạy kiểm thử an toàn (`verify-safety.ps1`): PASS 100% (30/30 unit tests pass, typecheck 5 workspaces pass, 0 secrets).
+  - Kiểm toán READ-ONLY trực tiếp cơ sở dữ liệu `HuyAI` Singapore (`bdeluacbzbdflxubhpha`).
+  - Ban hành các tài liệu schema, migration, RLS matrix, queue plan.
 - [x] **Master Architecture Patch V1.1 & Phase 06A Reconciliation:**
-  - Lập Gap Analysis `docs/HUYAI_CONTROL_CENTER_GAP_ANALYSIS.md`, `docs/HUYAI_SECURITY_BASELINE.md`, `docs/V1_1_RECONCILIATION_REPORT.md`.
   - Ban hành ADR-001 (Consolidate HuyAI) và ADR-002 (Cost-Optimized V1).
-  - Kích hoạt agent skills và bảng chi phí `docs/INFRASTRUCTURE_COSTS.md`.
-- [x] **Phase 01 — System Audit:** Kiểm toán READ-ONLY 3 website hiện hữu.
-- [x] **Phase 02 — AI Center Foundation:** Monorepo, contracts, shared utils, CI workflow.
-- [x] **Phase 03 — Supabase Control Center Schema:** Khung thiết kế sơ bộ các bảng điều khiển trung tâm.
-- [x] **Phase 04 — AI Task API Contract:** 5 Endpoints API, Idempotency key, Standard error model.
-- [x] **Phase 05 — Control Center Web Application:** Dashboard Next.js 15, Teacher AI form chuẩn CV 5512.
-- [x] **Phase 06 — Dell Dispatcher Worker:** Worker daemon, MockAdapter, TaskRouter, ResultHandler, Dockerfile.
+- [x] **Phases 01 → 06:** Foundation, Monorepo, Contracts, API Routes, Next.js Web Dashboard, Dell Dispatcher Worker.
 
 ## IN_PROGRESS
-- Không có (Phase 06B hoàn thành toàn diện, đang DỪNG chờ phê duyệt trước khi apply lên database).
+- Không có (Phase 06D hoàn thành toàn diện, đang DỪNG chờ phê duyệt trước khi apply lên database).
 
 ## PENDING
 - [ ] Review & Human Approval từ Lead Architect / Sponsor đối với 5 tệp SQL migration và Kế hoạch Migration HuyAI.
@@ -106,9 +99,9 @@ WITHIN_BUDGET
 ---
 
 ## DATABASE_STATE
-- **Production Supabase của 3 Website:** 100% nguyên vẹn (Zero-Touch, chưa chạy bất kỳ lệnh DDL nào).
-- **13 Bảng Sản Xuất Hiện Hữu tại HuyAI:** `resources`, `videos`, `contacts`, `leads`, `student_points_balance`, `daily_tasks`, `task_completions`, `user_document_progress`, `user_video_progress`, `knowledge_chunks`, `item_reviews`, `orders`, `audit_logs`.
-- **HuyAI Control Center Migrations Chuẩn Bị:** 5 tệp SQL an toàn (`20260920000001` - `20260920000005`) tại `supabase/migrations/` sẵn sàng apply ngay sau khi được con người phê duyệt.
+- **Production Supabase của 3 Website:** 100% nguyên vẹn (Zero-Touch, DDL APPLIED: ZERO).
+- **19 Bảng Sản Xuất Hiện Hữu tại HuyAI:** `contacts`, `videos`, `resources`, `resource_views`, `premium_contents`, `item_reviews`, `audit_logs`, `user_activity_metrics`, `student_points_balance`, `daily_tasks`, `task_completions`, `cms_folders`, `orders`, `cms_settings`, `knowledge_chunks`, `user_video_progress`, `user_document_progress`, `leads`, `site_content`.
+- **HuyAI Control Center Migrations Chuẩn Bị:** 5 tệp SQL an toàn (`20260920000001` - `20260920000005`) tại `supabase/migrations/` tạo chính xác 15 bảng mới và mở rộng 1 bảng cũ (`audit_logs`), sẵn sàng apply ngay sau khi được con người phê duyệt.
 
 ## API_STATE
 - Endpoints hoạt động tại `apps/control-center/src/app/api/ai/...`:
@@ -127,7 +120,7 @@ WITHIN_BUDGET
 ---
 
 ## TEST_STATUS
-- **SQL Migration Static Validation:** PASS (5/5 migrations tuân thủ UUID, timestamps, search_path, RLS, no secrets, non-destructive).
+- **SQL Migration Static Validation:** PASS (5/5 migrations tuân thủ UUID, timestamps, search_path, RLS, no secrets, non-destructive, 15 new tables).
 - **Contracts Unit Tests:** PASS (14/14 tests).
 - **API Logic Tests:** PASS (6/6 tests).
 - **Dispatcher Tests:** PASS (7/7 tests).
