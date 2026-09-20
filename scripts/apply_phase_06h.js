@@ -2,6 +2,23 @@ const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
+// Optionally load local .env.local if present (strictly gitignored)
+const envLocalPath = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  const content = fs.readFileSync(envLocalPath, 'utf8');
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const idx = trimmed.indexOf('=');
+      if (idx !== -1) {
+        const k = trimmed.substring(0, idx).trim();
+        const v = trimmed.substring(idx + 1).trim().replace(/^["']|["']$/g, '');
+        if (!process.env[k]) process.env[k] = v;
+      }
+    }
+  }
+}
+
 const DB_PASSWORD = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD;
 const DB_HOST = 'db.bdeluacbzbdflxubhpha.supabase.co';
 const DB_PORT = 5432;
