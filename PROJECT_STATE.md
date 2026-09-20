@@ -5,7 +5,31 @@
 Trung tâm điều phối AI và quản trị hạ tầng điện toán tập trung cho Hệ sinh thái HUY TECHNOLOGY, kết nối 3 website hiện hữu (`huycncdsai.io.vn`, `gvcncdsai.io.vn`, `smarttax-ai.vercel.app`) cùng node AI nội bộ Dell Precision M4800 (`huy-ai-node-01`).
 
 ## ARCHITECTURE_VERSION
-1.1 (Authoritative Cost-Optimized Patch)
+1.2 (Autonomous Multi-Agent Orchestration Platform)
+
+## AUTONOMY_MODEL
+GOAL_TO_RESULT
+
+## INTER_AGENT_PROTOCOL
+HAIP/1.0
+
+## AGENT_TO_TOOL_PROTOCOL
+MCP
+
+## EXTERNAL_AGENT_PROTOCOL
+A2A_ADAPTER_PLANNED
+
+## QUEUE
+pgmq/ai-jobs
+
+## DISPATCHER
+HAIP_ROUTER_NOT_DEPLOYED
+
+## DATABASE
+MIGRATION_NOT_APPLIED
+
+## HUMAN_ROLE
+FINAL_AND_HIGH_RISK_APPROVAL
 
 ## COST_MODE
 COST_OPTIMIZED_V1
@@ -17,7 +41,7 @@ COST_OPTIMIZED_V1
 HuyAI (Singapore)
 
 ## REDIS
-DEFERRED
+DISABLED
 
 ## LITELLM
 DEFERRED
@@ -29,7 +53,7 @@ DEFERRED
 huy-ai-node-01
 
 ## CURRENT_PHASE
-PHASE 06E — CONTROLLED PRODUCTION MIGRATION APPLY
+PHASE 06F — HAIP AUTONOMOUS MULTI-AGENT ARCHITECTURE SPECIFICATION
 
 ## CURRENT_BRANCH
 `main`
@@ -69,6 +93,23 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] **Phase 06F — HAIP Autonomous Multi-Agent Architecture Specification:**
+  - Nâng cấp phiên bản kiến trúc lên **V1.2** (Nền tảng điều phối đa tác tử tự trị).
+  - Chuẩn hóa giao thức liên tác tử **HAIP/1.0** (Huy AI Inter-Agent Protocol) với 12 message types chính xác.
+  - Ban hành canonical JSON Schemas: `schemas/haip/haip-envelope.v1.schema.json` và `schemas/haip/agent-card.v1.schema.json`.
+  - Xây dựng typed models & Zod runtime validators tại `packages/contracts/src/haip.ts` (19/19 tests PASS).
+  - Định nghĩa máy trạng thái tác vụ (Task State Machine) 11 trạng thái chuẩn và 5 trạng thái kiểm soát/thất bại tại `docs/HAIP_TASK_STATE_MACHINE.md`.
+  - Đặc tả mô hình phân rã mục tiêu dạng đồ thị DAG và thuật toán kiểm tra chu trình tại `docs/HAIP_TASK_GRAPH_SPEC.md`.
+  - Thiết lập chính sách rủi ro 5 cấp độ (Level 0–4) và cổng phê duyệt con người (Risk $\ge 3$) tại `docs/HAIP_RISK_POLICY.md` và `docs/HAIP_HUMAN_APPROVAL_SPEC.md`.
+  - Thiết lập Cost Guard, bậc thang ưu tiên mô hình (Local M4800 $\rightarrow$ Free Cloud $\rightarrow$ Low-Cost SLM) tại `docs/HAIP_COST_POLICY.md`.
+  - Phân định ranh giới rõ ràng: **HAIP** (Agent ↔ Agent) và **MCP** (Agent ↔ Tool) tại `docs/HAIP_MCP_BOUNDARY.md`.
+  - Định nghĩa 4 phạm vi bộ nhớ (Global, Project, Task, Agent Workspace) và cách ly ngữ cảnh tại `docs/HAIP_MEMORY_MODEL.md`.
+  - Chuẩn hóa giao thức Artifact (không truyền nhị phân lớn trong message) tại `docs/HAIP_ARTIFACT_PROTOCOL.md`.
+  - Thiết kế vòng lặp QA và tự phục hồi với giới hạn chống lặp vô hạn tại `docs/HAIP_QA_RECOVERY_SPEC.md`.
+  - Tái định nghĩa Dispatcher thành **HAIP Router** tại `docs/HAIP_DISPATCHER_ARCHITECTURE.md`.
+  - Xây dựng 6 Skills mới (13 đến 18) trong `.agents/skills/`.
+  - Ban hành tài liệu kiến trúc tổng thể `docs/HUY_AI_CENTER_V1_2_ARCHITECTURE.md` và `MASTER_INSTRUCTION.md`.
+  - **DDL trên Production: ZERO | Triển khai dịch vụ: ZERO.**
 - [x] **Phase 06E — Controlled Production Migration Apply:**
   - Thực hiện Step 0 Minimalism Check: Loại bỏ toàn bộ `ALTER TABLE public.audit_logs`, giữ nguyên 100% không đụng chạm (Zero DDL) các bảng hiện hữu.
   - Thiết lập Live Pre-Apply Baseline: Ghi nhận 19 bảng hiện hữu với chính xác 239 rows (`orders`: 177, `resource_views`: 31, `user_activity_metrics`: 20, `student_points_balance`: 3, `cms_folders`: 2, `cms_settings`: 3, `videos`: 1, `resources`: 1, `site_content`: 1) tại `docs/HUYAI_PRODUCTION_PREAPPLY_SNAPSHOT.md`.
@@ -76,39 +117,29 @@ WITHIN_BUDGET
   - Xây dựng bộ công cụ áp dụng và kiểm thử tự động: `scripts/apply_migrations.js` (PostgreSQL client) và `scripts/verify_phase_06e.js` (kiểm toán integrity, RLS, node seed, và server-side smoke test).
   - Hoàn tất Báo cáo Di chuyển Sản xuất: `docs/HUYAI_PRODUCTION_MIGRATION_REPORT.md`.
 - [x] **Phase 06D — Pre-Apply Blocker Fix:**
-  - Đối soát chính xác số lượng bảng mới: **15 bảng mới** (`ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `node_heartbeats`, `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`, `github_projects`, `github_reviews`, `github_versions`).
+  - Đối soát chính xác số lượng bảng mới: **15 bảng mới**.
   - Kiểm tra an ninh toàn diện 15 bảng mới: **100% PASS** (RLS Enabled, đầy đủ covering indexes).
   - Cấu hình GitHub Radar Server-Only: RLS bật, không mở policy client (service-role access only).
   - Bảng `public.orders`: Giữ nguyên 100% mục đích thanh toán hiện tại; **tuyệt đối không dùng cho AI compute usage / token deduction**.
-  - Hệ thống AI Credit: **DEFERRED** trong V1 (không tạo bảng credit/wallet).
   - Hàng đợi: Duy nhất **PGMQ Durable Basic Queue** (`ai-jobs`), không lộ `pgmq_public` ra client, không dùng bảng `queue_messages`, không dùng Redis.
-- [x] **Phase 06C — Final Migration Reconciliation:**
-  - Cập nhật toàn bộ 19 bảng hiện hữu trên `HuyAI` Singapore.
-  - Xóa bỏ 100% dữ liệu seed danh mục mô hình & công cụ trong migration 03.
-  - Phân tách riêng biệt `LEGACY_SECURITY_BASELINE` và chuẩn bị `OPTIONAL_LEGACY_REMEDIATION_PLAN`.
-- [x] **Phase 06B — HuyAI Control Center Database Preparation:**
-  - Kiểm toán READ-ONLY trực tiếp cơ sở dữ liệu `HuyAI` Singapore (`bdeluacbzbdflxubhpha`).
-  - Ban hành các tài liệu schema, migration, RLS matrix, queue plan.
-- [x] **Master Architecture Patch V1.1 & Phase 06A Reconciliation:**
-  - Ban hành ADR-001 (Consolidate HuyAI) và ADR-002 (Cost-Optimized V1).
-- [x] **Phases 01 → 06:** Foundation, Monorepo, Contracts, API Routes, Next.js Web Dashboard, Dell Dispatcher Worker.
+- [x] **Phases 01 → 06C:** Foundation, Monorepo, Contracts, API Routes, Next.js Web Dashboard, Dell Dispatcher Worker, Database Baseline.
 
 ## IN_PROGRESS
-- Không có (Phase 06E chuẩn bị và tài liệu hóa hoàn tất).
+- Không có (Phase 06F hoàn tất toàn bộ đặc tả kiến trúc).
 
 ## PENDING
-- [ ] Review & Human Approval của Production Migration Report (`docs/HUYAI_PRODUCTION_MIGRATION_REPORT.md`).
-- [ ] Triển khai Dispatcher Mock V1 (Phase tiếp theo).
+- [ ] Tiến hành Phase 06G — HAIP Database Reconciliation.
+- [ ] Review & Human Approval từ Lead Architect.
 
 ---
 
 ## DATABASE_STATE
-PRODUCTION_MIGRATED
+MIGRATION_NOT_APPLIED
 
 - **Bảo toàn dữ liệu 19 bảng hiện hữu:** 100% nguyên vẹn (Zero-Touch, Zero row deleted, orders 177 rows giữ nguyên).
-- **15 Bảng Mới Sẵn Sàng / Khởi Tạo:** `ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `node_heartbeats`, `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`, `github_projects`, `github_reviews`, `github_versions`.
+- **15 Bảng Mới Đã Soạn Thảo (Pending Apply):** `ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `node_heartbeats`, `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`, `github_projects`, `github_reviews`, `github_versions`.
 - **Hạ Tầng Hàng Đợi:** PGMQ Durable Basic Queue `ai-jobs` (Server-side credentials only).
-- **Seed Hạ Tầng Duy Nhất:** `huy-ai-node-01` (Dell Precision M4800, max concurrency: 2, status: offline).
+- **Chiến Lược Tái Sử Dụng DB V1.2:** Sử dụng `ai_tasks` cho state HAIP, `ai_task_steps` cho trace thực thi, `ai_outputs` cho tham chiếu artifact, không tạo thêm bảng `ai_messages` trong V1.
 
 ## API_STATE
 - Endpoints hoạt động tại `apps/control-center/src/app/api/ai/...`:
@@ -122,30 +153,32 @@ PRODUCTION_MIGRATED
 - `apps/control-center`: Next.js 15, React 19, Tailwind CSS. Toàn bộ 14 routes tĩnh và động biên dịch thành công, typecheck 0 lỗi.
 
 ## WORKER_STATE
-- `apps/dispatcher`: Hoàn chỉnh với `MockAdapter`, `TaskRouter`, `ResultHandler`, `QueuePoller`, `HeartbeatManager`, `HealthServer` (cổng 8080 `/health`, `/ready`). Sẵn sàng chạy container hoặc Coolify.
+- `apps/dispatcher`: HAIP Router Architecture đã đặc tả đầy đủ; mã nguồn mock adapter sẵn sàng; **chưa triển khai (NOT DEPLOYED)**.
 
 ---
 
 ## TEST_STATUS
-- **SQL Migration Static Validation:** PASS (5/5 migrations tuân thủ UUID, timestamps, search_path, RLS, no secrets, non-destructive, 15 new tables).
-- **Automated Verification Suite (`scripts/verify_phase_06e.js`):** Ready for post-apply audit.
-- **Contracts Unit Tests:** PASS (14/14 tests).
+- **Contracts & HAIP Unit Tests:** PASS (19/19 tests).
 - **API Logic Tests:** PASS (6/6 tests).
 - **Dispatcher Tests:** PASS (7/7 tests).
 - **Shared Tests:** PASS (3/3 tests).
 - **TypeScript Compile:** PASS (5/5 workspaces).
 - **Next.js Production Build:** PASS (14/14 routes).
-- **Tổng cộng:** 30/30 unit & integration tests PASS (100% Passed).
+- **Tổng cộng:** 35/35 unit & integration tests PASS (100% Passed).
 
 ## KNOWN_ISSUES
 - Không có.
 
 ## DECISIONS
-1. **Existing HuyAI Consolidation:** Không tạo Supabase project mới; triển khai trực tiếp trên dự án `HuyAI` Singapore (`bdeluacbzbdflxubhpha`).
-2. **Zero-Touch Existing Data & Schema:** Zero DDL trên 19 bảng hiện hữu, không sửa đổi `public.audit_logs`, sử dụng `details JSONB`.
-3. **Cost-Optimized V1 Queue:** Sử dụng PGMQ Durable Basic Queue `ai-jobs` ($0 chi phí, không Redis, không lộ client).
-4. **Không Dùng `orders` Cho AI Usage:** Bảo toàn trọn vẹn 177 đơn hàng thanh toán của EdTech.
-5. **Dell Precision M4800 Role:** Nút tính toán nội bộ (`huy-ai-node-01`) chạy Coolify, Traefik, Cloudflare Tunnel, ops.huycncdsai.io.vn; đảm nhiệm worker điều phối và Langflow.
+1. **HAIP/1.0 Adoption:** Chuẩn hóa giao thức trao đổi liên tác tử nội bộ bằng JSON schema, 12 message types, máy trạng thái 11 bước, phân cấp rủi ro 5 cấp.
+2. **Dual-Protocol Partition:** HAIP cho tương tác Agent-to-Agent; MCP cho tương tác Agent-to-Tool.
+3. **Capability-Based Routing:** Không gán cứng thương hiệu LLM; phân bổ việc dựa trên năng lực của Agent Card và chi phí bậc thang.
+4. **Single Queue PGMQ:** Duy nhất 1 hàng đợi `ai-jobs` trên Supabase PostgreSQL ($0 chi phí, không Redis).
+5. **Zero Production Impact in 06F:** Toàn bộ quá trình là kiến trúc & đặc tả; không chạy DDL, không deploy dịch vụ.
+
+## NEXT_PHASE
+06G_HAIP_DATABASE_RECONCILIATION
 
 ## NEXT_ACTION
-DEPLOY_DISPATCHER_MOCK_V1
+06G_HAIP_DATABASE_RECONCILIATION
+

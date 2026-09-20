@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huyai.vn/schemas/haip/haip-envelope.v1.schema.json",
+  "title": "HAIP Envelope V1.0",
+  "description": "Huy AI Inter-Agent Protocol (HAIP/1.0) Canonical Message Envelope",
+  "type": "object",
+  "required": [
+    "haip_version",
+    "message_id",
+    "conversation_id",
+    "task_id",
+    "type",
+    "sender",
+    "recipient",
+    "intent",
+    "priority",
+    "budget",
+    "risk",
+    "limits",
+    "trace",
+    "created_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "haip_version": {
+      "type": "string",
+      "const": "HAIP/1.0",
+      "description": "Authoritative protocol version string"
+    },
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Globally unique identifier for this message"
+    },
+    "conversation_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Conversation or root goal scope identifier"
+    },
+    "task_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Identifier of the associated task or subtask"
+    },
+    "parent_task_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "Parent task ID in the DAG task graph, if subtask"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "TASK",
+        "PLAN",
+        "CLAIM",
+        "DELEGATE",
+        "TOOL_CALL",
+        "RESULT",
+        "REVIEW",
+        "CORRECTION",
+        "STATE_UPDATE",
+        "ERROR",
+        "FINAL_CANDIDATE",
+        "APPROVAL_REQUEST"
+      ],
+      "description": "Canonical HAIP message type"
+    },
+    "sender": {
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["orchestrator", "planner", "agent", "tool", "dispatcher", "human", "system"]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier of sending entity"
+        }
+      }
+    },
+    "recipient": {
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["orchestrator", "planner", "agent", "tool", "dispatcher", "human", "broadcast"]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Target recipient identifier, or broadcast"
+        }
+      }
+    },
+    "intent": {
+      "type": "string",
+      "minLength": 1,
+      "description": "High-level deterministic intent summary (e.g. generate_lesson_plan, review_output)"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "normal", "high", "urgent"],
+      "default": "normal"
+    },
+    "input_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ref_id", "type"],
+        "properties": {
+          "ref_id": { "type": "string" },
+          "type": { "type": "string" },
+          "uri": { "type": "string" },
+          "checksum": { "type": "string" }
+        }
+      },
+      "default": []
+    },
+    "constraints": {
+      "type": "object",
+      "default": {},
+      "properties": {
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "preferred_runtime": {
+          "type": "string"
+        }
+      }
+    },
+    "expected_outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "schema_ref": { "type": "string" }
+        }
+      },
+      "default": []
+    },
+    "budget": {
+      "type": "object",
+      "required": ["max_cost_usd", "max_tokens", "prefer_local"],
+      "additionalProperties": false,
+      "properties": {
+        "max_cost_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum allowed cost in USD"
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Token cap across LLM calls"
+        },
+        "max_runtime_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum execution duration in seconds"
+        },
+        "prefer_local": {
+          "type": "boolean",
+          "default": true,
+          "description": "Route to local compute (Dell M4800 / Ollama) first"
+        }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "required": ["level", "production", "financial", "external_action"],
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3, 4],
+          "description": "0=Read/Analyze, 1=Content Draft, 2=Sandbox/Staging, 3=Prod Write/Deploy, 4=Financial/Critical"
+        },
+        "production": {
+          "type": "boolean",
+          "description": "True if operation impacts production services"
+        },
+        "financial": {
+          "type": "boolean",
+          "description": "True if operation involves money, credits, or payments"
+        },
+        "external_action": {
+          "type": "boolean",
+          "description": "True if operation triggers outbound communications or APIs"
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": ["max_hops", "max_retries", "max_review_cycles"],
+      "additionalProperties": false,
+      "properties": {
+        "max_hops": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 8
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 3
+        },
+        "max_review_cycles": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 2
+        }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "required": ["hop"],
+      "additionalProperties": false,
+      "properties": {
+        "hop": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current hop counter, incremented at each delegation"
+        },
+        "parent_message_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "route_history": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "Type-specific payload data",
+      "default": {}
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 creation timestamp"
+    },
+    "expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "UTC ISO 8601 message expiration timestamp"
+    }
+  }
+}
