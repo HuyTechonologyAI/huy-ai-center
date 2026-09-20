@@ -637,42 +637,38 @@ COMMENT ON FUNCTION public.haip_archive_job(BIGINT) IS 'Secure server-side archi
 
 REVOKE ALL ON FUNCTION public.haip_archive_job(BIGINT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.haip_archive_job(BIGINT) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.claim_ai_task(p_worker_id TEXT)
+-- 2.4 Atomic Specific Task Claim Procedure (Claim specific task_id from PGMQ message)
+CREATE OR REPLACE FUNCTION public.claim_ai_task(
+    p_task_id UUID,
+    p_worker_id TEXT,
+    p_expected_version INTEGER DEFAULT NULL
+)
 RETURNS SETOF public.ai_tasks 
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-DECLARE
-    v_task_id UUID;
 BEGIN
-    SELECT id INTO v_task_id
-    FROM public.ai_tasks
-    WHERE status = 'QUEUED'
-    ORDER BY priority ASC, created_at ASC
-    LIMIT 1
-    FOR UPDATE SKIP LOCKED;
-
-    IF v_task_id IS NOT NULL THEN
-        RETURN QUERY
-        UPDATE public.ai_tasks
-        SET 
-            status = 'CLAIMED',
-            claimed_by_node_id = p_worker_id,
-            claimed_at = timezone('utc'::text, now()),
-            updated_at = timezone('utc'::text, now())
-        WHERE id = v_task_id
-        RETURNING *;
-    END IF;
-    RETURN;
+    -- Atomically transition the specific task from QUEUED to CLAIMED
+    -- Protected by state_version concurrency check
+    RETURN QUERY
+    UPDATE public.ai_tasks
+    SET 
+        status = 'CLAIMED',
+        claimed_by_node_id = p_worker_id,
+        claimed_at = timezone('utc'::text, now()),
+        updated_at = timezone('utc'::text, now())
+    WHERE id = p_task_id
+      AND status = 'QUEUED'
+      AND (p_expected_version IS NULL OR state_version = p_expected_version)
+    RETURNING *;
 END;
 $$;
 
-COMMENT ON FUNCTION public.claim_ai_task(TEXT) IS 'Atomic direct claim function for Dell Precision M4800 worker node';
+COMMENT ON FUNCTION public.claim_ai_task(UUID, TEXT, INTEGER) IS 'Atomically claims a specific task_id referenced by a PGMQ message with concurrency protection';
 
-REVOKE ALL ON FUNCTION public.claim_ai_task(TEXT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.claim_ai_task(TEXT) TO service_role;
+REVOKE ALL ON FUNCTION public.claim_ai_task(UUID, TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_ai_task(UUID, TEXT, INTEGER) TO service_role;
 
 -- ==============================================================================
 -- ZERO-TOUCH PRODUCTION AUDIT LOG POLICY:
