@@ -1,118 +1,118 @@
-# HUYAI QUEUE ARCHITECTURE & DEPLOYMENT PLAN
+# HUYAI QUEUE ARCHITECTURE & IMPLEMENTATION PLAN
+## PGMQ DEDICATED QUEUE SPECIFICATION (PHASE 06C)
 
-**Trạng thái:** KẾ HOẠCH HÀNG ĐỢI ĐA TẦNG (ZERO-REDIS QUEUE ARCHITECTURE)  
-**Tác giả:** Lead Software Architect + DevOps Integration Engineer  
-**Chi phí cơ sở hạ tầng hàng tháng:** **$0.00 USD**
+**Trạng thái:** KIẾN TRÚC HÀNG ĐỢI DUY NHẤT (PGMQ ONLY)  
+**Tiện ích cốt lõi:** `pgmq` (Supabase Queues, phiên bản `1.5.1` khả dụng trong cơ sở dữ liệu)  
+**Tên Queue:** `ai-jobs`  
+**Chi phí phát sinh:** **$0.00 USD/tháng** (Zero Redis, Zero Upstash, Zero Custom Queue Tables)
 
 ---
 
-## 1. Chiến Lược Hàng Đợi Hai Tầng (Dual-Mode Queue Architecture)
+## 1. Kiến Trúc Hàng Đợi Chuẩn (Streamlined Queue Architecture)
 
-Hệ sinh thái AI Center V1.1 loại bỏ hoàn toàn Redis, BullMQ hoặc các dịch vụ hàng đợi đám mây có phí (Upstash, AWS SQS) để tuân thủ giới hạn chi phí tối đa $30 USD/tháng. Thay vào đó, hệ thống triển khai kiến trúc tự thích ứng 2 tầng:
+Tuân thủ nghiêm ngặt chỉ đạo kỹ thuật Phase 06C, hệ thống **loại bỏ hoàn toàn** bảng tự tạo `queue_messages` và không duy trì giải pháp dự phòng kép. Hệ thống sử dụng duy nhất tiện ích mở rộng chuẩn **`pgmq`** của Supabase:
 
 ```text
-                     Control Center / Web APIs
-                                │
-                        [Enqueue AI Task]
-                                │
-                                ▼
-            ┌───────────────────────────────────────┐
-            │  Khả năng hỗ trợ pgmq trên HuyAI?     │
-            └───────────────────┬───────────────────┘
-                                │
-               ┌────────────────┴────────────────┐
-               │ CÓ                              │ CHƯA HỖ TRỢ
-               ▼                                 ▼
-      [TẦNG 1: PGMQ Queue]             [TẦNG 2: Postgres Native Queue]
-         Queue: ai-jobs                   Table: queue_messages & ai_tasks
-       pgmq.send / read                 claim_ai_task (FOR UPDATE SKIP LOCKED)
-               │                                 │
-               └────────────────┬────────────────┘
-                                │
-                                ▼
-                     Dell Precision M4800
-                   (apps/dispatcher worker)
+                     Web Applications / API Gateway
+                                   │
+                                   ▼ (POST /api/ai/tasks)
+                        [INSERT public.ai_tasks]
+                                   │
+                                   ▼ (pgmq.send)
+                     ┌───────────────────────────┐
+                     │     PGMQ Queue: ai-jobs   │
+                     │  (schema pgmq.q_ai_jobs)  │
+                     └─────────────┬─────────────┘
+                                   │
+                                   ▼ (pgmq.read / visibility timeout)
+                        Dell Precision M4800
+                      (apps/dispatcher worker)
+                                   │
+                      ┌────────────┴────────────┐
+                      ▼                         ▼
+                 Thành Công                  Thất Bại
+             (pgmq.archive / delete)     (pgmq retry / fail)
+                      │                         │
+                      ▼                         ▼
+              [ai_tasks: completed]     [ai_tasks: failed]
+              [ai_outputs: inserted]    [ai_tasks.error: updated]
 ```
 
-### 1.1. Tầng 1: Supabase Queues / pgmq Extension (Ưu tiên số 1)
-- **Cơ chế:** Khi Supabase Cloud hỗ trợ tiện ích mở rộng `pgmq`, hệ sinh thái sẽ kích hoạt:
-  ```sql
-  DO $$
-  BEGIN
-      CREATE EXTENSION IF NOT EXISTS pgmq;
-      PERFORM pgmq.create('ai-jobs');
-  EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'pgmq extension not available in this Supabase tier; fallback active.';
-  END $$;
-  ```
-- **Ưu điểm:** Tích hợp sâu vào PostgreSQL, hỗ trợ visibility timeout, dead-letter archiving và batch read hiệu năng cao.
+---
 
-### 1.2. Tầng 2: PostgreSQL Native Queue Fallback (Đảm bảo hoạt động 100%)
-- **Cơ chế:** Sử dụng bảng `queue_messages` và `ai_tasks` kết hợp cơ chế khóa dòng nguyên tử `FOR UPDATE SKIP LOCKED`.
-- **Hàm xử lý nguyên tử:**
-  ```sql
-  CREATE OR REPLACE FUNCTION public.claim_ai_task(p_worker_id TEXT)
-  RETURNS SETOF public.ai_tasks 
-  SET search_path = public, pg_temp
-  LANGUAGE plpgsql SECURITY DEFINER AS $$
-  DECLARE
-      v_task_id UUID;
-  BEGIN
-      SELECT id INTO v_task_id
-      FROM public.ai_tasks
-      WHERE status = 'queued'
-      ORDER BY 
-          CASE priority 
-              WHEN 'urgent' THEN 1
-              WHEN 'high' THEN 2
-              WHEN 'normal' THEN 3
-              WHEN 'low' THEN 4
-              ELSE 5 
-          END ASC,
-          created_at ASC
-      LIMIT 1
-      FOR UPDATE SKIP LOCKED;
+## 2. Thiết Lập & Khởi Tạo Hàng Đợi (Queue Setup)
 
-      IF v_task_id IS NOT NULL THEN
-          RETURN QUERY
-          UPDATE public.ai_tasks
-          SET 
-              status = 'claimed',
-              claimed_by_node_id = p_worker_id,
-              claimed_at = timezone('utc'::text, now()),
-              updated_at = timezone('utc'::text, now())
-          WHERE id = v_task_id
-          RETURNING *;
-      END IF;
-      RETURN;
-  END;
-  $$;
-  ```
-- **Đặc tính chống Race Condition:**
-  - `FOR UPDATE SKIP LOCKED` cho phép hàng chục worker trên Dell Precision M4800 (hoặc mở rộng thêm node sau này) cùng thăm dò một bảng mà không bao giờ bị đụng độ (deadlock) hoặc nhận trùng cùng một task.
+Trong migration `20260920000005_queue_and_governance.sql`:
+1. **Kích hoạt Extension:**
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS pgmq;
+   ```
+2. **Khởi tạo Hàng đợi `ai-jobs` (Idempotent):**
+   ```sql
+   DO $$
+   BEGIN
+       PERFORM pgmq.create('ai-jobs');
+       RAISE NOTICE 'PGMQ queue ai-jobs verified/created successfully.';
+   EXCEPTION WHEN OTHERS THEN
+       RAISE NOTICE 'Notice on pgmq.create(ai-jobs): %', SQLERRM;
+   END $$;
+   ```
+3. **Cấu trúc thông điệp trong `ai-jobs`:**
+   ```json
+   {
+     "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+     "task_type": "lesson_plan",
+     "source_app": "education",
+     "priority": "normal",
+     "input": {
+       "subject": "Tin học",
+       "grade": "Lớp 8",
+       "topic": "Mạng máy tính và Internet",
+       "periods": 2
+     },
+     "options": {
+       "timeout_seconds": 300,
+       "max_retries": 3
+     }
+   }
+   ```
 
 ---
 
-## 2. Quản Lý Vòng Đời Tác Vụ (Task Lifecycle Management)
+## 3. Quản Lý Vòng Đời Thông Điệp (Message Lifecycle & Visibility Timeout)
 
-1. **Khởi tạo (Enqueue):**
-   - API `/api/ai/tasks` chèn dòng mới với `status = 'queued'`, `priority`, `source_app`, `payload`.
-2. **Nhận tác vụ (Claim):**
-   - Dispatcher Poller gọi `claim_ai_task('huy-ai-node-01')`. Trạng thái chuyển sang `'claimed'`.
-3. **Gia hạn thời gian xử lý (Lease Renewal):**
-   - Đối với các tác vụ dài (ví dụ: tạo giáo án 5512 kèm slide và câu hỏi), worker định kỳ mỗi 30 giây gửi heartbeat gia hạn `claimed_at`, tránh tình trạng task bị worker khác giành lại nếu quá hạn `timeout_seconds`.
-4. **Xử lý lỗi & Thử lại (Retry & Backoff):**
-   - Nếu xảy ra lỗi mạng với adapter ngoài, tăng `retry_count`. Nếu `retry_count < max_retries`, task trở lại trạng thái `'queued'`.
-   - Nếu vượt quá `max_retries`, chuyển trạng thái `'failed'` kèm thông điệp lỗi chi tiết trong `error`.
-5. **Hoàn thành (Completion):**
-   - Lưu kết quả vào `ai_outputs` và đánh dấu `ai_tasks.status = 'completed'`.
+1. **Gửi thông điệp (Enqueue):**
+   ```sql
+   SELECT * FROM pgmq.send(
+       queue_name => 'ai-jobs',
+       msg => jsonb_build_object('task_id', task_id, 'task_type', task_type, 'input', input),
+       delay => 0
+   );
+   ```
+2. **Nhận thông điệp (Read with Visibility Timeout):**
+   - Dispatcher trên Dell Precision M4800 đọc thông điệp kèm visibility timeout (mặc định 300 giây):
+   ```sql
+   SELECT * FROM pgmq.read(
+       queue_name => 'ai-jobs',
+       vt => 300,
+       qty => 1
+   );
+   ```
+   - Trong suốt 300 giây, các worker khác sẽ không nhìn thấy thông điệp này.
+3. **Lưu trữ hoặc Xóa sau khi hoàn thành:**
+   - Khi hoàn thành xử lý, worker gọi hàm lưu trữ hoặc xóa:
+   ```sql
+   SELECT pgmq.archive('ai-jobs', msg_id);
+   -- hoặc: SELECT pgmq.delete('ai-jobs', msg_id);
+   ```
+4. **Xử lý lỗi & Dead-Letter:**
+   - Nếu worker bị tắt đột ngột (crash/power loss), sau 300 giây thông điệp sẽ tự động hiển thị lại để worker khác nhận xử lý.
+   - PGMQ tự động tăng trường `read_ct`. Nếu `read_ct > 3`, hệ thống chuyển task sang trạng thái `'failed'`.
 
 ---
 
-## 3. Đánh Giá Khả Năng Mở Rộng & Tiêu Thụ Tài Nguyên
-- **Dell Precision M4800:**
-  - 32 GB RAM đáp ứng thoải mái hơn 50 worker processes đồng thời mà không chiếm quá 5% RAM.
-  - Tần suất thăm dò mặc định: 1500ms khi rảnh, giảm xuống 200ms khi có hàng đợi dồn tải.
-- **Tải trên Supabase HuyAI:**
-  - Chỉ mục `idx_ai_tasks_queue_poll` có điều kiện `WHERE status = 'queued'` đảm bảo kích thước B-tree index chỉ chứa vài chục dòng đang chờ, tốc độ quét chỉ mất **< 1 millisecond** (0.001s).
-  - Không gây tốn CPU hay IOPS trên gói Supabase của hệ thống.
+## 4. Ưu Điểm So Với Bảng Custom Queue
+1. **Zero Maintenance:** Tận dụng bảng nội bộ tối ưu của `pgmq` (`pgmq.q_ai_jobs`, `pgmq.a_ai_jobs`).
+2. **Zero Schema Pollution:** Không sinh thêm bảng phụ trợ `queue_messages` trong schema `public`.
+3. **Độ Tin Cậy ACID:** Thông điệp được bảo vệ bằng giao dịch PostgreSQL nguyên tử, không bao giờ mất việc khi restart server.
+4. **Tiết Kiệm Chi Phí Tuyệt Đối:** $0/tháng, hoàn toàn nằm trong gói Supabase hiện có.

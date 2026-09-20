@@ -112,51 +112,9 @@ CREATE TABLE IF NOT EXISTS public.agent_versions (
     CONSTRAINT uq_agent_version UNIQUE (agent_id, version)
 );
 
--- 8. Seed Essential Providers and Models
-INSERT INTO public.ai_providers (id, name, provider_type, base_url, is_active, is_default)
-VALUES 
-    ('gemini-cloud', 'Google Gemini AI', 'cloud', 'https://generativelanguage.googleapis.com', true, true),
-    ('ollama-local', 'Ollama Local Node', 'local', 'http://localhost:11434', true, false),
-    ('groq-cloud', 'Groq LPU Cloud', 'cloud', 'https://api.groq.com/openai/v1', true, false),
-    ('heuristic-fallback', 'Huy AI Heuristic Fallback Engine', 'mock', NULL, true, false)
-ON CONFLICT (id) DO UPDATE SET
-    name = EXCLUDED.name,
-    is_active = EXCLUDED.is_active;
-
-INSERT INTO public.ai_models (id, provider_id, model_name, display_name, context_window, max_output_tokens, is_active, capabilities)
-VALUES
-    ('gemini-2.0-flash', 'gemini-cloud', 'gemini-2.0-flash', 'Google Gemini 2.0 Flash', 1048576, 8192, true, ARRAY['text', 'multimodal', 'fast']),
-    ('qwen2.5:7b', 'ollama-local', 'qwen2.5:7b', 'Qwen 2.5 7B (On-Prem M4800)', 32768, 4096, true, ARRAY['text', 'local', 'privacy']),
-    ('llama-3.3-70b-versatile', 'groq-cloud', 'llama-3.3-70b-versatile', 'Llama 3.3 70B Versatile', 131072, 8192, true, ARRAY['text', 'complex_reasoning']),
-    ('vanhoalong-heuristic-v1', 'heuristic-fallback', 'heuristic-engine', 'Huy Studio Heuristic Engine V1', 4096, 2048, true, ARRAY['offline', 'mock'])
-ON CONFLICT (id) DO UPDATE SET
-    display_name = EXCLUDED.display_name,
-    is_active = EXCLUDED.is_active;
-
--- Seed Initial Core Tools (from ai-tools-registry.ts)
-INSERT INTO public.tools (id, name, description, category, repository_url, license, default_endpoint, status, recommended_role, supported_inputs, output_format)
-VALUES
-    ('presenton', 'Presenton', 'Tạo bài trình chiếu từ prompt/tài liệu, xuất PPTX hoàn toàn chỉnh sửa được', 'slide', 'https://github.com/presenton/presenton', 'Apache-2.0', 'http://localhost:5000', 'ready', 'Chủ lực tạo Slide PPTX cho Giáo viên & Trường học', ARRAY['Văn bản', 'PDF', 'Template PPTX'], 'Microsoft PowerPoint (.pptx)'),
-    ('pptagent', 'PPTAgent', 'Phân tích bài presentation tham chiếu của trường, học bố cục và sinh bài mới', 'slide', 'https://github.com/ammadhh/pptagent', 'Open Source', 'http://localhost:8000', 'standby', 'Học phong cách slide chuẩn của đơn vị/trường học', ARRAY['PPTX mẫu', 'Nội dung bài'], 'Slide chuẩn Style Guide (.pptx)'),
-    ('slidev', 'Slidev', 'Tạo slide bằng Markdown, hỗ trợ Mermaid, LaTeX, syntax highlight và live code', 'slide', 'https://github.com/slidevjs/slidev', 'MIT', 'http://localhost:3030', 'ready', 'Slide bài giảng Công nghệ, Cơ khí, Điện tử, CNC, AI & Lập trình', ARRAY['Markdown', 'LaTeX', 'Mermaid'], 'Interactive Web Slide / PDF'),
-    ('marp', 'Marp', 'Hệ thống siêu nhẹ chuyển đổi Markdown thành Slide HTML, PDF, PPTX', 'slide', 'https://github.com/marp-team/marp', 'MIT', 'cli', 'ready', 'Bộ biên dịch Slide nhanh miễn phí cho toàn hệ sinh thái', ARRAY['Markdown Gaura/Marp'], 'PPTX, PDF, HTML'),
-    ('comfyui', 'ComfyUI', 'Nền tảng node-based xây dựng workflow AI tạo ảnh, video minh họa kỹ thuật', 'image', 'https://github.com/Comfy-Org/ComfyUI', 'GPL-3.0', 'http://127.0.0.1:8188', 'ready', 'Tự động sinh bộ ảnh minh họa kỹ thuật', ARRAY['Prompt', 'Image reference'], 'PNG, WebP')
-ON CONFLICT (id) DO UPDATE SET
-    name = EXCLUDED.name,
-    description = EXCLUDED.description,
-    status = EXCLUDED.status;
-
--- Seed Initial Agents
-INSERT INTO public.agents (id, name, slug, description, default_model_id, is_active)
-VALUES
-    ('teacher-ai', 'Teacher AI Assistant', 'teacher-ai', 'Hỗ trợ giáo viên soạn giáo án CV 5512, slide bài giảng, câu hỏi trắc nghiệm và phiếu học tập', 'gemini-2.0-flash', true),
-    ('student-ai', 'Student Learning AI', 'student-ai', 'Trợ giảng AI giải đáp thắc mắc, tóm tắt bài giảng và hướng dẫn tự học', 'gemini-2.0-flash', true),
-    ('smarttax-ai', 'SmartTax AI Specialist', 'smarttax-ai', 'Chuyên gia rà soát rủi ro thuế, hóa đơn, tờ khai và chính sách kế toán', 'gemini-2.0-flash', true),
-    ('business-ai', 'Business Workflow AI', 'business-ai', 'Tự động hóa báo cáo, phân tích số liệu và tối ưu quy trình doanh nghiệp', 'gemini-2.0-flash', true)
-ON CONFLICT (id) DO UPDATE SET
-    name = EXCLUDED.name,
-    description = EXCLUDED.description,
-    is_active = EXCLUDED.is_active;
+-- 8. REGISTRY SEEDS (PURGED PER PHASE 06C)
+-- Registry tables are created empty without speculative seed rows.
+-- Model/tool/provider/agent catalog entries will be introduced via reviewed catalog migrations or admin UI.
 
 -- 9. ROW LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.ai_providers ENABLE ROW LEVEL SECURITY;
