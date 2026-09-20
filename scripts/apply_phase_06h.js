@@ -72,6 +72,11 @@ async function verifyLegacyCounts(client, stage) {
   console.log(`✅ Legacy baseline perfectly preserved: exactly 19 tables, 239 rows.`);
 }
 
+function sanitize(msg) {
+  if (!msg || typeof msg !== 'string') return '';
+  return msg.replace(/postgres(?:ql)?:\/\/[^@\s]+@/gi, 'postgres://[REDACTED]@');
+}
+
 async function main() {
   console.log('================================================================');
   console.log('PHASE 06H — CONTROLLED PRODUCTION MIGRATION RUNNER');
@@ -81,7 +86,7 @@ async function main() {
   if (!DB_PASSWORD && !process.env.DATABASE_URL) {
     console.error('❌ Error: Neither SUPABASE_DB_PASSWORD nor DATABASE_URL is set.');
     console.error('To run automated migration:');
-    console.error('  $env:SUPABASE_DB_PASSWORD="<password>"; node scripts/apply_phase_06h.js');
+    console.error('  $env:DATABASE_URL="postgres://..."; node scripts/apply_phase_06h.js');
     console.error('\nAlternatively, the 5 canonical migration files can be run sequentially');
     console.error('in the Supabase Dashboard SQL Editor:');
     MIGRATIONS.forEach((m, idx) => {
@@ -209,7 +214,7 @@ async function main() {
     console.log('  node scripts/verify_phase_06h.js\n');
 
   } catch (err) {
-    console.error('\n❌ MIGRATION FAILED:', err.message);
+    console.error('\n❌ MIGRATION FAILED:', sanitize(err.message));
     process.exit(1);
   } finally {
     await client.end();
