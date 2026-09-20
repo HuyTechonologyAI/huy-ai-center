@@ -1,112 +1,95 @@
 # HUYAI ROW-LEVEL SECURITY (RLS) MATRIX & SECURITY BASELINE
-## RECONCILED SPECIFICATION (PHASE 06D)
+## RECONCILED SPECIFICATION (PHASE 06G — HAIP V1.2)
 
-**Trạng thái:** TÀI LIỆU PHÂN TÁCH BẢO MẬT HIỆN TRẠNG & BẢO MẬT MỚI (15 BẢNG MỚI ĐÃ ĐỐI SOÁT)  
+**Trạng thái:** TÀI LIỆU PHÂN TÁCH BẢO MẬT CHÍNH THỨC (HAIP V1.2)  
 **Dự án:** Supabase `HuyAI` (`bdeluacbzbdflxubhpha`, Singapore)  
-**Quy tắc:** Phân biệt rõ ràng giữa Schema Cũ (Legacy: 19 bảng) và Schema Mới (AI Center: 15 bảng mới + 1 bảng mở rộng). Không can thiệp chính sách cũ khi chưa có phê duyệt riêng.
+**Quy tắc bất biến:** Phân biệt rõ ràng giữa Schema Cũ (`LEGACY_HUYAI`: 19 bảng) và Schema Mới (`AI_CENTER_V1_2`: 15 bảng).  
+**DDL trên Production:** **ZERO (CHƯA THỰC THI)**  
 
 ---
 
-# PHẦN A: LEGACY_SECURITY_BASELINE (HIỆN TRẠNG 19 BẢNG CŨ)
+# PHẦN A: LEGACY_HUYAI_BASELINE (19 BẢNG HIỆN HỮU)
 
-Kiểm toán thực tế cho thấy cơ sở dữ liệu `HuyAI` hiện hữu đang tồn tại các cảnh báo bảo mật và tối ưu hóa sau:
+Toàn bộ **19 bảng hiện hữu** và **239 dòng dữ liệu sản xuất** được giữ nguyên trạng 100%:
 
-### 1. Bảng có RLS Bật nhưng CHƯA CÓ Policy nào (RLS Enabled with No Policies)
-*Tình trạng:* Khi bật RLS mà không có chính sách (policy), mọi truy vấn từ anonymous và authenticated users đều bị chặn theo mặc định (chỉ service_role có quyền đọc/ghi).
-- `public.cms_settings`
-- `public.leads`
-- `public.user_document_progress`
-- `public.user_video_progress`
+| STT | Bảng Hiện Hữu | RLS Status | Hiện Trạng Chính Sách | Hành Động Trong Phase 06G |
+| :---: | :--- | :---: | :--- | :--- |
+| 1 | `contacts` | Enabled | Có policy | **TOUCH ZERO** |
+| 2 | `videos` | Enabled | Có policy | **TOUCH ZERO** |
+| 3 | `resources` | Enabled | Có policy | **TOUCH ZERO** |
+| 4 | `resource_views` | Enabled | Có policy | **TOUCH ZERO** |
+| 5 | `premium_contents` | Enabled | Có policy | **TOUCH ZERO** |
+| 6 | `item_reviews` | Enabled | Có policy | **TOUCH ZERO** |
+| 7 | `audit_logs` | Enabled | Có policy | **TOUCH ZERO (ZERO DDL)** — Tái sử dụng cột `details JSONB` hiện hữu. |
+| 8 | `user_activity_metrics` | Enabled | Có policy | **TOUCH ZERO** |
+| 9 | `student_points_balance` | Enabled | Có policy | **TOUCH ZERO** |
+| 10 | `daily_tasks` | Enabled | Có policy | **TOUCH ZERO** |
+| 11 | `task_completions` | Enabled | Có policy | **TOUCH ZERO** |
+| 12 | `cms_folders` | Enabled | Có policy | **TOUCH ZERO** |
+| 13 | `orders` | Enabled | Có policy | **TOUCH ZERO** — Giữ nguyên cho thanh toán khóa học. |
+| 14 | `cms_settings` | Enabled | Không có policy (Cảnh báo cũ) | **TOUCH ZERO** (Không tự ý sửa) |
+| 15 | `knowledge_chunks` | Enabled | Có multiple permissive policies | **TOUCH ZERO** (Tái sử dụng cho RAG) |
+| 16 | `user_video_progress` | Enabled | Không có policy (Cảnh báo cũ) | **TOUCH ZERO** (Không tự ý sửa) |
+| 17 | `user_document_progress` | Enabled | Không có policy (Cảnh báo cũ) | **TOUCH ZERO** (Không tự ý sửa) |
+| 18 | `leads` | Enabled | Không có policy (Cảnh báo cũ) | **TOUCH ZERO** (Không tự ý sửa) |
+| 19 | `site_content` | Enabled | Có policy | **TOUCH ZERO** |
 
-### 2. Cảnh báo Mutable Search Path trên Stored Procedure
-- Hàm `public.match_knowledge_chunks`: Đang thiếu khai báo `SET search_path = public, pg_temp;`.
-
-### 3. Cảnh báo Hiệu Năng & Tối Ưu Hóa (Performance & Permissive Warnings)
-- **Foreign keys without covering indexes:** Một số bảng cũ có khóa ngoại trỏ tới tài nguyên nhưng thiếu chỉ mục B-tree tương ứng.
-- **Multiple permissive policies on `knowledge_chunks`:** Tồn tại nhiều policy permissive cùng áp dụng cho một hành vi, có thể làm chậm quá trình kiểm tra quyền khi khối lượng vector lớn.
-- **RLS Init-Plan optimization:** Một số điều kiện policy cũ thực hiện sub-query lặp lại thay vì dùng hàm đánh dấu STABLE/IMMUTABLE.
-
-> [!WARNING]
-> **CHỈ THỊ KIẾN TRÚC VỀ SCHEMA CŨ:**  
-> Không tuyên bố toàn bộ HuyAI là "security-clean". Không tự ý trộn lẫn việc sửa các bảng cũ vào các tệp migration của AI Center. Các biện pháp khắc phục cho schema cũ được lập thành phương án riêng biệt tại **PHẦN C** và chỉ thi hành khi có phê duyệt độc lập.
+> [!NOTE]
+> Các cảnh báo bảo mật cũ của `LEGACY_HUYAI` (ví dụ 4 bảng có RLS nhưng thiếu policy) được cách ly độc lập. Chúng không được gom chung vào migration của AI Center để tránh tạo ra sự phụ thuộc chéo hoặc thay đổi hành vi ngoài ý muốn.
 
 ---
 
-# PHẦN B: AI_CENTER_SECURITY_BASELINE (CHÍNH XÁC 15 BẢNG MỚI + 1 BẢNG MỞ RỘNG)
+# PHẦN B: AI_CENTER_V1_2_SECURITY_MATRIX (15 BẢNG MỚI)
 
-Tất cả **15 bảng mới** của AI Center V1.1 được áp dụng tiêu chuẩn bảo mật tuyệt đối 100%:
+Tất cả **15 bảng mới** đều được kích hoạt Row-Level Security (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`).
 
-| STT | Tên Bảng Mới | RLS Status | Anon (Khách) | Authenticated (Người dùng) | Service Role (Backend/Worker) | Chỉ Mục Khóa Ngoại |
-| :---: | :--- | :---: | :--- | :--- | :--- | :--- |
-| 1 | **`ai_tasks`** | **ENABLED** | ❌ Chặn | **SELECT / INSERT**: Chỉ tác vụ của chính mình (`user_id = auth.uid()` hoặc `user_email = auth.jwt()->email`). | **ALL** | `idx_ai_tasks_user_id`, `idx_ai_tasks_queue_poll` |
-| 2 | **`ai_task_steps`** | **ENABLED** | ❌ Chặn | **SELECT**: Chỉ xem bước của task thuộc quyền mình. | **ALL** | `idx_ai_task_steps_task` |
-| 3 | **`ai_outputs`** | **ENABLED** | ❌ Chặn | **SELECT**: Chỉ xem kết quả thuộc task của mình. | **ALL** | `idx_ai_outputs_task` |
-| 4 | **`nodes`** | **ENABLED** | ❌ Chặn | **SELECT**: Đọc thông tin node an toàn (online/offline, capabilities). | **ALL** | `idx_nodes_status` |
-| 5 | **`node_heartbeats`** | **ENABLED** | ❌ Chặn | **SELECT**: Đọc telemetry giám sát. | **ALL** | `idx_node_heartbeats_node` |
-| 6 | **`ai_providers`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | Khóa chính TEXT |
-| 7 | **`ai_models`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | `idx_ai_models_provider` |
-| 8 | **`tools`** | **ENABLED** | **SELECT** (`status != 'deprecated'`) | **SELECT** (`status != 'deprecated'`) | **ALL** | Khóa chính TEXT |
-| 9 | **`tool_versions`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | `uq_tool_version` |
-| 10 | **`tool_capabilities`**| **ENABLED** | **SELECT** | **SELECT** | **ALL** | `uq_tool_capability` |
-| 11 | **`agents`** | **ENABLED** | **SELECT** (`is_active = true`) | **SELECT** (`is_active = true`) | **ALL** | Khóa ngoại model |
-| 12 | **`agent_versions`** | **ENABLED** | **SELECT** | **SELECT** | **ALL** | `uq_agent_version` |
-| 13 | **`github_projects`** | **ENABLED** | ❌ Chặn | ❌ **Chặn (Server-Only)** | **ALL (Service-Role Only)** | `idx_github_projects_monitored` |
-| 14 | **`github_reviews`** | **ENABLED** | ❌ Chặn | ❌ **Chặn (Server-Only)** | **ALL (Service-Role Only)** | `idx_github_reviews_project` |
-| 15 | **`github_versions`** | **ENABLED** | ❌ Chặn | ❌ **Chặn (Server-Only)** | **ALL (Service-Role Only)** | `idx_github_versions_project` |
-| — | **`audit_logs`** *(Mở rộng)* | **ENABLED** | ❌ Chặn | **SELECT**: Chỉ xem log của chính mình (`actor_profile_id = auth.uid()` hoặc `user_email`). | **ALL** | `idx_audit_logs_actor`, `idx_audit_logs_action` |
+Quyền hạn truy cập được phân chia thành hai loại nghiêm ngặt:
+1. **OWNER-READ:** Người dùng đã xác thực chỉ có thể đọc dữ liệu thuộc về chính họ (`owner_user_id = auth.uid()`).
+2. **SERVER-ONLY:** Ẩn hoàn toàn khỏi mọi client web/trình duyệt. Chỉ `service_role` (Backend Next.js API và Worker Dispatcher) mới có quyền truy cập.
 
-### Nguyên Tắc Thiết Kế Cho GitHub Radar (Server-Only)
-- 3 bảng `github_projects`, `github_reviews`, `github_versions` được cấu hình **hoàn toàn Server-Side**:
-  - RLS được bật bắt buộc.
-  - **Không cấp quyền cho client** (anon và authenticated đều không có policy SELECT/INSERT/UPDATE/DELETE).
-  - Chỉ backend scanner và dispatcher chạy với `service_role` mới có quyền đọc và cập nhật dữ liệu.
+| STT | Tên Bảng Mới | RLS Phân Loại | Anon (Khách) | Authenticated (Người Dùng) | Service Role (Backend / Worker) |
+| :---: | :--- | :---: | :---: | :---: | :---: |
+| 1 | **`ai_tasks`** | **OWNER-READ** | ❌ Chặn | **SELECT / INSERT**: Chỉ tác vụ của chính mình (`owner_user_id = auth.uid()`). | **ALL** (Full Access) |
+| 2 | **`ai_task_steps`** | **SERVER-ONLY** | ❌ Chặn | ❌ **Chặn 100% (DENIED)**: Toàn bộ tin nhắn liên tác tử, reasoning trace, prompt context nội bộ được bảo vệ tuyệt đối. | **ALL** (Full Access) |
+| 3 | **`ai_outputs`** | **OWNER-READ** | ❌ Chặn | **SELECT**: Chỉ xem kết quả thuộc tác vụ của chính mình (thông qua `EXISTS (SELECT 1 FROM ai_tasks WHERE task_id = id AND owner_user_id = auth.uid())`). | **ALL** (Full Access) |
+| 4 | **`nodes`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 5 | **`node_heartbeats`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 6 | **`ai_providers`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 7 | **`ai_models`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 8 | **`tools`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 9 | **`tool_versions`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 10 | **`tool_capabilities`**| **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 11 | **`agents`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 12 | **`agent_versions`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 13 | **`github_projects`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 14 | **`github_reviews`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
+| 15 | **`github_versions`** | **SERVER-ONLY** | ❌ Chặn | ❌ Chặn | **ALL** (Full Access) |
 
-### Bảo Vệ Stored Procedures AI Center
-Mọi hàm trong migration AI Center đều tuân thủ nguyên tắc search_path:
+---
+
+# PHẦN C: BẢO VỆ RPC GATEWAY & PGMQ QUEUE
+
+### 1. Phân Quyền RPC Chức Năng
+Tất cả các hàm Gateway điều phối công việc đều được thiết lập:
+- `SECURITY DEFINER`
+- `SET search_path = public, pgmq, pg_temp;`
+- Thu hồi toàn bộ quyền thực thi từ `PUBLIC`, `anon`, `authenticated`.
+- Chỉ cấp quyền `EXECUTE` duy nhất cho `service_role`.
+
 ```sql
-CREATE OR REPLACE FUNCTION public.claim_ai_task(p_worker_id TEXT)
-RETURNS SETOF public.ai_tasks 
-SET search_path = public, pg_temp
-LANGUAGE plpgsql SECURITY DEFINER AS $$ ... $$;
+REVOKE ALL ON FUNCTION public.haip_enqueue_job(UUID, TEXT, JSONB) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.haip_enqueue_job(UUID, TEXT, JSONB) TO service_role;
+
+REVOKE ALL ON FUNCTION public.haip_read_jobs(TEXT, INTEGER, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.haip_read_jobs(TEXT, INTEGER, INTEGER) TO service_role;
+
+REVOKE ALL ON FUNCTION public.haip_archive_job(BIGINT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.haip_archive_job(BIGINT) TO service_role;
+
+REVOKE ALL ON FUNCTION public.claim_ai_task(TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_ai_task(TEXT) TO service_role;
 ```
 
----
-
-# PHẦN C: OPTIONAL_LEGACY_REMEDIATION_PLAN (KẾ HOẠCH KHẮC PHỤC RIÊNG BIỆT)
-
-*Kế hoạch này KHÔNG nằm trong core migration của AI Center. Được chuẩn bị sẵn để trình duyệt độc lập khi cần.*
-
-```sql
--- =============================================================================
--- OPTIONAL SCRIPT: HUYAI LEGACY SCHEMA REMEDIATION
--- ÁP DỤNG KHI VÀ CHỈ KHI CÓ PHÊ DUYỆT RIÊNG
--- =============================================================================
-
--- 1. Bổ sung policy cho cms_settings (Public đọc cấu hình, Service Role cập nhật)
-DROP POLICY IF EXISTS "Public can view active cms_settings" ON public.cms_settings;
-CREATE POLICY "Public can view active cms_settings" 
-    ON public.cms_settings FOR SELECT TO anon, authenticated USING (true);
-
--- 2. Bổ sung policy cho leads (Cho phép khách gửi lead, Service Role đọc xử lý)
-DROP POLICY IF EXISTS "Public can insert leads" ON public.leads;
-CREATE POLICY "Public can insert leads" 
-    ON public.leads FOR INSERT TO anon, authenticated WITH CHECK (true);
-
--- 3. Bổ sung policy cho user_document_progress
-DROP POLICY IF EXISTS "Users can manage own document progress" ON public.user_document_progress;
-CREATE POLICY "Users can manage own document progress" 
-    ON public.user_document_progress FOR ALL TO authenticated 
-    USING (user_email = (auth.jwt() ->> 'email'))
-    WITH CHECK (user_email = (auth.jwt() ->> 'email'));
-
--- 4. Bổ sung policy cho user_video_progress
-DROP POLICY IF EXISTS "Users can manage own video progress" ON public.user_video_progress;
-CREATE POLICY "Users can manage own video progress" 
-    ON public.user_video_progress FOR ALL TO authenticated 
-    USING (user_email = (auth.jwt() ->> 'email'))
-    WITH CHECK (user_email = (auth.jwt() ->> 'email'));
-
--- 5. Khắc phục search_path trên hàm match_knowledge_chunks
-ALTER FUNCTION public.match_knowledge_chunks(vector, double precision, integer) 
-    SET search_path = public, pg_temp;
-```
+### 2. Không Phơi Bày `pgmq_public`
+- Tuyệt đối không cài đặt hoặc cấp quyền schema `pgmq_public` cho client.
+- Client chỉ tương tác thông qua API routes Next.js (`/api/ai/tasks`) với quyền `service_role` sau khi đã xác thực người dùng.

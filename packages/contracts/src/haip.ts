@@ -169,6 +169,47 @@ export const HaipApprovalDecisionSchema = z.enum([
 export type HaipApprovalDecision = z.infer<typeof HaipApprovalDecisionSchema>;
 
 /**
+ * Task Approval Status (Stored in public.ai_tasks.approval_status)
+ */
+export const HaipApprovalStatusSchema = z.enum([
+  'NOT_REQUIRED',
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'REVISION_REQUESTED'
+]);
+export type HaipApprovalStatus = z.infer<typeof HaipApprovalStatusSchema>;
+
+/**
+ * Numeric Priority (1 = Highest / Critical, 5 = Lowest / Background)
+ */
+export const HaipNumericPrioritySchema = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+  z.literal(5)
+]);
+export type HaipNumericPriority = z.infer<typeof HaipNumericPrioritySchema>;
+
+export function haipPriorityToNumber(p: 'urgent' | 'high' | 'normal' | 'low'): number {
+  switch (p) {
+    case 'urgent': return 1;
+    case 'high': return 2;
+    case 'normal': return 3;
+    case 'low': return 4;
+    default: return 5;
+  }
+}
+
+export function numberToHaipPriority(n: number): 'urgent' | 'high' | 'normal' | 'low' {
+  if (n <= 1) return 'urgent';
+  if (n === 2) return 'high';
+  if (n <= 4) return 'normal';
+  return 'low';
+}
+
+/**
  * Agent Card V1 Specification
  */
 export const HaipAgentCardSchema = z.object({

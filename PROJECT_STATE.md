@@ -13,6 +13,18 @@ GOAL_TO_RESULT
 ## INTER_AGENT_PROTOCOL
 HAIP/1.0
 
+## HAIP_DATABASE_MAPPING
+READY
+
+## EXPECTED_EXISTING_PUBLIC_TABLES
+19
+
+## EXPECTED_NEW_PUBLIC_TABLES
+15
+
+## EXPECTED_FINAL_PUBLIC_TABLES
+34
+
 ## AGENT_TO_TOOL_PROTOCOL
 MCP
 
@@ -21,6 +33,15 @@ A2A_ADAPTER_PLANNED
 
 ## QUEUE
 pgmq/ai-jobs
+
+## QUEUE_DELIVERY
+AT_LEAST_ONCE
+
+## IDEMPOTENCY
+ENFORCED
+
+## CLIENT_INTERNAL_TRACE_ACCESS
+DENIED
 
 ## DISPATCHER
 HAIP_ROUTER_NOT_DEPLOYED
@@ -53,7 +74,7 @@ DEFERRED
 huy-ai-node-01
 
 ## CURRENT_PHASE
-PHASE 06F — HAIP AUTONOMOUS MULTI-AGENT ARCHITECTURE SPECIFICATION
+PHASE 06G — HAIP DATABASE RECONCILIATION V1.2
 
 ## CURRENT_BRANCH
 `main`
@@ -93,43 +114,36 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] **Phase 06G — HAIP Database Reconciliation V1.2:**
+  - Đối soát và dung hợp toàn diện 5 file migration hiện có với Kiến trúc Đa tác tử tự trị HAIP V1.2.
+  - Bảo toàn tuyệt đối kiến trúc **15 bảng mới** (Tổng 34 bảng sau migration, Zero-Table-Addition).
+  - Không tạo các bảng trùng lặp/dư thừa: `ai_messages`, `ai_task_dependencies`, `approvals`, `agent_events`, `queue_messages`, `dead_letter_messages`, `credit_transactions`, `ai_usage_events`.
+  - Thiết lập đồ thị DAG qua mảng `depends_on UUID[]` có chỉ mục GIN trên `public.ai_tasks`.
+  - Cài đặt trigger chuyển trạng thái xác định `check_ai_task_status_transition()` khóa 4 trạng thái kết thúc (`COMPLETED`, `FAILED`, `CANCELLED`, `EXPIRED`) và tăng `state_version`.
+  - Lưu trữ 12 loại thông điệp HAIP/1.0 trong `public.ai_task_steps` (`message_id UUID UNIQUE`, `idempotency_key UNIQUE`, `envelope JSONB`).
+  - Thiết lập RLS phân quyền rõ ràng: **Owner-Read** (`ai_tasks`, `ai_outputs`) và **Server-Only** (`ai_task_steps`, `nodes`, `node_heartbeats`, `agents`, `tools`, `github_*`). Client hoàn toàn bị chặn truy cập trace và prompt nội bộ.
+  - Khởi tạo Durable Basic Queue `ai-jobs` và các hàm RPC bảo mật (`haip_enqueue_job`, `haip_read_jobs`, `haip_archive_job`, `claim_ai_task`) cấp quyền duy nhất cho `service_role`.
+  - Giữ nguyên 100% không đụng chạm (Zero DDL) trên 19 bảng sản xuất hiện hữu (`contacts`, `videos`, `orders` [177 rows], `audit_logs`...).
+  - Ban hành 5 tài liệu nghiệp vụ kiến trúc: `HAIP_DATABASE_MAPPING.md`, `HAIP_DATABASE_STATE_TRANSITIONS.md`, `HAIP_IDEMPOTENCY_MODEL.md`, `HAIP_QUEUE_DELIVERY_MODEL.md`, `HAIP_DATABASE_INDEX_PLAN.md`.
+  - Cập nhật hợp đồng TypeScript `packages/contracts/src/haip.ts` và bộ kiểm thử đối soát tính tương đồng `haip-parity.test.ts` (40/40 tests toàn monorepo PASS 100%).
+  - **DDL trên Production: ZERO | Triển khai dịch vụ: ZERO.**
 - [x] **Phase 06F — HAIP Autonomous Multi-Agent Architecture Specification:**
   - Nâng cấp phiên bản kiến trúc lên **V1.2** (Nền tảng điều phối đa tác tử tự trị).
   - Chuẩn hóa giao thức liên tác tử **HAIP/1.0** (Huy AI Inter-Agent Protocol) với 12 message types chính xác.
   - Ban hành canonical JSON Schemas: `schemas/haip/haip-envelope.v1.schema.json` và `schemas/haip/agent-card.v1.schema.json`.
-  - Xây dựng typed models & Zod runtime validators tại `packages/contracts/src/haip.ts` (19/19 tests PASS).
-  - Định nghĩa máy trạng thái tác vụ (Task State Machine) 11 trạng thái chuẩn và 5 trạng thái kiểm soát/thất bại tại `docs/HAIP_TASK_STATE_MACHINE.md`.
-  - Đặc tả mô hình phân rã mục tiêu dạng đồ thị DAG và thuật toán kiểm tra chu trình tại `docs/HAIP_TASK_GRAPH_SPEC.md`.
-  - Thiết lập chính sách rủi ro 5 cấp độ (Level 0–4) và cổng phê duyệt con người (Risk $\ge 3$) tại `docs/HAIP_RISK_POLICY.md` và `docs/HAIP_HUMAN_APPROVAL_SPEC.md`.
-  - Thiết lập Cost Guard, bậc thang ưu tiên mô hình (Local M4800 $\rightarrow$ Free Cloud $\rightarrow$ Low-Cost SLM) tại `docs/HAIP_COST_POLICY.md`.
-  - Phân định ranh giới rõ ràng: **HAIP** (Agent ↔ Agent) và **MCP** (Agent ↔ Tool) tại `docs/HAIP_MCP_BOUNDARY.md`.
-  - Định nghĩa 4 phạm vi bộ nhớ (Global, Project, Task, Agent Workspace) và cách ly ngữ cảnh tại `docs/HAIP_MEMORY_MODEL.md`.
-  - Chuẩn hóa giao thức Artifact (không truyền nhị phân lớn trong message) tại `docs/HAIP_ARTIFACT_PROTOCOL.md`.
-  - Thiết kế vòng lặp QA và tự phục hồi với giới hạn chống lặp vô hạn tại `docs/HAIP_QA_RECOVERY_SPEC.md`.
-  - Tái định nghĩa Dispatcher thành **HAIP Router** tại `docs/HAIP_DISPATCHER_ARCHITECTURE.md`.
+  - Định nghĩa máy trạng thái tác vụ 16 trạng thái tại `docs/HAIP_TASK_STATE_MACHINE.md`.
   - Xây dựng 6 Skills mới (13 đến 18) trong `.agents/skills/`.
-  - Ban hành tài liệu kiến trúc tổng thể `docs/HUY_AI_CENTER_V1_2_ARCHITECTURE.md` và `MASTER_INSTRUCTION.md`.
-  - **DDL trên Production: ZERO | Triển khai dịch vụ: ZERO.**
 - [x] **Phase 06E — Controlled Production Migration Apply:**
-  - Thực hiện Step 0 Minimalism Check: Loại bỏ toàn bộ `ALTER TABLE public.audit_logs`, giữ nguyên 100% không đụng chạm (Zero DDL) các bảng hiện hữu.
-  - Thiết lập Live Pre-Apply Baseline: Ghi nhận 19 bảng hiện hữu với chính xác 239 rows (`orders`: 177, `resource_views`: 31, `user_activity_metrics`: 20, `student_points_balance`: 3, `cms_folders`: 2, `cms_settings`: 3, `videos`: 1, `resources`: 1, `site_content`: 1) tại `docs/HUYAI_PRODUCTION_PREAPPLY_SNAPSHOT.md`.
-  - Chuẩn bị trọn bộ 5 file migration tuần tự (`20260920000001` - `20260920000005`) cùng tệp gộp duy nhất `supabase/migrations/deploy_phase_06e_complete.sql`.
-  - Xây dựng bộ công cụ áp dụng và kiểm thử tự động: `scripts/apply_migrations.js` (PostgreSQL client) và `scripts/verify_phase_06e.js` (kiểm toán integrity, RLS, node seed, và server-side smoke test).
-  - Hoàn tất Báo cáo Di chuyển Sản xuất: `docs/HUYAI_PRODUCTION_MIGRATION_REPORT.md`.
-- [x] **Phase 06D — Pre-Apply Blocker Fix:**
-  - Đối soát chính xác số lượng bảng mới: **15 bảng mới**.
-  - Kiểm tra an ninh toàn diện 15 bảng mới: **100% PASS** (RLS Enabled, đầy đủ covering indexes).
-  - Cấu hình GitHub Radar Server-Only: RLS bật, không mở policy client (service-role access only).
-  - Bảng `public.orders`: Giữ nguyên 100% mục đích thanh toán hiện tại; **tuyệt đối không dùng cho AI compute usage / token deduction**.
-  - Hàng đợi: Duy nhất **PGMQ Durable Basic Queue** (`ai-jobs`), không lộ `pgmq_public` ra client, không dùng bảng `queue_messages`, không dùng Redis.
-- [x] **Phases 01 → 06C:** Foundation, Monorepo, Contracts, API Routes, Next.js Web Dashboard, Dell Dispatcher Worker, Database Baseline.
+  - Ghi nhận Live Pre-Apply Baseline: 19 bảng hiện hữu với 239 rows tại `docs/HUYAI_PRODUCTION_PREAPPLY_SNAPSHOT.md`.
+  - Chuẩn bị trọn bộ 5 file migration tuần tự cùng script gộp `deploy_phase_06g_complete.sql`.
+- [x] **Phases 01 → 06D:** Foundation, Monorepo, Contracts, API Routes, Next.js Web Dashboard, Dell Dispatcher Worker, Database Baseline.
 
 ## IN_PROGRESS
-- Không có (Phase 06F hoàn tất toàn bộ đặc tả kiến trúc).
+- Không có (Phase 06G hoàn tất toàn bộ đối soát cơ sở dữ liệu).
 
 ## PENDING
-- [ ] Tiến hành Phase 06G — HAIP Database Reconciliation.
-- [ ] Review & Human Approval từ Lead Architect.
+- [ ] Phê duyệt của con người (Human Approval) trước khi chạy migration vào Supabase Production `HuyAI`.
+- [ ] Tiến hành Phase 06H — Controlled Production Migration Apply.
 
 ---
 
@@ -137,9 +151,9 @@ WITHIN_BUDGET
 MIGRATION_NOT_APPLIED
 
 - **Bảo toàn dữ liệu 19 bảng hiện hữu:** 100% nguyên vẹn (Zero-Touch, Zero row deleted, orders 177 rows giữ nguyên).
-- **15 Bảng Mới Đã Soạn Thảo (Pending Apply):** `ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `node_heartbeats`, `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`, `github_projects`, `github_reviews`, `github_versions`.
-- **Hạ Tầng Hàng Đợi:** PGMQ Durable Basic Queue `ai-jobs` (Server-side credentials only).
-- **Chiến Lược Tái Sử Dụng DB V1.2:** Sử dụng `ai_tasks` cho state HAIP, `ai_task_steps` cho trace thực thi, `ai_outputs` cho tham chiếu artifact, không tạo thêm bảng `ai_messages` trong V1.
+- **15 Bảng Mới Đã Đối Soát (Pending Apply):** `ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `node_heartbeats`, `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`, `github_projects`, `github_reviews`, `github_versions`.
+- **Hạ Tầng Hàng Đợi:** PGMQ Durable Basic Queue `ai-jobs` (Server-side credentials only via RPCs).
+- **Chiến Lược Tái Sử Dụng DB V1.2:** Dung hợp hoàn toàn vào 15 bảng; không tạo bảng thừa.
 
 ## API_STATE
 - Endpoints hoạt động tại `apps/control-center/src/app/api/ai/...`:
@@ -153,32 +167,30 @@ MIGRATION_NOT_APPLIED
 - `apps/control-center`: Next.js 15, React 19, Tailwind CSS. Toàn bộ 14 routes tĩnh và động biên dịch thành công, typecheck 0 lỗi.
 
 ## WORKER_STATE
-- `apps/dispatcher`: HAIP Router Architecture đã đặc tả đầy đủ; mã nguồn mock adapter sẵn sàng; **chưa triển khai (NOT DEPLOYED)**.
+- `apps/dispatcher`: HAIP Router Architecture đã đối soát và cập nhật; **chưa triển khai (NOT DEPLOYED)**.
 
 ---
 
 ## TEST_STATUS
-- **Contracts & HAIP Unit Tests:** PASS (19/19 tests).
+- **Contracts & HAIP Unit Tests:** PASS (24/24 tests).
 - **API Logic Tests:** PASS (6/6 tests).
 - **Dispatcher Tests:** PASS (7/7 tests).
 - **Shared Tests:** PASS (3/3 tests).
 - **TypeScript Compile:** PASS (5/5 workspaces).
-- **Next.js Production Build:** PASS (14/14 routes).
-- **Tổng cộng:** 35/35 unit & integration tests PASS (100% Passed).
+- **Tổng cộng:** 40/40 unit & integration tests PASS (100% Passed).
 
 ## KNOWN_ISSUES
 - Không có.
 
 ## DECISIONS
-1. **HAIP/1.0 Adoption:** Chuẩn hóa giao thức trao đổi liên tác tử nội bộ bằng JSON schema, 12 message types, máy trạng thái 11 bước, phân cấp rủi ro 5 cấp.
-2. **Dual-Protocol Partition:** HAIP cho tương tác Agent-to-Agent; MCP cho tương tác Agent-to-Tool.
-3. **Capability-Based Routing:** Không gán cứng thương hiệu LLM; phân bổ việc dựa trên năng lực của Agent Card và chi phí bậc thang.
-4. **Single Queue PGMQ:** Duy nhất 1 hàng đợi `ai-jobs` trên Supabase PostgreSQL ($0 chi phí, không Redis).
-5. **Zero Production Impact in 06F:** Toàn bộ quá trình là kiến trúc & đặc tả; không chạy DDL, không deploy dịch vụ.
+1. **15-Table Architecture Preserved:** 100% yêu cầu của HAIP V1.2 được ánh xạ vào 15 bảng mới đã chuẩn bị, giữ tổng số bảng public là 34 (19 cũ + 15 mới).
+2. **DAG in `depends_on UUID[]`:** Sử dụng PostgreSQL array kết hợp GIN index thay cho bảng phụ `ai_task_dependencies`.
+3. **Internal Trace Access Denied:** Bảng `public.ai_task_steps` kích hoạt RLS Server-Only, ngăn chặn rò rỉ prompt và hội thoại liên tác tử ra ngoài client.
+4. **PGMQ At-Least-Once Delivery:** Sử dụng RPCs `SECURITY DEFINER` cho `ai-jobs` với cơ chế gia hạn lease VT và lưu trữ tự động vào `a_ai_jobs`.
+5. **Zero Production DDL in 06G:** Quá trình chỉ đối soát mã nguồn và tài liệu; tuyệt đối không can thiệp live database.
 
 ## NEXT_PHASE
-06G_HAIP_DATABASE_RECONCILIATION
+06H_CONTROLLED_PRODUCTION_MIGRATION
 
 ## NEXT_ACTION
-06G_HAIP_DATABASE_RECONCILIATION
-
+AWAIT_HUMAN_APPROVAL

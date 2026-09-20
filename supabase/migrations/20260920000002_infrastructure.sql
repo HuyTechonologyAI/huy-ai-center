@@ -1,9 +1,10 @@
 -- ==============================================================================
 -- HUY TECHNOLOGY AI CENTER — DATABASE MIGRATION
 -- Migration: 20260920000002_infrastructure.sql
+-- Architecture: V1.2 (HAIP/1.0 Multi-Agent Orchestration Platform)
 -- Module: Infrastructure (nodes, node_heartbeats)
 -- Target: HuyAI Singapore (bdeluacbzbdflxubhpha)
--- Rules: Non-destructive, 100% additive, Idempotent, RLS enabled.
+-- Rules: Non-destructive, 100% additive, Idempotent, RLS enabled, Server-Only.
 -- ==============================================================================
 
 -- 1. Infrastructure Compute Nodes Table
@@ -48,6 +49,7 @@ COMMENT ON TABLE public.node_heartbeats IS 'Periodic telemetry metrics submitted
 CREATE INDEX IF NOT EXISTS idx_node_heartbeats_node ON public.node_heartbeats (node_id, created_at DESC);
 
 -- 3. Seed Initial Node Configuration (Dell Precision M4800)
+-- Retains OFFLINE status until Dispatcher daemon actively reports heartbeat.
 INSERT INTO public.nodes (id, name, hostname, status, capabilities, specs, max_concurrency)
 VALUES (
     'huy-ai-node-01',
@@ -64,22 +66,15 @@ ON CONFLICT (id) DO UPDATE SET
     capabilities = EXCLUDED.capabilities,
     updated_at = timezone('utc'::text, now());
 
--- 4. ROW LEVEL SECURITY (RLS) POLICIES
+-- 4. ROW LEVEL SECURITY (RLS) POLICIES — SERVER-ONLY
 ALTER TABLE public.nodes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.node_heartbeats ENABLE ROW LEVEL SECURITY;
 
--- Authenticated users: Read-only access to compute cluster health status
+-- Clean state: Drop any client/authenticated policies per V1.2 Server-Only spec
 DROP POLICY IF EXISTS "Authenticated can view compute nodes" ON public.nodes;
-CREATE POLICY "Authenticated can view compute nodes"
-    ON public.nodes FOR SELECT TO authenticated
-    USING (true);
-
 DROP POLICY IF EXISTS "Authenticated can view node heartbeats" ON public.node_heartbeats;
-CREATE POLICY "Authenticated can view node heartbeats"
-    ON public.node_heartbeats FOR SELECT TO authenticated
-    USING (true);
 
--- Service Role full access
+-- Service Role full access exclusively
 DROP POLICY IF EXISTS "Service role full access on nodes" ON public.nodes;
 CREATE POLICY "Service role full access on nodes"
     ON public.nodes FOR ALL TO service_role USING (true) WITH CHECK (true);

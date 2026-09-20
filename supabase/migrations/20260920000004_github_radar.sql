@@ -1,9 +1,10 @@
 -- ==============================================================================
 -- HUY TECHNOLOGY AI CENTER — DATABASE MIGRATION
 -- Migration: 20260920000004_github_radar.sql
+-- Architecture: V1.2 (HAIP/1.0 Multi-Agent Orchestration Platform)
 -- Module: GitHub Radar (projects, reviews, releases)
 -- Target: HuyAI Singapore (bdeluacbzbdflxubhpha)
--- Rules: Non-destructive, 100% additive, Idempotent, RLS enabled.
+-- Rules: Non-destructive, 100% additive, Idempotent, RLS enabled, Server-Only.
 -- ==============================================================================
 
 -- 1. GitHub Monitored Projects Table
