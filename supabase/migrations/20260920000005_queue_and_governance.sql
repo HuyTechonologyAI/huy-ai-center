@@ -69,39 +69,12 @@ $$;
 COMMENT ON FUNCTION public.claim_ai_task(TEXT) IS 'Atomic claim function for Dell Precision M4800 worker nodes';
 
 -- -----------------------------------------------------------------------------
--- 2. GOVERNANCE & AUDIT LOGS MODULE (REUSE & EXTEND EXISTING)
+-- 2. GOVERNANCE & AUDIT LOGS MODULE (ZERO DDL ON EXISTING PRODUCTION TABLES)
 -- -----------------------------------------------------------------------------
 
--- Scoped Reuse: public.audit_logs is used strictly for user, admin, and security events
--- with a legitimate user identity. Node telemetry is tracked in nodes/node_heartbeats,
--- and runtime events in structured dispatcher logs. Existing constraints are preserved.
--- Non-destructive additive extension to existing HuyAI audit_logs table
-ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS actor_profile_id UUID;
-ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS organization_id UUID;
-ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS action TEXT;
-ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS entity_type TEXT;
-ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS entity_id TEXT;
-ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+-- Scoped Reuse: public.audit_logs is already present with:
+-- (id, user_id, user_email, user_name, action_type, target_resource, details JSONB, created_at).
+-- Per Step 0 minimalism check, all audit context fits into existing columns and details JSONB.
+-- ZERO DDL is applied to public.audit_logs to ensure 100% safety of existing production tables.
+-- Node telemetry is tracked in nodes/node_heartbeats, and runtime logs in dispatcher logs.
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON public.audit_logs (actor_profile_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON public.audit_logs (action, created_at DESC);
-
--- -----------------------------------------------------------------------------
--- 3. ROW LEVEL SECURITY (RLS) POLICIES ON EXTENDED AUDIT LOGS
--- -----------------------------------------------------------------------------
-
-ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
-
--- Audit logs: Authenticated can view own logs, Service role has full access
-DROP POLICY IF EXISTS "Users can view own audit logs" ON public.audit_logs;
-CREATE POLICY "Users can view own audit logs"
-    ON public.audit_logs FOR SELECT TO authenticated
-    USING (
-        user_id = (auth.uid())::text OR
-        user_email = (auth.jwt() ->> 'email') OR
-        actor_profile_id = auth.uid()
-    );
-
-DROP POLICY IF EXISTS "Service role full on audit_logs" ON public.audit_logs;
-CREATE POLICY "Service role full on audit_logs"
-    ON public.audit_logs FOR ALL TO service_role USING (true) WITH CHECK (true);

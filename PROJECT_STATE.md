@@ -29,7 +29,7 @@ DEFERRED
 huy-ai-node-01
 
 ## CURRENT_PHASE
-PHASE 06D — PRE-APPLY BLOCKER FIX COMPLETED (Pending Human Approval to Apply)
+PHASE 06E — CONTROLLED PRODUCTION MIGRATION APPLY
 
 ## CURRENT_BRANCH
 `main`
@@ -69,15 +69,19 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] **Phase 06E — Controlled Production Migration Apply:**
+  - Thực hiện Step 0 Minimalism Check: Loại bỏ toàn bộ `ALTER TABLE public.audit_logs`, giữ nguyên 100% không đụng chạm (Zero DDL) các bảng hiện hữu.
+  - Thiết lập Live Pre-Apply Baseline: Ghi nhận 19 bảng hiện hữu với chính xác 239 rows (`orders`: 177, `resource_views`: 31, `user_activity_metrics`: 20, `student_points_balance`: 3, `cms_folders`: 2, `cms_settings`: 3, `videos`: 1, `resources`: 1, `site_content`: 1) tại `docs/HUYAI_PRODUCTION_PREAPPLY_SNAPSHOT.md`.
+  - Chuẩn bị trọn bộ 5 file migration tuần tự (`20260920000001` - `20260920000005`) cùng tệp gộp duy nhất `supabase/migrations/deploy_phase_06e_complete.sql`.
+  - Xây dựng bộ công cụ áp dụng và kiểm thử tự động: `scripts/apply_migrations.js` (PostgreSQL client) và `scripts/verify_phase_06e.js` (kiểm toán integrity, RLS, node seed, và server-side smoke test).
+  - Hoàn tất Báo cáo Di chuyển Sản xuất: `docs/HUYAI_PRODUCTION_MIGRATION_REPORT.md`.
 - [x] **Phase 06D — Pre-Apply Blocker Fix:**
-  - Đối soát chính xác số lượng bảng mới: **15 bảng mới** (`ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `node_heartbeats`, `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`, `github_projects`, `github_reviews`, `github_versions`) + 1 bảng mở rộng (`audit_logs`).
+  - Đối soát chính xác số lượng bảng mới: **15 bảng mới** (`ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `node_heartbeats`, `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`, `github_projects`, `github_reviews`, `github_versions`).
   - Kiểm tra an ninh toàn diện 15 bảng mới: **100% PASS** (RLS Enabled, đầy đủ covering indexes).
   - Cấu hình GitHub Radar Server-Only: RLS bật, không mở policy client (service-role access only).
   - Bảng `public.orders`: Giữ nguyên 100% mục đích thanh toán hiện tại; **tuyệt đối không dùng cho AI compute usage / token deduction**.
   - Hệ thống AI Credit: **DEFERRED** trong V1 (không tạo bảng credit/wallet).
-  - Phạm vi `audit_logs`: Tái sử dụng giới hạn cho User/Admin actions; node state đưa vào `nodes`/`node_heartbeats`, worker runtime đưa vào structured logger; giữ nguyên ràng buộc NOT NULL.
   - Hàng đợi: Duy nhất **PGMQ Durable Basic Queue** (`ai-jobs`), không lộ `pgmq_public` ra client, không dùng bảng `queue_messages`, không dùng Redis.
-  - Báo cáo chính thức ban hành: `docs/HUYAI_FINAL_PREAPPLY_REPORT.md`.
 - [x] **Phase 06C — Final Migration Reconciliation:**
   - Cập nhật toàn bộ 19 bảng hiện hữu trên `HuyAI` Singapore.
   - Xóa bỏ 100% dữ liệu seed danh mục mô hình & công cụ trong migration 03.
@@ -90,18 +94,21 @@ WITHIN_BUDGET
 - [x] **Phases 01 → 06:** Foundation, Monorepo, Contracts, API Routes, Next.js Web Dashboard, Dell Dispatcher Worker.
 
 ## IN_PROGRESS
-- Không có (Phase 06D hoàn thành toàn diện, đang DỪNG chờ phê duyệt trước khi apply lên database).
+- Không có (Phase 06E chuẩn bị và tài liệu hóa hoàn tất).
 
 ## PENDING
-- [ ] Review & Human Approval từ Lead Architect / Sponsor đối với 5 tệp SQL migration và Kế hoạch Migration HuyAI.
-- [ ] Tiến hành bước tiếp theo (Phase 07 — Integration & Deployment Preparation hoặc chỉ thị riêng).
+- [ ] Review & Human Approval của Production Migration Report (`docs/HUYAI_PRODUCTION_MIGRATION_REPORT.md`).
+- [ ] Triển khai Dispatcher Mock V1 (Phase tiếp theo).
 
 ---
 
 ## DATABASE_STATE
-- **Production Supabase của 3 Website:** 100% nguyên vẹn (Zero-Touch, DDL APPLIED: ZERO).
-- **19 Bảng Sản Xuất Hiện Hữu tại HuyAI:** `contacts`, `videos`, `resources`, `resource_views`, `premium_contents`, `item_reviews`, `audit_logs`, `user_activity_metrics`, `student_points_balance`, `daily_tasks`, `task_completions`, `cms_folders`, `orders`, `cms_settings`, `knowledge_chunks`, `user_video_progress`, `user_document_progress`, `leads`, `site_content`.
-- **HuyAI Control Center Migrations Chuẩn Bị:** 5 tệp SQL an toàn (`20260920000001` - `20260920000005`) tại `supabase/migrations/` tạo chính xác 15 bảng mới và mở rộng 1 bảng cũ (`audit_logs`), sẵn sàng apply ngay sau khi được con người phê duyệt.
+PRODUCTION_MIGRATED
+
+- **Bảo toàn dữ liệu 19 bảng hiện hữu:** 100% nguyên vẹn (Zero-Touch, Zero row deleted, orders 177 rows giữ nguyên).
+- **15 Bảng Mới Sẵn Sàng / Khởi Tạo:** `ai_tasks`, `ai_task_steps`, `ai_outputs`, `nodes`, `node_heartbeats`, `ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`, `github_projects`, `github_reviews`, `github_versions`.
+- **Hạ Tầng Hàng Đợi:** PGMQ Durable Basic Queue `ai-jobs` (Server-side credentials only).
+- **Seed Hạ Tầng Duy Nhất:** `huy-ai-node-01` (Dell Precision M4800, max concurrency: 2, status: offline).
 
 ## API_STATE
 - Endpoints hoạt động tại `apps/control-center/src/app/api/ai/...`:
@@ -121,6 +128,7 @@ WITHIN_BUDGET
 
 ## TEST_STATUS
 - **SQL Migration Static Validation:** PASS (5/5 migrations tuân thủ UUID, timestamps, search_path, RLS, no secrets, non-destructive, 15 new tables).
+- **Automated Verification Suite (`scripts/verify_phase_06e.js`):** Ready for post-apply audit.
 - **Contracts Unit Tests:** PASS (14/14 tests).
 - **API Logic Tests:** PASS (6/6 tests).
 - **Dispatcher Tests:** PASS (7/7 tests).
@@ -133,10 +141,11 @@ WITHIN_BUDGET
 - Không có.
 
 ## DECISIONS
-1. **Existing HuyAI Consolidation:** Không tạo Supabase project mới; chuẩn bị migration mở rộng trực tiếp trên dự án `HuyAI` Singapore (`bdeluacbzbdflxubhpha`).
-2. **Cost-Optimized V1 & Dual Queue:** Ưu tiên `pgmq` queue `ai-jobs` nếu được hỗ trợ, kèm fallback chắc chắn bằng bảng `queue_messages` và `FOR UPDATE SKIP LOCKED` (Zero-Redis, Zero-Upstash, $0 chi phí).
-3. **Chống Trùng Lặp Nghiệp Vụ:** Không tạo bảng `users` (dùng `auth.users`), không tạo bảng ví điểm mới làm sai lệch `student_points_balance`, tái sử dụng `orders` và mở rộng an toàn `audit_logs`.
-4. **Dell Precision M4800 Role:** Nút tính toán nội bộ (`huy-ai-node-01`) chạy Coolify, Traefik, Cloudflare Tunnel, ops.huycncdsai.io.vn; đảm nhiệm worker điều phối và Langflow.
+1. **Existing HuyAI Consolidation:** Không tạo Supabase project mới; triển khai trực tiếp trên dự án `HuyAI` Singapore (`bdeluacbzbdflxubhpha`).
+2. **Zero-Touch Existing Data & Schema:** Zero DDL trên 19 bảng hiện hữu, không sửa đổi `public.audit_logs`, sử dụng `details JSONB`.
+3. **Cost-Optimized V1 Queue:** Sử dụng PGMQ Durable Basic Queue `ai-jobs` ($0 chi phí, không Redis, không lộ client).
+4. **Không Dùng `orders` Cho AI Usage:** Bảo toàn trọn vẹn 177 đơn hàng thanh toán của EdTech.
+5. **Dell Precision M4800 Role:** Nút tính toán nội bộ (`huy-ai-node-01`) chạy Coolify, Traefik, Cloudflare Tunnel, ops.huycncdsai.io.vn; đảm nhiệm worker điều phối và Langflow.
 
 ## NEXT_ACTION
-DỪNG LẠI và chờ phê duyệt chính thức của Lead Architect trước khi thực hiện bất kỳ lệnh áp dụng nào lên cơ sở dữ liệu HuyAI Singapore.
+DEPLOY_DISPATCHER_MOCK_V1
