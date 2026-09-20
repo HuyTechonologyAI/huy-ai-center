@@ -117,84 +117,145 @@ async function main() {
     // 0. Pre-Flight Legacy Verification
     await verifyLegacyCounts(client, 'PRE-FLIGHT');
 
-    // 1. Apply Migration 01: AI Operations
-    console.log('\n--- APPLYING MIGRATION 01: 20260920000001_ai_operations.sql ---');
-    const sql01 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[0].file), 'utf8');
-    await client.query(sql01);
-    console.log('✅ Migration 01 applied successfully.');
-
-    // Verify 01
-    const res01 = await client.query(`
-      SELECT table_name, rowsecurity 
-      FROM pg_tables 
-      WHERE schemaname = 'public' AND table_name IN ('ai_tasks', 'ai_task_steps', 'ai_outputs');
-    `);
-    if (res01.rows.length !== 3) throw new Error('Expected 3 AI operations tables');
-    for (const r of res01.rows) {
-      if (!r.rowsecurity) throw new Error(`RLS not enabled on ${r.table_name}`);
+    // Helper to record Supabase migration history atomically
+    async function recordMigration(version, name) {
+      await client.query(`CREATE SCHEMA IF NOT EXISTS supabase_migrations;`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (
+          version text PRIMARY KEY,
+          statements text[],
+          name text
+        );
+      `);
+      await client.query(`
+        INSERT INTO supabase_migrations.schema_migrations (version, name)
+        VALUES ($1, $2)
+        ON CONFLICT (version) DO NOTHING;
+      `, [version, name]);
     }
-    console.log('✅ Verified: ai_tasks, ai_task_steps, ai_outputs exist with RLS enabled.');
-    await verifyLegacyCounts(client, 'POST-MIGRATION-01');
+
+    // 1. Apply Migration 01: AI Operations
+    console.log('\n--- [1/5] TRANSACTION BEGIN: 20260920000001_ai_operations.sql ---');
+    await client.query('BEGIN');
+    try {
+      const sql01 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[0].file), 'utf8');
+      await client.query(sql01);
+
+      // Verify 01 inside transaction
+      const res01 = await client.query(`
+        SELECT table_name, rowsecurity 
+        FROM pg_tables 
+        WHERE schemaname = 'public' AND table_name IN ('ai_tasks', 'ai_task_steps', 'ai_outputs');
+      `);
+      if (res01.rows.length !== 3) throw new Error('Expected 3 AI operations tables');
+      for (const r of res01.rows) {
+        if (!r.rowsecurity) throw new Error(`RLS not enabled on ${r.table_name}`);
+      }
+      await verifyLegacyCounts(client, 'POST-MIGRATION-01');
+      await recordMigration('20260920000001', 'ai_operations');
+
+      await client.query('COMMIT');
+      console.log('✅ Migration 01 verified & COMMITTED successfully.');
+    } catch (err01) {
+      await client.query('ROLLBACK');
+      console.error('🛑 Migration 01 failed. Transaction ROLLED BACK. Zero partially-created objects remain.');
+      throw err01;
+    }
 
     // 2. Apply Migration 02: Infrastructure
-    console.log('\n--- APPLYING MIGRATION 02: 20260920000002_infrastructure.sql ---');
-    const sql02 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[1].file), 'utf8');
-    await client.query(sql02);
-    console.log('✅ Migration 02 applied successfully.');
+    console.log('\n--- [2/5] TRANSACTION BEGIN: 20260920000002_infrastructure.sql ---');
+    await client.query('BEGIN');
+    try {
+      const sql02 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[1].file), 'utf8');
+      await client.query(sql02);
 
-    // Verify 02
-    const res02 = await client.query(`SELECT id, name, status FROM public.nodes WHERE id = 'huy-ai-node-01'`);
-    if (res02.rows.length !== 1) throw new Error("Expected 1 seed node 'huy-ai-node-01'");
-    console.log(`✅ Verified: nodes and node_heartbeats created. Seed node: ${res02.rows[0].id} (status: ${res02.rows[0].status})`);
-    await verifyLegacyCounts(client, 'POST-MIGRATION-02');
+      // Verify 02 inside transaction
+      const res02 = await client.query(`SELECT id, name, status FROM public.nodes WHERE id = 'huy-ai-node-01'`);
+      if (res02.rows.length !== 1) throw new Error("Expected 1 seed node 'huy-ai-node-01'");
+      await verifyLegacyCounts(client, 'POST-MIGRATION-02');
+      await recordMigration('20260920000002', 'infrastructure');
+
+      await client.query('COMMIT');
+      console.log(`✅ Migration 02 verified & COMMITTED. Node: ${res02.rows[0].id} (status: ${res02.rows[0].status})`);
+    } catch (err02) {
+      await client.query('ROLLBACK');
+      console.error('🛑 Migration 02 failed. Transaction ROLLED BACK. Zero partially-created objects remain.');
+      throw err02;
+    }
 
     // 3. Apply Migration 03: AI Registry
-    console.log('\n--- APPLYING MIGRATION 03: 20260920000003_ai_registry.sql ---');
-    const sql03 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[2].file), 'utf8');
-    await client.query(sql03);
-    console.log('✅ Migration 03 applied successfully.');
+    console.log('\n--- [3/5] TRANSACTION BEGIN: 20260920000003_ai_registry.sql ---');
+    await client.query('BEGIN');
+    try {
+      const sql03 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[2].file), 'utf8');
+      await client.query(sql03);
 
-    // Verify 03
-    const regTables = ['ai_providers', 'ai_models', 'tools', 'tool_versions', 'tool_capabilities', 'agents', 'agent_versions'];
-    for (const t of regTables) {
-      const r = await client.query(`SELECT COUNT(*)::int as c FROM public."${t}"`);
-      if (r.rows[0].c !== 0) throw new Error(`Expected 0 rows in registry table ${t}, found ${r.rows[0].c}`);
+      // Verify 03 inside transaction
+      const regTables = ['ai_providers', 'ai_models', 'tools', 'tool_versions', 'tool_capabilities', 'agents', 'agent_versions'];
+      for (const t of regTables) {
+        const r = await client.query(`SELECT COUNT(*)::int as c FROM public."${t}"`);
+        if (r.rows[0].c !== 0) throw new Error(`Expected 0 rows in registry table ${t}, found ${r.rows[0].c}`);
+      }
+      await verifyLegacyCounts(client, 'POST-MIGRATION-03');
+      await recordMigration('20260920000003', 'ai_registry');
+
+      await client.query('COMMIT');
+      console.log('✅ Migration 03 verified & COMMITTED (7 tables created, 0 seeds).');
+    } catch (err03) {
+      await client.query('ROLLBACK');
+      console.error('🛑 Migration 03 failed. Transaction ROLLED BACK. Zero partially-created objects remain.');
+      throw err03;
     }
-    console.log('✅ Verified: 7 AI Registry tables created with 0 seeds (empty catalog).');
-    await verifyLegacyCounts(client, 'POST-MIGRATION-03');
 
     // 4. Apply Migration 04: GitHub Radar
-    console.log('\n--- APPLYING MIGRATION 04: 20260920000004_github_radar.sql ---');
-    const sql04 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[3].file), 'utf8');
-    await client.query(sql04);
-    console.log('✅ Migration 04 applied successfully.');
+    console.log('\n--- [4/5] TRANSACTION BEGIN: 20260920000004_github_radar.sql ---');
+    await client.query('BEGIN');
+    try {
+      const sql04 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[3].file), 'utf8');
+      await client.query(sql04);
 
-    // Verify 04
-    const radarTables = ['github_projects', 'github_reviews', 'github_versions'];
-    for (const t of radarTables) {
-      const r = await client.query(`SELECT COUNT(*)::int as c FROM public."${t}"`);
-      if (r.rows[0].c !== 0) throw new Error(`Expected 0 rows in radar table ${t}`);
+      // Verify 04 inside transaction
+      const radarTables = ['github_projects', 'github_reviews', 'github_versions'];
+      for (const t of radarTables) {
+        const r = await client.query(`SELECT COUNT(*)::int as c FROM public."${t}"`);
+        if (r.rows[0].c !== 0) throw new Error(`Expected 0 rows in radar table ${t}`);
+      }
+      await verifyLegacyCounts(client, 'POST-MIGRATION-04');
+      await recordMigration('20260920000004', 'github_radar');
+
+      await client.query('COMMIT');
+      console.log('✅ Migration 04 verified & COMMITTED (3 tables created, Server-Only).');
+    } catch (err04) {
+      await client.query('ROLLBACK');
+      console.error('🛑 Migration 04 failed. Transaction ROLLED BACK. Zero partially-created objects remain.');
+      throw err04;
     }
-    console.log('✅ Verified: 3 GitHub Radar tables created with 0 seeds (server-only).');
-    await verifyLegacyCounts(client, 'POST-MIGRATION-04');
 
     // 5. Apply Migration 05: Queue & Governance
-    console.log('\n--- APPLYING MIGRATION 05: 20260920000005_queue_and_governance.sql ---');
-    const sql05 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[4].file), 'utf8');
-    await client.query(sql05);
-    console.log('✅ Migration 05 applied successfully.');
+    console.log('\n--- [5/5] TRANSACTION BEGIN: 20260920000005_queue_and_governance.sql ---');
+    await client.query('BEGIN');
+    try {
+      const sql05 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', MIGRATIONS[4].file), 'utf8');
+      await client.query(sql05);
 
-    // Verify 05
-    const extRes = await client.query(`SELECT extname, extversion FROM pg_extension WHERE extname = 'pgmq'`);
-    if (extRes.rows.length === 0) throw new Error('pgmq extension not found');
-    console.log(`✅ Verified: pgmq extension active (version: ${extRes.rows[0].extversion}).`);
+      // Verify 05 inside transaction
+      const extRes = await client.query(`SELECT extname, extversion FROM pg_extension WHERE extname = 'pgmq'`);
+      if (extRes.rows.length === 0) throw new Error('pgmq extension not found');
 
-    const qRes = await client.query(`SELECT queue_name, is_partitioned, is_unlogged FROM pgmq.list_queues() WHERE queue_name = 'ai-jobs'`);
-    if (qRes.rows.length === 0) throw new Error("Queue 'ai-jobs' not found in pgmq");
-    if (qRes.rows[0].is_unlogged) throw new Error("Queue 'ai-jobs' must be DURABLE (not unlogged)");
-    console.log(`✅ Verified: Queue 'ai-jobs' created as DURABLE BASIC queue.`);
+      const qRes = await client.query(`SELECT queue_name, is_partitioned, is_unlogged FROM pgmq.list_queues() WHERE queue_name = 'ai-jobs'`);
+      if (qRes.rows.length === 0) throw new Error("Queue 'ai-jobs' not found in pgmq");
+      if (qRes.rows[0].is_unlogged) throw new Error("Queue 'ai-jobs' must be DURABLE (not unlogged)");
 
-    await verifyLegacyCounts(client, 'POST-MIGRATION-05');
+      await verifyLegacyCounts(client, 'POST-MIGRATION-05');
+      await recordMigration('20260920000005', 'queue_and_governance');
+
+      await client.query('COMMIT');
+      console.log(`✅ Migration 05 verified & COMMITTED (pgmq active, ai-jobs DURABLE BASIC queue).`);
+    } catch (err05) {
+      await client.query('ROLLBACK');
+      console.error('🛑 Migration 05 failed. Transaction ROLLED BACK. Zero partially-created objects remain.');
+      throw err05;
+    }
 
     // 6. Total Public Tables Count Check
     const totalTablesRes = await client.query(`
@@ -208,6 +269,7 @@ async function main() {
       throw new Error(`Public table count mismatch! Expected 34, got ${totalTables}`);
     }
     console.log('✅ EXACT MATCH: 19 legacy + 15 new = 34 public tables.');
+
 
     console.log('\n🎉 ALL 5 CANONICAL MIGRATIONS APPLIED AND VERIFIED SUCCESSFULLY!');
     console.log('Ready to run comprehensive post-migration verification suite:');
