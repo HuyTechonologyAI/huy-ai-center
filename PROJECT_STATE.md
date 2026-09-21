@@ -173,7 +173,10 @@ ACTIVE
 LOCAL_PASS
 
 ## HUMAN_STAGING_REVIEW
-PENDING
+PASS
+
+## PRODUCTION_APPROVAL
+GRANTED_FOR_NEXT_PHASE_ONLY
 
 ## BRAND_SYSTEM
 FROZEN
@@ -230,10 +233,10 @@ UNCHANGED
 UNCHANGED
 
 ## CURRENT_PHASE
-PHASE 06J-UX-C — STAGING VALIDATION
+PHASE 06J-UX-C.1 — HUMAN STAGING REVIEW
 
 ## NEXT_PHASE
-06J-UX-C.1_HUMAN_STAGING_REVIEW
+06J-UX-D_PRODUCTION_CUTOVER
 
 ## CURRENT_BRANCH
 `feature/06j-ux-b-corporate-v2-preview` (Remote pushed; main untouched)
@@ -273,6 +276,12 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] **Phase 06J-UX-C.1 — Human Staging Review (Pre-Production Acceptance Gate):**
+  - Thẩm định trực quan toàn diện trên môi trường Vercel Preview HTTPS (`https://edtech-ai-portfolio-azmg886h4-huytechonologyais-projects.vercel.app/v2`).
+  - Đạt chuẩn 100% các tiêu chí: Hero, 6 Đơn vị thành viên, AI Agency phân cấp chuẩn, Giải pháp, Sản phẩm, An ninh 4 trụ cột, Nhà sáng lập & 2 giải thưởng 2020, Form liên hệ Staging, Footer và Menu di động.
+  - Đính chính tình trạng GitHub Draft PR: Chưa tạo PR cụ thể, link khởi tạo PR so sánh sẵn sàng.
+  - Khuyến nghị kích hoạt GitHub Branch Protection trên nhánh `main` trước khi mở rộng tác tử.
+  - Quyết định nghiệm thu: `APPROVED_FOR_PRODUCTION_CUTOVER`.
 - [x] **Phase 06J-UX-C — Staging Validation:**
   - Cam kết mã nguồn ứng viên staging `6c0fa2f` lên nhánh `feature/06j-ux-b-corporate-v2-preview` và đẩy thành công lên GitHub remote.
   - Vercel Preview Deployment tự động kích hoạt thành công: `https://edtech-ai-portfolio-azmg886h4-huytechonologyais-projects.vercel.app`.
@@ -319,13 +328,12 @@ WITHIN_BUDGET
 ---
 
 ## IN_PROGRESS
-- Không có (Phase 06J-UX-C đã hoàn tất 100% triển khai và thẩm định Staging; dừng lại chờ đánh giá của con người).
+- Không có (Phase 06J-UX-C.1 đã hoàn tất 100% thẩm định và sẵn sàng cho Phase 06J-UX-D).
 
 ---
 
 ## PENDING
-- [ ] Đánh giá thẩm định của con người đối với Staging Preview V2 (`docs/PHASE_06J_UX_C_STAGING_VALIDATION_REPORT.md`).
-- [ ] Tiến hành Phase 06J-UX-C.1 — Human Staging Review.
+- [ ] Phê duyệt và ban hành lệnh chuyển giao sản xuất chính thức (Phase 06J-UX-D — Production Cutover).
 
 ---
 
@@ -351,7 +359,7 @@ PRODUCTION_MIGRATED_STABLE
 
 ## FRONTEND_STATE
 - `apps/control-center`: Next.js 15, React 19, Tailwind CSS. Toàn bộ 14 routes tĩnh và động biên dịch thành công, typecheck 0 lỗi.
-- `scratch/edtech-ai-portfolio`: Next.js 16 (Turbopack). Nhánh `feature/06j-ux-b-corporate-v2-preview`. Đã đẩy lên remote và kích hoạt Vercel Preview Deployment thành công. Toàn bộ 56 routes biên dịch thành công 100%. Đã xuất 14 ảnh chụp màn hình kiểm định staging tại `public/screenshots-v2-staging/`.
+- `scratch/edtech-ai-portfolio`: Next.js 16 (Turbopack). Nhánh `feature/06j-ux-b-corporate-v2-preview`. Đã thẩm định Staging đạt APPROVED_FOR_PRODUCTION_CUTOVER. Toàn bộ 56 routes biên dịch thành công 100%.
 
 ---
 
@@ -379,5 +387,5 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_ACTION
-AWAIT_HUMAN_STAGING_REVIEW (Dừng lại để người dùng đánh giá thẩm định trực tiếp trên Vercel Preview URL trước khi chuyển sang các giai đoạn tiếp theo).
+AWAIT_PRODUCTION_CUTOVER_INSTRUCTION (Dừng lại để người dùng ra quyết định chỉ đạo chuyển giao sản xuất chính thức tại Phase 06J-UX-D).
 
