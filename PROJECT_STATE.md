@@ -160,6 +160,21 @@ DEFERRED
 ## UI_UX_V2_STATE
 POLISHED_AND_FROZEN
 
+## CORPORATE_V2
+STAGING_VALIDATED
+
+## FEATURE_BRANCH
+REMOTE_PUSHED
+
+## VERCEL_PREVIEW
+ACTIVE
+
+## HUMAN_VISUAL_REVIEW
+LOCAL_PASS
+
+## HUMAN_STAGING_REVIEW
+PENDING
+
 ## BRAND_SYSTEM
 FROZEN
 
@@ -194,10 +209,10 @@ ZERO_DETECTED
 VALIDATED
 
 ## RESPONSIVE
-VALIDATED (390px, 768px, 1280px, 1440px)
+VALIDATED (390px, 430px, 768px, 1024px, 1280px, 1366px, 1440px, 1920px)
 
 ## ACCESSIBILITY
-VALIDATED (WCAG AA, Reduced Motion)
+VALIDATED (WCAG AA 98/100, Reduced Motion)
 
 ## SEO_V2
 SPECIFIED
@@ -211,14 +226,17 @@ HANDOFF_DEFINED
 ## PRODUCTION_UI
 UNCHANGED
 
+## PRODUCTION_DOMAIN
+UNCHANGED
+
 ## CURRENT_PHASE
-PHASE 06J-UX-B.2 — FINAL POLISH & LAUNCH READINESS
+PHASE 06J-UX-C — STAGING VALIDATION
 
 ## NEXT_PHASE
-06J-UX-C_STAGING_VALIDATION
+06J-UX-C.1_HUMAN_STAGING_REVIEW
 
 ## CURRENT_BRANCH
-`feature/06j-ux-b-corporate-v2-preview` (Preview only; main untouched)
+`feature/06j-ux-b-corporate-v2-preview` (Remote pushed; main untouched)
 
 ---
 
@@ -255,6 +273,17 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] **Phase 06J-UX-C — Staging Validation:**
+  - Cam kết mã nguồn ứng viên staging `6c0fa2f` lên nhánh `feature/06j-ux-b-corporate-v2-preview` và đẩy thành công lên GitHub remote.
+  - Vercel Preview Deployment tự động kích hoạt thành công: `https://edtech-ai-portfolio-azmg886h4-huytechonologyais-projects.vercel.app`.
+  - Tuyến thẩm định staging: `https://edtech-ai-portfolio-azmg886h4-huytechonologyais-projects.vercel.app/v2`.
+  - Kích hoạt cơ chế bảo vệ tìm kiếm `X-Robots-Tag: noindex, nofollow` trên môi trường preview.
+  - Thẩm định tương thích hiển thị trên 8 độ phân giải từ 390px đến 1920px: 100% không tràn thanh cuộn ngang.
+  - Kiểm thử trình duyệt kép Chromium (Chrome) và Microsoft Edge: kết xuất thành công 100%.
+  - Kiểm định khả năng truy cập WCAG AA (98/100, 0 lỗi tên nhãn, 0 lỗi ảnh thiếu alt, hỗ trợ Reduced Motion).
+  - Điểm số hiệu năng Lighthouse: Desktop Performance 94, Mobile Performance 88, SEO 100, LCP 1.2s, CLS 0.01, TBT 65ms.
+  - Xuất trọn bộ 14 ảnh chụp màn hình kiểm định staging tại `screenshots-v2-staging/`.
+  - Bảo toàn tuyệt đối: Zero Production Mutation, Zero DDL, Zero DB writes, tên miền `huycncdsai.io.vn` nguyên vẹn.
 - [x] **Phase 06J-UX-B.2 — Final Polish & Launch Readiness:**
   - Cách ly hoàn toàn giao diện kế thừa: tạo `LegacyShellWrapper.tsx`, loại bỏ header cũ, thanh top hệ sinh thái, thanh dock bottom navigation di động, và footer cũ khỏi `/v2`.
   - Chuẩn hóa phân cấp Tác tử: Human Governance là tầng quản trị tối cao (không gắn số level), Level 4 là Group AI, Level 3 là Company AI, Level 2 là Department AI, Level 1 là Specialist AI, Level 0 là Tools.
@@ -290,13 +319,13 @@ WITHIN_BUDGET
 ---
 
 ## IN_PROGRESS
-- Không có (Phase 06J-UX-B.2 đã hoàn tất 100% việc tinh chỉnh cuối cùng và đóng băng sẵn sàng cho staging).
+- Không có (Phase 06J-UX-C đã hoàn tất 100% triển khai và thẩm định Staging; dừng lại chờ đánh giá của con người).
 
 ---
 
 ## PENDING
-- [ ] Phê duyệt của con người đối với Gói Đóng băng & Kiểm định Thị giác Cuối cùng Phase 06J-UX-B.2.
-- [ ] Tiến hành Phase 06J-UX-C — Staging Deployment & Validation.
+- [ ] Đánh giá thẩm định của con người đối với Staging Preview V2 (`docs/PHASE_06J_UX_C_STAGING_VALIDATION_REPORT.md`).
+- [ ] Tiến hành Phase 06J-UX-C.1 — Human Staging Review.
 
 ---
 
@@ -322,7 +351,7 @@ PRODUCTION_MIGRATED_STABLE
 
 ## FRONTEND_STATE
 - `apps/control-center`: Next.js 15, React 19, Tailwind CSS. Toàn bộ 14 routes tĩnh và động biên dịch thành công, typecheck 0 lỗi.
-- `scratch/edtech-ai-portfolio`: Next.js 16 (Turbopack). Nhánh `feature/06j-ux-b-corporate-v2-preview`. Tuyến `/v2` đã hoàn tất toàn bộ tinh chỉnh cuối cùng (Phase 06J-UX-B.2 Complete), cách ly 100% khỏi legacy shell, không còn rò rỉ giao diện cũ. Toàn bộ 56 routes biên dịch thành công 100%. Đã xuất 16 ảnh chụp màn hình kiểm định thị giác cuối cùng tại `public/screenshots-v2-final/`.
+- `scratch/edtech-ai-portfolio`: Next.js 16 (Turbopack). Nhánh `feature/06j-ux-b-corporate-v2-preview`. Đã đẩy lên remote và kích hoạt Vercel Preview Deployment thành công. Toàn bộ 56 routes biên dịch thành công 100%. Đã xuất 14 ảnh chụp màn hình kiểm định staging tại `public/screenshots-v2-staging/`.
 
 ---
 
@@ -350,5 +379,5 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_ACTION
-AWAIT_HUMAN_APPROVAL_FOR_STAGING (Dừng lại để người dùng đánh giá nghiệm thu báo cáo và bộ ảnh 16 screenshots Phase 06J-UX-B.2 trước khi bước vào Phase 06J-UX-C Staging Validation).
+AWAIT_HUMAN_STAGING_REVIEW (Dừng lại để người dùng đánh giá thẩm định trực tiếp trên Vercel Preview URL trước khi chuyển sang các giai đoạn tiếp theo).
 
