@@ -359,7 +359,7 @@ PRODUCTION_MIGRATED_STABLE
 
 ## FRONTEND_STATE
 - `apps/control-center`: Next.js 15, React 19, Tailwind CSS. Toàn bộ 14 routes tĩnh và động biên dịch thành công, typecheck 0 lỗi.
-- `scratch/edtech-ai-portfolio`: Next.js 16 (Turbopack). Nhánh `feature/06j-ux-b-corporate-v2-preview`. Đã thẩm định Staging đạt APPROVED_FOR_PRODUCTION_CUTOVER. Toàn bộ 56 routes biên dịch thành công 100%.
+- `scratch/edtech-ai-portfolio`: Next.js 16 (Turbopack). Nhánh `main` (commit `2fcf482` / merge `32d096a`). Đã chuyển giao sản xuất chính thức tại Phase 06J-UX-D (PRODUCTION CUTOVER). Toàn bộ 57 routes biên dịch thành công 100%. Tên miền `https://www.huycncdsai.io.vn` đã kết xuất trực tiếp giao diện Corporate V2.
 
 ---
 
@@ -376,6 +376,7 @@ PRODUCTION_MIGRATED_STABLE
 - **Architecture V2 Consistency Tests:** PASS (7/7 tests).
 - **UI/UX Design Tokens & Contracts Tests:** PASS (5/5 tests).
 - **UI/UX V2 Final Polish Tests:** PASS (5/5 tests).
+- **Production Smoke Tests & Visual Captures:** PASS (10/10 screenshots, 0 browser console errors).
 - **TypeScript Compile:** PASS (Toàn bộ workspaces & portfolio).
 - **Tổng cộng:** 58/58 tests PASS (100% Passed).
 
@@ -387,5 +388,5 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_ACTION
-AWAIT_PRODUCTION_CUTOVER_INSTRUCTION (Dừng lại để người dùng ra quyết định chỉ đạo chuyển giao sản xuất chính thức tại Phase 06J-UX-D).
+HARD_STOP_ENGAGED (Phase 06J-UX-D hoàn thành chuyển giao sản xuất thành công. Tuyệt đối không tự ý triển khai Dispatcher hay chỉnh sửa DB Supabase. Dừng lại chờ chỉ thị tiếp theo từ Founder).
 
