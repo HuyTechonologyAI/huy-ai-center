@@ -68,10 +68,10 @@ DENY (Zero-Trust Policy Engine Contract)
 LOGICAL_ISOLATION_STAGE_1 (Organization-scoped RLS, Department authorization, Storage isolation, Knowledge isolation)
 
 ## AGENT_CARD_V2
-PROPOSED_NOT_PERSISTED (Database Mapping Deferred to Phase 06K)
+SPECIFIED_V2 (Formal JSON Schema 2.0 + Model B Pointer + SHA-256 Hash Verification designed in Phase 06K-A)
 
 ## DATABASE_MULTI_ORG
-NOT_MIGRATED (Zero Schema DDL in Phase 06J)
+DESIGNED_NOT_MIGRATED (Phase 06K-A Multi-Org Schema & Policy Design Complete; Zero Schema DDL executed in Phase 06K-A)
 
 ## PRODUCTION_AGENTS
 0 (Clean registry; unseeded)
@@ -233,13 +233,13 @@ UNCHANGED
 UNCHANGED
 
 ## CURRENT_PHASE
-PHASE 06J-UX-C.1 — HUMAN STAGING REVIEW
+PHASE 06K-A — MULTI-ORG DATABASE ARCHITECTURE + AGENT CARD V2 PERSISTENCE DESIGN
 
 ## NEXT_PHASE
-06J-UX-D_PRODUCTION_CUTOVER
+06K-B — DATABASE MIGRATION & MULTI-ORG SEEDING
 
 ## CURRENT_BRANCH
-`feature/06j-ux-b-corporate-v2-preview` (Remote pushed; main untouched)
+`feature/06k-a-multi-org-db-design`
 
 ---
 
@@ -276,6 +276,19 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] **Phase 06K-A — Multi-Org Database Architecture + Agent Card V2 Persistence Design:**
+  - Chế độ thực hiện: **DESIGN ONLY** (Bảo toàn tuyệt đối 0 DDL, 0 migration, 0 mutation trên Supabase Production `HuyAI`).
+  - Đối soát độc lập trạng thái cơ sở dữ liệu: Xác nhận đúng 34 bảng public (19 bảng legacy chứa 239 rows nguyên vẹn 100% + 15 bảng HAIP AI Center). `agents` = 0 rows, `agent_versions` = 0 rows, `ai-jobs` queue = 0 ready messages.
+  - Hoàn tất 8 tài liệu thiết kế kiến trúc chuẩn mực:
+    1. `docs/architecture/06K_A_CURRENT_SCHEMA_BASELINE.md`: Báo cáo đối soát 34 bảng & chỉ mục production.
+    2. `docs/architecture/06K_A_MULTI_ORG_ERD.md`: Sơ đồ quan hệ thực thể phân loại EXISTING / NEW / EXTENDED.
+    3. `docs/architecture/06K_A_MULTI_ORG_SCHEMA_DESIGN.md`: Bản thiết kế pseudo-DDL 4 bảng mới (`organizations`, `departments`, `organization_memberships`, `ai_policies`), 5 bảng mở rộng (`agents`, `agent_versions`, `ai_tasks`, `ai_task_steps`, `ai_outputs`), ON DELETE rules và Dispatcher index.
+    4. `docs/architecture/06K_A_AGENT_CARD_V2_SPEC.md`: Đặc tả JSON Schema 2.0 hoàn chỉnh, mã mẫu SmartTax L1, cơ chế băm SHA-256 đối soát toàn vẹn, nguyên tắc bất biến phiên bản và quyết định con trỏ Model B (`current_agent_version_id`).
+    5. `docs/architecture/06K_A_POLICY_AND_RLS_MODEL.md`: Mô hình kế thừa chính sách 4 cấp (`GROUP` -> `ORGANIZATION` -> `DEPARTMENT` -> `AGENT`), cơ chế trần bảo mật nghiêm ngặt nhất (Strictest-wins), cô lập hermetic "Tax Vault" SmartTax, và chính sách RLS default-deny sử dụng STABLE helper functions.
+    6. `docs/architecture/06K_A_QUEUE_ENVELOPE_SPEC.md`: Chuẩn hóa phong bì hàng đợi HAIP Message Envelope V2 trên `ai-jobs` PGMQ và giao thức 5 bước xác thực bất biến cơ sở dữ liệu của Dispatcher trước khi giao việc cho Worker Node.
+    7. `docs/architecture/06K_A_MIGRATION_SEQUENCE_PLAN.md`: Quy trình di trú an toàn 15 bước tuần tự không gây gián đoạn (zero-downtime, strictly additive) và quy trình hoàn tác (rollback down-migration) hoàn chỉnh cho Phase 06K-B.
+    8. `docs/architecture/06K_A_SECURITY_TEST_MATRIX.md`: Ma trận 24 ca kiểm thử an ninh đa tổ chức, cô lập SmartTax, tính toàn vẹn Agent Card và trần rủi ro.
+  - Ban hành báo cáo tổng thể: `docs/PHASE_06K_A_DESIGN_REPORT.md`.
 - [x] **Phase 06J-UX-C.1 — Human Staging Review (Pre-Production Acceptance Gate):**
   - Thẩm định trực quan toàn diện trên môi trường Vercel Preview HTTPS (`https://edtech-ai-portfolio-azmg886h4-huytechonologyais-projects.vercel.app/v2`).
   - Đạt chuẩn 100% các tiêu chí: Hero, 6 Đơn vị thành viên, AI Agency phân cấp chuẩn, Giải pháp, Sản phẩm, An ninh 4 trụ cột, Nhà sáng lập & 2 giải thưởng 2020, Form liên hệ Staging, Footer và Menu di động.
@@ -328,12 +341,13 @@ WITHIN_BUDGET
 ---
 
 ## IN_PROGRESS
-- Không có (Phase 06J-UX-C.1 đã hoàn tất 100% thẩm định và sẵn sàng cho Phase 06J-UX-D).
+- Không có (Phase 06K-A đã hoàn tất 100% tài liệu thiết kế và đối soát baseline).
 
 ---
 
 ## PENDING
-- [ ] Phê duyệt và ban hành lệnh chuyển giao sản xuất chính thức (Phase 06J-UX-D — Production Cutover).
+- [ ] Human Review & Approval cho toàn bộ tài liệu kiến trúc Phase 06K-A.
+- [ ] Ủy quyền tiến hành Phase 06K-B (Database Migration & Multi-Org Seeding).
 
 ---
 
@@ -407,10 +421,10 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_PHASE
-06K_MULTI_ORG_DATABASE_DESIGN (Sẽ khởi động sau khi có phê duyệt và chỉ thị chính thức từ Founder).
+06K-B — DATABASE MIGRATION & MULTI-ORG SEEDING (Sẽ khởi động sau khi có phê duyệt thiết kế từ Human Owner).
 
 ---
 
 ## NEXT_ACTION
-HARD_STOP_ENGAGED (Phase 06J-UX-D.1d hoàn thành xuất sắc Next.js Security Hotfix 16.3.5. Quality Gate = SUCCESS, Vercel Preview = READY, 0 Critical vulnerabilities, 57/57 routes passed. Tuyệt đối không tự ý merge PR #2 vào main, không sửa Supabase, không bắt đầu 06K. Dừng lại chờ Human Repository Owner review và merge PR #2).
+HARD_STOP_ENGAGED (Phase 06K-A hoàn thành xuất sắc toàn bộ tài liệu thiết kế Multi-Org Database Architecture và Agent Card V2 Persistence Design. Hoàn tất 8 tài liệu thiết kế kiến trúc chuẩn mực. Đối soát thực tế Supabase Production HuyAI nguyên vẹn 100%: 34 bảng, 239 dòng dữ liệu legacy được bảo tồn tuyệt đối. Zero DDL, Zero mutations. Dừng lại chờ Human Owner xem xét báo cáo và chỉ thị tiếp theo).
 
