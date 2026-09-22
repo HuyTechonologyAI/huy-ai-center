@@ -367,7 +367,10 @@ PRODUCTION_MIGRATED_STABLE
 - **CORPORATE_V2:** PRODUCTION_LIVE
 - **PRODUCTION_CUTOVER:** PASS
 - **ROLLBACK:** READY (`pre-corporate-v2-cutover-2026-09-21` & `corporate-v2.0.0`)
-- **BRANCH_PROTECTION:** MANUAL_ACTION_REQUIRED (Quy tắc đã thiết kế chi tiết; cần Repository Owner áp dụng trên GitHub Settings)
+- **BRANCH_PROTECTION:** ACTIVE (Ruleset `Protect main - Production` ID 23806829 enforced on GitHub)
+- **GITHUB_ACTIONS_CI:** CONFIGURED (`.github/workflows/ci.yml`, Job: `Quality Gate`, PR #1 created)
+- **EXACT_STATUS_CHECK:** `Quality Gate`
+- **LEGACY_LINT_DEBT:** IDENTIFIED (246 errors / 120 warnings across 79 legacy files; V2 scope has 0 errors / 0 warnings)
 - **SOURCE_CONTROL_GOVERNANCE:** DEFINED (Ban hành bộ 6 văn bản quản trị tại `docs/governance/`)
 - **AI_AGENT_PRODUCTION_WRITE:** DENY_BY_DEFAULT (Cấm push trực tiếp, cấm force-push, cấm self-merge, cấm tự động deploy)
 - **PULL_REQUEST_TEMPLATE:** CREATED (`.github/pull_request_template.md`)
@@ -405,5 +408,5 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_ACTION
-HARD_STOP_ENGAGED (Phase 06J-UX-D.1 hoàn thành củng cố quản trị sau phát hành. Tuyệt đối không tự ý chạy migration, seed tác tử hay triển khai Dispatcher/n8n/Langflow/Ollama. Dừng lại chờ chỉ thị tiếp theo từ Founder).
+HARD_STOP_ENGAGED (Phase 06J-UX-D.1b hoàn thành thiết lập CI Quality Gate, mở PR #1 và định danh chính xác Status Check `Quality Gate`. Tuyệt đối không tự ý merge PR vào main, không chạy migration, seed tác tử hay triển khai Dispatcher/n8n/Langflow/Ollama. Dừng lại chờ Human Repository Owner kiểm tra và phê duyệt).
 
