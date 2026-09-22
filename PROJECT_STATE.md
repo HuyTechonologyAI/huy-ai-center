@@ -368,10 +368,11 @@ PRODUCTION_MIGRATED_STABLE
 - **PRODUCTION_CUTOVER:** PASS
 - **ROLLBACK:** READY (`pre-corporate-v2-cutover-2026-09-21` & `corporate-v2.0.0`)
 - **BRANCH_PROTECTION:** ACTIVE (Ruleset `Protect main - Production` ID 23806829 enforced on GitHub)
-- **GITHUB_ACTIONS_CI:** CONFIGURED (`.github/workflows/ci.yml`, Job: `Quality Gate`, Node v22.23.2)
-- **EXACT_STATUS_CHECK:** `Quality Gate` (Status: PASS / GREEN on PR #1, Run ID #35733315682)
+- **GITHUB_ACTIONS_CI:** CONFIGURED (`.github/workflows/ci.yml`, Job: `Quality Gate`, Node v22.23.2, Overall Workflow: SUCCESS)
+- **EXACT_STATUS_CHECK:** `Quality Gate` (Status: PASS / GREEN on PR #1, Run ID #35736594113)
+- **SUPABASE_SOURCE_FALLBACKS:** ZERO (Production source code strictly fails-fast with ! assertion; CI placeholders isolated to ci.yml env block)
 - **DEBT_CONTAINMENT_POLICY:** ACTIVE (Ratchet: Modern V2 scope 0 errors/0 warnings + changed files 0 errors/0 warnings)
-- **LEGACY_LINT_DEBT:** AUDITED (246 errors / 108 warnings across 79 legacy files reported in diagnostic job `Legacy Lint Audit`)
+- **LEGACY_LINT_DEBT:** AUDITED (246 errors / 108 warnings across 79 legacy files reported in non-blocking diagnostic job `Legacy Lint Audit` with continue-on-error: true)
 - **NPM_SECURITY_AUDIT:** AUDITED (10 vulnerabilities: 6 prod / 4 dev; critical Next.js vulnerability evaluated as low practical exploit on Vercel platform)
 - **SOURCE_CONTROL_GOVERNANCE:** DEFINED (Ban hành bộ 6 văn bản quản trị tại `docs/governance/`)
 - **AI_AGENT_PRODUCTION_WRITE:** DENY_BY_DEFAULT (Cấm push trực tiếp, cấm force-push, cấm self-merge, cấm tự động deploy)
@@ -410,5 +411,5 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_ACTION
-HARD_STOP_ENGAGED (Phase 06J-UX-D.1c hoàn thành xuất sắc đưa CI Quality Gate chuyển sang GREEN trên PR #1 và định danh chính xác Status Check `Quality Gate`. Tuyệt đối không tự ý merge PR vào main, không can thiệp Ruleset, không chạy migration, seed tác tử hay triển khai Dispatcher. Dừng lại chờ Human Repository Owner kích hoạt Ruleset và phê duyệt PR #1).
+HARD_STOP_ENGAGED (Phase 06J-UX-D.1c.1 hoàn thành xuất sắc CI Final Cleanup: Quality Gate = SUCCESS, Overall CI Workflow = SUCCESS, Supabase source fallbacks = ZERO. Tuyệt đối không tự ý merge PR #1 vào main, không sửa Supabase, không bắt đầu 06K. Dừng lại chờ Human Repository Owner kích hoạt Ruleset và phê duyệt PR #1).
 
