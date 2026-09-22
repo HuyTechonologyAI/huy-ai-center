@@ -378,6 +378,7 @@ PRODUCTION_MIGRATED_STABLE
 - **AI_AGENT_PRODUCTION_WRITE:** DENY_BY_DEFAULT (Cấm push trực tiếp, cấm force-push, cấm self-merge, cấm tự động deploy)
 - **PULL_REQUEST_TEMPLATE:** CREATED (`.github/pull_request_template.md`)
 - **INCIDENT_TEMPLATE:** CREATED (`.github/ISSUE_TEMPLATE/production-incident.md`)
+- **NEXTJS_SECURITY_HOTFIX:** READY_FOR_HUMAN_REVIEW (Next.js 16.3.5, PR #2 open, Quality Gate = SUCCESS, Vercel Preview = READY)
 
 ---
 
@@ -411,5 +412,5 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_ACTION
-HARD_STOP_ENGAGED (Phase 06J-UX-D.1c.1 hoàn thành xuất sắc CI Final Cleanup: Quality Gate = SUCCESS, Overall CI Workflow = SUCCESS, Supabase source fallbacks = ZERO. Tuyệt đối không tự ý merge PR #1 vào main, không sửa Supabase, không bắt đầu 06K. Dừng lại chờ Human Repository Owner kích hoạt Ruleset và phê duyệt PR #1).
+HARD_STOP_ENGAGED (Phase 06J-UX-D.1d hoàn thành xuất sắc Next.js Security Hotfix 16.3.5. Quality Gate = SUCCESS, Vercel Preview = READY, 0 Critical vulnerabilities, 57/57 routes passed. Tuyệt đối không tự ý merge PR #2 vào main, không sửa Supabase, không bắt đầu 06K. Dừng lại chờ Human Repository Owner review và merge PR #2).
 
