@@ -359,7 +359,19 @@ PRODUCTION_MIGRATED_STABLE
 
 ## FRONTEND_STATE
 - `apps/control-center`: Next.js 15, React 19, Tailwind CSS. Toàn bộ 14 routes tĩnh và động biên dịch thành công, typecheck 0 lỗi.
-- `scratch/edtech-ai-portfolio`: Next.js 16 (Turbopack). Nhánh `main` (commit `2fcf482` / merge `32d096a`). Đã chuyển giao sản xuất chính thức tại Phase 06J-UX-D (PRODUCTION CUTOVER). Toàn bộ 57 routes biên dịch thành công 100%. Tên miền `https://www.huycncdsai.io.vn` đã kết xuất trực tiếp giao diện Corporate V2.
+- `scratch/edtech-ai-portfolio`: Next.js 16 (Turbopack). Nhánh `main` (commit `e8a24c6`, release tag `corporate-v2.0.0`). Đã chuyển giao sản xuất chính thức tại Phase 06J-UX-D và hoàn tất củng cố quản trị tại Phase 06J-UX-D.1. Toàn bộ 57 routes biên dịch thành công 100%. Tên miền `https://www.huycncdsai.io.vn` đang hoạt động ổn định.
+
+---
+
+## POST_LAUNCH_GOVERNANCE_STATE
+- **CORPORATE_V2:** PRODUCTION_LIVE
+- **PRODUCTION_CUTOVER:** PASS
+- **ROLLBACK:** READY (`pre-corporate-v2-cutover-2026-09-21` & `corporate-v2.0.0`)
+- **BRANCH_PROTECTION:** MANUAL_ACTION_REQUIRED (Quy tắc đã thiết kế chi tiết; cần Repository Owner áp dụng trên GitHub Settings)
+- **SOURCE_CONTROL_GOVERNANCE:** DEFINED (Ban hành bộ 6 văn bản quản trị tại `docs/governance/`)
+- **AI_AGENT_PRODUCTION_WRITE:** DENY_BY_DEFAULT (Cấm push trực tiếp, cấm force-push, cấm self-merge, cấm tự động deploy)
+- **PULL_REQUEST_TEMPLATE:** CREATED (`.github/pull_request_template.md`)
+- **INCIDENT_TEMPLATE:** CREATED (`.github/ISSUE_TEMPLATE/production-incident.md`)
 
 ---
 
@@ -387,6 +399,11 @@ PRODUCTION_MIGRATED_STABLE
 
 ---
 
+## NEXT_PHASE
+06K_MULTI_ORG_DATABASE_DESIGN (Sẽ khởi động sau khi có phê duyệt và chỉ thị chính thức từ Founder).
+
+---
+
 ## NEXT_ACTION
-HARD_STOP_ENGAGED (Phase 06J-UX-D hoàn thành chuyển giao sản xuất thành công. Tuyệt đối không tự ý triển khai Dispatcher hay chỉnh sửa DB Supabase. Dừng lại chờ chỉ thị tiếp theo từ Founder).
+HARD_STOP_ENGAGED (Phase 06J-UX-D.1 hoàn thành củng cố quản trị sau phát hành. Tuyệt đối không tự ý chạy migration, seed tác tử hay triển khai Dispatcher/n8n/Langflow/Ollama. Dừng lại chờ chỉ thị tiếp theo từ Founder).
 
