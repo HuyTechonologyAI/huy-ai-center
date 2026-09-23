@@ -77,7 +77,7 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
     const stderr = redact(result.stderr ?? "");
     const output = stdout || stderr;
 
-    if (isAgyAuthError(output)) {
+    if (result.status !== 0 && isAgyAuthError(`${stderr}\n${stdout}`)) {
       return buildUnavailablePlan(req.taskId, "HUMAN_AUTH_REQUIRED");
     }
 
@@ -157,7 +157,9 @@ HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a huma
 
     const output = redact(result.stdout ?? "").trim().toUpperCase();
 
-    if (isAgyAuthError(output)) {
+    if (result.status !== 0 && isAgyAuthError(
+      `${redact(result.stderr ?? "")}\n${redact(result.stdout ?? "")}`
+    )) {
       return "HUMAN_AUTH_REQUIRED";
     }
 
