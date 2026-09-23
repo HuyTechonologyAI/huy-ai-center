@@ -1,0 +1,208 @@
+{
+  "schema_version": "1.0",
+  "roadmap_id": "huy-ai-center-autonomous-roadmap-v1",
+  "mode": "SERIAL_FAIL_CLOSED",
+  "max_concurrency": 1,
+  "invariants": {
+    "antigravity_role": "PLANNER_AUDITOR_ONLY",
+    "codex_role": "IMPLEMENTER_ONLY",
+    "primary_worktree_edits_forbidden": true,
+    "task_worktree_required": true,
+    "parallel_tasks_require_disjoint_allowed_paths": true,
+    "r3_r4_stop_for_human": true,
+    "production_writes_default": "DENY",
+    "merge_to_main_default": "HUMAN_REQUIRED"
+  },
+  "tasks": [
+    {
+      "id": "bridge-b-core",
+      "title": "AI-DEV-BRIDGE-B autonomous backlog runner",
+      "phase": "AI-DEV-BRIDGE-B",
+      "risk": "R2",
+      "depends_on": [],
+      "status": "READY",
+      "objective": "Implement serial DAG backlog execution, exclusive worktree/path leases, Antigravity planner/auditor ownership, Codex implementation ownership, guarded feature push and human-gated main merge.",
+      "allowed_paths": [
+        "automation/agent-bridge/",
+        "config/autonomy/",
+        "schemas/",
+        "tests/automation/",
+        "docs/automation/",
+        "package.json"
+      ],
+      "verification": [
+        "npm run typecheck",
+        "npm run test:bridge"
+      ],
+      "human_gate": false
+    },
+    {
+      "id": "06k-c-readiness",
+      "title": "06K-C production migration readiness package",
+      "phase": "06K-C0",
+      "risk": "R1",
+      "depends_on": [
+        "bridge-b-core"
+      ],
+      "status": "BLOCKED",
+      "objective": "Prepare a read-only production migration readiness packet: current production snapshot, migration checksums, exact apply sequence, rollback decision tree, pre/post queries, and explicit R4 approval request. No production mutation.",
+      "allowed_paths": [
+        "docs/architecture/",
+        "docs/automation/",
+        "scripts/",
+        "PROJECT_STATE.md"
+      ],
+      "verification": [
+        "npm run typecheck",
+        "npm run test:core"
+      ],
+      "human_gate": false
+    },
+    {
+      "id": "06k-c-production-apply",
+      "title": "06K-C controlled production migration",
+      "phase": "06K-C",
+      "risk": "R4",
+      "depends_on": [
+        "06k-c-readiness"
+      ],
+      "status": "BLOCKED",
+      "objective": "Apply approved multi-org migration to Supabase production only after explicit Human Owner authorization and verified readiness packet.",
+      "allowed_paths": [
+        "supabase/migrations/",
+        "docs/architecture/",
+        "PROJECT_STATE.md"
+      ],
+      "verification": [
+        "npm run verify:06k-b",
+        "npm run test:security"
+      ],
+      "human_gate": true
+    },
+    {
+      "id": "07a-dispatcher-v2",
+      "title": "Dispatcher V2 policy-aware implementation",
+      "phase": "07A",
+      "risk": "R2",
+      "depends_on": [
+        "06k-c-production-apply"
+      ],
+      "status": "BLOCKED",
+      "objective": "Implement Dispatcher V2 against the migrated multi-org schema with org, capability, risk, classification and Agent Card validation. Use mocks/local tests only.",
+      "allowed_paths": [
+        "apps/dispatcher/",
+        "packages/contracts/",
+        "tests/",
+        "docs/"
+      ],
+      "verification": [
+        "npm run typecheck",
+        "npm run test:core",
+        "npm run build"
+      ],
+      "human_gate": false
+    },
+    {
+      "id": "07b-dell-deploy",
+      "title": "Deploy Dispatcher V2 to Dell orchestration node",
+      "phase": "07B",
+      "risk": "R3",
+      "depends_on": [
+        "07a-dispatcher-v2"
+      ],
+      "status": "BLOCKED",
+      "objective": "Deploy verified Dispatcher V2 to the Dell orchestration node with rollback and health checks.",
+      "allowed_paths": [
+        "deploy/",
+        "docs/",
+        "PROJECT_STATE.md"
+      ],
+      "verification": [],
+      "human_gate": true
+    },
+    {
+      "id": "07c-e2e",
+      "title": "End-to-end HAIP execution validation",
+      "phase": "07C",
+      "risk": "R3",
+      "depends_on": [
+        "07b-dell-deploy"
+      ],
+      "status": "BLOCKED",
+      "objective": "Validate production-controlled end-to-end task flow through Dispatcher and ai-jobs under human-approved test scope.",
+      "allowed_paths": [
+        "tests/",
+        "docs/",
+        "PROJECT_STATE.md"
+      ],
+      "verification": [
+        "npm run test:core"
+      ],
+      "human_gate": true
+    },
+    {
+      "id": "08a-model-gateway",
+      "title": "LiteLLM model gateway and routing policy",
+      "phase": "08A",
+      "risk": "R2",
+      "depends_on": [
+        "07c-e2e"
+      ],
+      "status": "BLOCKED",
+      "objective": "Implement model gateway configuration and deterministic T0-T4 routing policy without production deployment.",
+      "allowed_paths": [
+        "config/",
+        "packages/",
+        "apps/",
+        "tests/",
+        "docs/"
+      ],
+      "verification": [
+        "npm run typecheck",
+        "npm run test:core",
+        "npm run build"
+      ],
+      "human_gate": false
+    },
+    {
+      "id": "08b-ollama-dell",
+      "title": "Ollama deployment on Dell",
+      "phase": "08B",
+      "risk": "R3",
+      "depends_on": [
+        "08a-model-gateway"
+      ],
+      "status": "BLOCKED",
+      "objective": "Deploy approved local Ollama runtime and selected lightweight models to Dell orchestration node.",
+      "allowed_paths": [
+        "deploy/",
+        "docs/",
+        "PROJECT_STATE.md"
+      ],
+      "verification": [],
+      "human_gate": true
+    },
+    {
+      "id": "08c-model-routing-e2e",
+      "title": "Model routing end-to-end tests",
+      "phase": "08C",
+      "risk": "R2",
+      "depends_on": [
+        "08b-ollama-dell"
+      ],
+      "status": "BLOCKED",
+      "objective": "Verify T0-T4 routing, local fallback, cost ceilings and failure behavior with non-production test tasks.",
+      "allowed_paths": [
+        "tests/",
+        "apps/",
+        "packages/",
+        "docs/"
+      ],
+      "verification": [
+        "npm run typecheck",
+        "npm run test:core"
+      ],
+      "human_gate": false
+    }
+  ]
+}
