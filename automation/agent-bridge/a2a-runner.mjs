@@ -40,6 +40,13 @@ export function checkScope(files, allowed) {
   }
 }
 
+export function parseGitStatus(output) {
+  return output.split('\n').filter(Boolean).map(line => {
+    if (!/^[ MADRCU?!]{2} /.test(line)) throw Error('GIT_STATUS_INVALID');
+    return { code: line.slice(0, 2), path: line.slice(3) };
+  });
+}
+
 function run(binary, args, cwd, input, timeout = 600000) {
   return new Promise((done, reject) => {
     const child = spawn(binary, args, { cwd, stdio: ['pipe','pipe','pipe'], shell: false, env: { PATH: process.env.PATH, HOME: process.env.HOME, USER: process.env.USER, TMPDIR: process.env.TMPDIR ?? '/tmp' } });
@@ -57,7 +64,8 @@ async function checked(binary, args, cwd, input, timeout) {
   const result = await run(binary, args, cwd, input, timeout);
   if (result.code !== 0 && CAPACITY.test(result.stdout + result.stderr)) throw Error('TOOL_CAPACITY_WAIT');
   if (result.code !== 0 || INVALID.test(result.stdout + result.stderr)) throw Error(`${binary.toUpperCase()}_FAILED:${(result.stderr || result.stdout).slice(0,400)}`);
-  return result.stdout.trim();
+  // Preserve leading spaces: Git porcelain status uses them as status columns.
+  return result.stdout.replace(/\r?\n$/, '');
 }
 
 async function git(cwd, ...args) { return checked('git', args, cwd); }
@@ -118,9 +126,9 @@ export async function execute(root, opts = {}) {
       await saveState(rolePath, { taskId: task.id, phase: 'IMPLEMENTING', writeOwner: 'CODEX', antigravityMode: 'READ_ONLY_AUDITOR' });
       const prompt = `You are the sole implementation writer in this isolated task worktree. Implement this plan:\n${plan}\n${brief}\nNever modify the primary worktree, production, main, secrets, or files outside allowed paths. Do not commit or push. Run required local verification. Stop if a permission is missing.`;
       await checked('codex', ['exec', '--sandbox', 'workspace-write', '--ephemeral', prompt], worktree, '', 3600000);
-      const entries = (await git(worktree, 'status', '--porcelain', '--untracked-files=all')).split('\n').filter(Boolean);
+      const entries = parseGitStatus(await git(worktree, 'status', '--porcelain', '--untracked-files=all'));
       if (entries.length === 0) throw Error('IMPLEMENTATION_EMPTY');
-      const changed = entries.map(line => line.slice(3));
+      const changed = entries.map(entry => entry.path);
       checkScope(changed, task.allowed_paths);
       state.tasks[task.id].status = 'VERIFYING'; await saveState(statePath, state);
       await checked('npm', ['run', 'build:shared'], worktree, '', 3600000);
@@ -128,14 +136,14 @@ export async function execute(root, opts = {}) {
         if (!['npm run typecheck', 'npm run test:bridge', 'npm run build:shared', 'npm run test:core'].includes(command)) throw Error(`VERIFICATION_NOT_ALLOWED:${command}`);
         await checked('npm', command.split(' ').slice(1), worktree, '', 3600000);
       }
-      const trackedDiff = await git(worktree, 'diff', 'HEAD', '--', ...entries.filter(line => !line.startsWith('?? ')).map(line => line.slice(3)));
-      const untracked = await Promise.all(entries.filter(line => line.startsWith('?? ')).map(async line => `${line.slice(3)}:\n${(await readFile(join(worktree, line.slice(3)), 'utf8')).slice(0, 12000)}`));
+      const trackedDiff = await git(worktree, 'diff', 'HEAD', '--', ...entries.filter(entry => entry.code !== '??').map(entry => entry.path));
+      const untracked = await Promise.all(entries.filter(entry => entry.code === '??').map(async entry => `${entry.path}:\n${(await readFile(join(worktree, entry.path), 'utf8')).slice(0, 12000)}`));
       const diff = trackedDiff + '\n' + untracked.join('\n');
       if (diff.length > 90000) throw Error('AUDIT_CONTEXT_TOO_LARGE');
       state.tasks[task.id].status = 'AUDITING'; await saveState(statePath, state);
       await saveState(rolePath, { taskId: task.id, phase: 'AUDITING', writeOwner: 'NONE', antigravityMode: 'READ_ONLY_AUDITOR' });
       const audit = await checked('agy', ['-p', `READ_ONLY FINAL AUDITOR. Do not run commands or write files. Review task and changed files. Respond exactly PASS or CORRECTION_REQUIRED with reasons.\n${brief}\nPlan:\n${plan}\nChanges:\n${diff}`, '--output-format', 'text'], worktree);
-      if (!/^PASS\b/.test(audit)) throw Error(`AUDIT_NOT_PASS:${audit.slice(0,300)}`);
+      if (!/^PASS\b/.test(audit.trim())) throw Error(`AUDIT_NOT_PASS:${audit.slice(0,300)}`);
       if (!opts.execute) { state.tasks[task.id].status = 'AWAITING_REVIEW'; await saveState(statePath, state); return { status: 'AWAITING_REVIEW', taskId: task.id, worktree, changed }; }
       // Only these two branch namespaces are writable. Git never receives a main ref.
       if (!/^agent-task\/[a-z0-9-]+$/.test(taskBranch) || !/^feature\/[a-z0-9-]+$/.test(branch)) throw Error('BRANCH_GUARD');
