@@ -4,7 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 function readV2File(relativePortfolioPath: string): string {
-  const filePath = path.join(process.cwd(), '..', 'edtech-ai-portfolio', relativePortfolioPath);
+  const portfolioDir = path.join(process.cwd(), '..', 'edtech-ai-portfolio');
+  if (!fs.existsSync(portfolioDir)) {
+    throw new Error(`DEPENDENCY_UNAVAILABLE: Sibling repository edtech-ai-portfolio not found at '${portfolioDir}'`);
+  }
+  const filePath = path.join(portfolioDir, relativePortfolioPath);
   return fs.readFileSync(filePath, 'utf-8');
 }
 

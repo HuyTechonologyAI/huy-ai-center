@@ -120,21 +120,22 @@ describe("A. SAFE_DEGRADATION_TEST", () => {
 });
 
 describe("B. REAL_E2E_BRIDGE_TEST", () => {
-  it("Executes full E2E flow if Codex and Antigravity are authenticated, otherwise skips cleanly", async () => {
+  it("REAL_E2E: Executes full flow to PASS if CLIs are AUTH_READY, otherwise reports NOT_EXECUTED_CI_ENVIRONMENT", async () => {
     const codex = checkCodex();
     const agy = checkAntigravity();
 
-    if (!codex.installed || codex.status === "UNAVAILABLE") {
-      console.log("    ℹ [REAL_E2E_BRIDGE_TEST] Skipped live execution: Codex CLI not installed.");
+    // Check if both CLIs are installed AND authenticated
+    const codexReady = codex.installed && codex.status === "AUTH_READY";
+    const agyReady = agy.installed && agy.status === "AUTH_READY";
+
+    if (!codexReady || !agyReady) {
+      console.log(
+        "    ℹ [REAL_E2E_BRIDGE_TEST] REAL_E2E: NOT_EXECUTED_CI_ENVIRONMENT (Requires authenticated Codex & Antigravity on trusted local machine)."
+      );
       return;
     }
 
-    if (!agy.installed || agy.status === "UNAVAILABLE") {
-      console.log("    ℹ [REAL_E2E_BRIDGE_TEST] Skipped live execution: Antigravity CLI not installed.");
-      return;
-    }
-
-    // Both CLIs installed: execute fixture contract
+    // Both CLIs installed and authenticated: execute fixture contract and require real PASS
     const realContract: TaskContract = {
       ...dryRunContract,
       taskId: "bridge-e2e-live-001",
@@ -146,9 +147,10 @@ describe("B. REAL_E2E_BRIDGE_TEST", () => {
 
     const state = await runTask(realContract, process.cwd());
     assert.ok(state);
-    assert.ok(
-      state.status === "COMPLETE" || state.status === "HUMAN_GATE" || state.status === "BLOCKED",
-      `Expected valid lifecycle state, got: ${state.status}`
+    assert.equal(
+      state.status,
+      "COMPLETE",
+      `Real authenticated E2E test must complete with PASS, got: ${state.status}`
     );
   });
 });
