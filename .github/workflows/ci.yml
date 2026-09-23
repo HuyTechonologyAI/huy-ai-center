@@ -6,7 +6,6 @@ on:
       - main
       - 'feat/**'
       - 'feature/**'
-      - 'agent-task/06k-b1-codex-hardening'
       - 'security/**'
       - 'hotfix/**'
       - 'chore/**'
