@@ -1,202 +1,247 @@
-# PHASE 06K-A: MIGRATION SEQUENCE PLAN
+# PHASE 06K-A.1: MIGRATION SEQUENCE PLAN (RECONCILED)
 ## HUY TECHNOLOGY AI GROUP — HAIP CONTROL PLANE
 
-**Document ID:** HAIP-DOC-06K-A-MIG-001  
-**Phase:** 06K-A (Design Only — Execution Scheduled in Phase 06K-B)  
-**System:** HUY AI CENTER / HAIP CONTROL PLANE  
-**Target Database:** Supabase `HuyAI` (`bdeluacbzbdflxubhpha`)  
-**Author:** Principal AI Infrastructure & Database Engineering  
-**Status:** APPROVED DESIGN BASELINE  
+**Document ID:** HAIP-DOC-06K-A1-MIG-001  
+**Phase:** 06K-A.1 (Design Reconciliation — Zero Database Mutations)  
+**Status:** RECONCILED — AUTHORITATIVE FOR PHASE 06K-B DRAFT  
+
+> **CORRECTION NOTE:** This document supersedes `06K_A_MIGRATION_SEQUENCE_PLAN.md` from Phase 06K-A.  
+> Corrections: `agents.enabled` (not `agents.status`), `membership_role` column, uppercase status, verified column names, phase sequencing (06K-B = Draft+DryRun only, 06K-C = Production).
 
 ---
 
-## 1. Governance Principles & Safety Invariants (D15)
+## 1. Governance & Safety Principles
 
-To guarantee 100% production uptime and safeguard existing database assets, all schema evolution in Phase 06K-B MUST obey these cardinal rules:
-
-1. **Strictly Additive**: Never drop, rename, or truncate existing tables, columns, or constraints.
-2. **Zero-Downtime Execution**: All new columns on existing high-throughput tables (`ai_tasks`, `ai_task_steps`, `ai_outputs`, `agents`, `agent_versions`) MUST be added as `NULLABLE` or have non-locking safe defaults.
-3. **Legacy Preservation**: The 19 legacy tables containing 239 verified production rows (`categories`, `courses`, `lessons`, `profiles`, `system_settings`, etc.) must remain completely untouched.
-4. **Independent Idempotence**: Every migration statement MUST use `IF NOT EXISTS` / `IF EXISTS` guards.
-5. **Reversibility Guarantee**: A corresponding deterministic Down-Migration script MUST be verified prior to applying forward migrations.
+1. **Strictly Additive**: No DROP, RENAME, or TRUNCATE of existing tables or columns
+2. **Zero-Downtime**: All new columns on existing tables are `NULLABLE` or have safe defaults
+3. **Legacy Preservation**: 19 legacy tables with their verified row counts remain ZERO-TOUCH
+4. **Idempotent**: Every DDL statement uses `IF NOT EXISTS` / `IF EXISTS`
+5. **Reversible**: Down-migration script verified before any forward migration applies
+6. **Phase Boundary**: Phase 06K-B = Draft + isolated dry-run. Phase 06K-C = Production apply after Human approval
 
 ---
 
-## 2. 15-Step Additive Migration Sequence
-
-The execution sequence is structured into 5 logical phases across 15 discrete atomic steps:
+## 2. 15-Step Migration Sequence (Corrected)
 
 ```
-[Phase 1: Foundation]
-  Step 01: Pre-flight baseline validation & lock timeout config
-  Step 02: Core Multi-Org Tables (`organizations`, `departments`)
-  Step 03: Identity & Access (`organization_memberships`)
-  Step 04: Governance Engine (`ai_policies`)
+[Phase 1: Foundation Tables]
+  Step 01: Pre-flight validation — confirm 34 tables, zero pending DDL
+  Step 02: CREATE public.organizations
+  Step 03: CREATE public.departments
+  Step 04: CREATE public.organization_memberships  (column: membership_role)
+  Step 05: CREATE public.ai_policies
 
 [Phase 2: Agent Registry Extensions]
-  Step 05: Extend `public.agents` (org, dept, hierarchy, cost center)
-  Step 06: Extend `public.agent_versions` (agent_card JSONB, SHA-256 hash)
-  Step 07: Establish Model B Version Pointer (`current_agent_version_id`)
+  Step 06: ALTER agents — ADD organization_id, department_id, hierarchy_level, cost_center_code
+  Step 07: ALTER agent_versions — ADD agent_card, agent_card_hash; ADD UNIQUE(agent_id, version)
+  Step 08: ALTER agents — ADD current_agent_version_id; ADD FK constraint + invariant trigger
 
 [Phase 3: Operational Pipeline Extensions]
-  Step 08: Extend `public.ai_tasks` (multi-org routing & classification)
-  Step 09: Extend `public.ai_task_steps` (cross-org sender/recipient trace)
-  Step 10: Extend `public.ai_outputs` (org scope, sensitivity, release status)
+  Step 09: ALTER ai_tasks — ADD organization_id, department_id, data_classification, cost_center_code, requested_by_organization_id
+  Step 10: ALTER ai_task_steps — ADD sender_organization_id, recipient_organization_id
+  Step 11: ALTER ai_outputs — ADD organization_id, data_classification, release_status
 
-[Phase 4: Data Initialization]
-  Step 11: Seed 6 Canonical Business Organizations
-  Step 12: Seed MVP Departments for all 6 Organizations
-  Step 13: Seed Baseline Policy Rules (Ceilings & SmartTax Lockdown)
+[Phase 4: Data Seeding]
+  Step 12: INSERT 6 canonical organizations
+  Step 13: INSERT initial departments
+  Step 14: INSERT baseline ai_policies (Group ceiling + SmartTax isolation)
 
-[Phase 5: Security & Verification]
-  Step 14: Enable RLS & Deploy Security Definer Helper Functions
-  Step 15: Run Post-Migration Verification & Smoke Test Suite
+[Phase 5: Security Layer]
+  Step 15: Enable RLS + SECURITY DEFINER helpers + RLS policies; verify ai_task_steps service-only
 ```
 
 ---
 
-### Detailed Step-by-Step Specification
+## 3. Key Per-Step Specification (Corrected Column References)
 
-#### Step 01: Pre-flight Baseline Validation & Session Configuration
-- Verify 34 tables exist and 0 pending uncommitted migrations.
-- Set conservative lock timeout: `SET statement_timeout = '15s'; SET lock_timeout = '5s';`.
+### Step 04: `public.organization_memberships`
+```sql
+-- Uses membership_role, UPPERCASE status values
+CREATE TABLE IF NOT EXISTS public.organization_memberships (
+    id              uuid    PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         uuid    NOT NULL REFERENCES auth.users(id)         ON DELETE CASCADE,
+    organization_id text    NOT NULL REFERENCES public.organizations(id) ON DELETE RESTRICT,
+    membership_role text    NOT NULL
+                    CHECK (membership_role IN ('owner','admin','reviewer','operator','member','auditor')),
+    department_id   text    REFERENCES public.departments(id) ON DELETE SET NULL,
+    is_primary      boolean NOT NULL DEFAULT false,
+    status          text    NOT NULL DEFAULT 'ACTIVE'
+                    CHECK (status IN ('ACTIVE','INVITED','SUSPENDED','REVOKED')),
+    permissions     jsonb   NOT NULL DEFAULT '[]'::jsonb,
+    metadata        jsonb   NOT NULL DEFAULT '{}'::jsonb,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_user_org UNIQUE (user_id, organization_id)
+);
+```
 
-#### Step 02: Core Multi-Org Tables
-- Create `public.organizations` with primary key `id text`, `code`, `cost_center_code`, `parent_org_id`, `data_classification_ceiling`.
-- Create `public.departments` with composite uniqueness `UNIQUE(organization_id, code)`.
+### Step 06: Extend `public.agents`
+```sql
+-- Verified existing columns: id(text), name, description, capabilities, configuration,
+-- risk_ceiling(integer), enabled(boolean), health_status, max_parallel_tasks, created_at, updated_at
+-- DO NOT reference: agents.status (NOT FOUND), agents.runtime (NOT FOUND)
+ALTER TABLE public.agents
+    ADD COLUMN IF NOT EXISTS organization_id          text      REFERENCES public.organizations(id) ON DELETE RESTRICT,
+    ADD COLUMN IF NOT EXISTS department_id            text      REFERENCES public.departments(id)   ON DELETE RESTRICT,
+    ADD COLUMN IF NOT EXISTS hierarchy_level          smallint  DEFAULT 1 CHECK (hierarchy_level BETWEEN 0 AND 4),
+    ADD COLUMN IF NOT EXISTS cost_center_code         text;
+```
 
-#### Step 03: Identity & Access
-- Create `public.organization_memberships` linking `auth.users(id)` and `public.organizations(id)`.
-- Unique constraint: `UNIQUE(organization_id, user_id)`.
+### Step 08: Version Pointer + Invariant Trigger
+```sql
+ALTER TABLE public.agents
+    ADD COLUMN IF NOT EXISTS current_agent_version_id uuid;
 
-#### Step 04: Governance Engine
-- Create `public.ai_policies` with check constraints on `policy_scope` and `priority`.
+-- FK constraint (add after agent_versions has data)
+ALTER TABLE public.agents
+    ADD CONSTRAINT fk_agents_current_version
+    FOREIGN KEY (current_agent_version_id) REFERENCES public.agent_versions(id) ON DELETE RESTRICT;
 
-#### Step 05: Extend `public.agents`
-- Add columns:
-  - `organization_id text REFERENCES public.organizations(id)`
-  - `department_id text REFERENCES public.departments(id)`
-  - `hierarchy_level integer DEFAULT 1 CHECK (hierarchy_level BETWEEN 0 AND 4)`
-  - `cost_center_code text`
-- Create index: `idx_agents_org_dept` on `(organization_id, department_id)`.
+-- Cross-column invariant: version must belong to the same agent
+CREATE OR REPLACE FUNCTION public.trg_check_version_belongs_to_agent()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.current_agent_version_id IS NOT NULL THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM public.agent_versions av
+            WHERE av.id = NEW.current_agent_version_id
+              AND av.agent_id = NEW.id
+        ) THEN
+            RAISE EXCEPTION 'current_agent_version_id % does not belong to agent %',
+                NEW.current_agent_version_id, NEW.id;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
 
-#### Step 06: Extend `public.agent_versions`
-- Add columns:
-  - `agent_card jsonb`
-  - `agent_card_hash text`
-- Create GIN index: `idx_agent_versions_card` on `agent_card jsonb_path_ops`.
+CREATE TRIGGER trg_agents_version_invariant
+BEFORE INSERT OR UPDATE OF current_agent_version_id ON public.agents
+FOR EACH ROW EXECUTE FUNCTION public.trg_check_version_belongs_to_agent();
+```
 
-#### Step 07: Model B Version Pointer
-- Add column to `public.agents`:
-  - `current_agent_version_id uuid REFERENCES public.agent_versions(id)`
-- Create index: `idx_agents_curr_version` on `(current_agent_version_id)`.
+### Step 09: Extend `public.ai_tasks`
+```sql
+-- Verified existing: id(uuid), assigned_agent_id(text), risk_level(integer), status, priority,
+-- approval_required, approval_status, retry_count
+-- NOT FOUND: ai_tasks.error_code, ai_tasks.error_message — do NOT add or reference
+ALTER TABLE public.ai_tasks
+    ADD COLUMN IF NOT EXISTS organization_id              text REFERENCES public.organizations(id) ON DELETE RESTRICT,
+    ADD COLUMN IF NOT EXISTS department_id                text REFERENCES public.departments(id)   ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS data_classification          text DEFAULT 'INTERNAL'
+                             CHECK (data_classification IN ('PUBLIC','INTERNAL','CONFIDENTIAL','RESTRICTED')),
+    ADD COLUMN IF NOT EXISTS cost_center_code             text,
+    ADD COLUMN IF NOT EXISTS requested_by_organization_id text REFERENCES public.organizations(id) ON DELETE SET NULL;
+```
 
-#### Step 08: Extend `public.ai_tasks`
-- Add columns:
-  - `organization_id text REFERENCES public.organizations(id)`
-  - `department_id text REFERENCES public.departments(id)`
-  - `data_classification text DEFAULT 'INTERNAL'`
-  - `cost_center_code text`
-  - `requested_by_organization_id text REFERENCES public.organizations(id)`
-- Create composite index: `idx_ai_tasks_org_status_prio` on `(organization_id, status, priority)`.
+### Step 10: Extend `public.ai_task_steps`
+```sql
+-- Verified existing: id, task_id, message_type, status, envelope(jsonb), result_payload(jsonb),
+-- error_code, error_message, created_at
+-- NOT FOUND: step_name, metadata, step_index, sender_agent_id, recipient_agent_id, duration_ms
+ALTER TABLE public.ai_task_steps
+    ADD COLUMN IF NOT EXISTS sender_organization_id    text,
+    ADD COLUMN IF NOT EXISTS recipient_organization_id text;
+```
 
-#### Step 09: Extend `public.ai_task_steps`
-- Add columns:
-  - `sender_organization_id text REFERENCES public.organizations(id)`
-  - `recipient_organization_id text REFERENCES public.organizations(id)`
-- Create index: `idx_ai_task_steps_cross_org` on `(task_id, sender_organization_id, recipient_organization_id)`.
+### Step 11: Extend `public.ai_outputs`
+```sql
+-- Verified existing: id, task_id, artifact_ref, artifact_type, version, qa_status, metadata(jsonb), created_at
+-- NOT FOUND: output_type, content, agent_id — do NOT reference
+ALTER TABLE public.ai_outputs
+    ADD COLUMN IF NOT EXISTS organization_id     text REFERENCES public.organizations(id) ON DELETE RESTRICT,
+    ADD COLUMN IF NOT EXISTS data_classification text DEFAULT 'INTERNAL'
+                             CHECK (data_classification IN ('PUBLIC','INTERNAL','CONFIDENTIAL','RESTRICTED')),
+    ADD COLUMN IF NOT EXISTS release_status      text DEFAULT 'DRAFT'
+                             CHECK (release_status IN ('DRAFT','QA_APPROVED','PUBLIC_APPROVED','REVOKED'));
+```
 
-#### Step 10: Extend `public.ai_outputs`
-- Add columns:
-  - `organization_id text REFERENCES public.organizations(id)`
-  - `data_classification text DEFAULT 'INTERNAL'`
-  - `release_status text DEFAULT 'DRAFT'`
-- Create index: `idx_ai_outputs_org_release` on `(organization_id, release_status)`.
+### Step 15: RLS Activation
+```sql
+-- Enable RLS on multi-org tables
+ALTER TABLE public.organizations            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.departments              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.organization_memberships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_policies              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agents                   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agent_versions           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_tasks                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_outputs               ENABLE ROW LEVEL SECURITY;
 
-#### Step 11: Seed 6 Canonical Organizations
-- Insert 6 canonical records:
-  - `org-01-huytech` (Holding Group)
-  - `org-02-edtech-ai` (EdTech)
-  - `org-03-smarttax` (SmartTax)
-  - `org-04-legal-gov` (Legal & Governance)
-  - `org-05-ecommerce-auto` (E-Commerce)
-  - `org-06-media-creative` (Media Studio)
+-- ai_task_steps: enable RLS but no permissive authenticated policy (service-role only in MVP)
+ALTER TABLE public.ai_task_steps            ENABLE ROW LEVEL SECURITY;
+-- (No CREATE POLICY for authenticated users on ai_task_steps in MVP)
 
-#### Step 12: Seed Initial Departments
-- Insert initial core departments for each of the 6 organizations.
-
-#### Step 13: Seed Baseline Policy Rules
-- Insert L0 Group Policies (`POL-GRP-001`, `POL-GRP-002`) and SmartTax Isolation Policy (`POL-ST-ISO-001`).
-
-#### Step 14: Enable RLS & Security Policies
-- Enable RLS on all 4 new tables + 5 extended tables.
-- Deploy `auth_user_organization_ids()`, `auth_user_has_org_role()`, `auth_user_is_group_admin()`.
-- Apply RLS policies as specified in `06K_A_POLICY_AND_RLS_MODEL.md`.
-
-#### Step 15: Post-Migration Verification & Health Check
-- Run automated verification script confirming:
-  - 38 total tables exist (34 original + 4 new).
-  - Legacy 19 tables have exactly 239 rows unmodified.
-  - Foreign key constraints active and consistent.
-  - RLS enabled on all multi-org entities.
+-- Deploy SECURITY DEFINER helpers (uses membership_role, UPPERCASE ACTIVE)
+-- See 06K_A_POLICY_AND_RLS_MODEL.md Section 4.2 for full function bodies
+```
 
 ---
 
-## 3. Rollback (Down-Migration) Procedure
+## 4. Post-Migration Verification (Step 15)
 
-In the event of an unexpected schema lock or operational anomaly during Phase 06K-B execution, the following reverse procedure restores the database to the 06K-A baseline:
+```javascript
+// Verify: 38 tables exist (34 original + 4 new)
+// Verify: Legacy 19 tables unchanged
+// Verify: agents.enabled (boolean) accessible — NOT agents.status
+// Verify: ai_task_steps: authenticated user query returns 0 rows (RLS service-only confirmed)
+// Verify: organization_memberships uses membership_role column
+// Verify: 6 canonical organizations seeded
+// Verify: PGMQ ai-jobs queue = 1 (no DLQ created)
+```
+
+---
+
+## 5. Rollback (Down-Migration)
 
 ```sql
--- ROLLBACK SCRIPT (Phase 06K-B Undo)
 BEGIN;
 
--- 1. Drop RLS Policies
-DROP POLICY IF EXISTS outputs_select_policy ON public.ai_outputs;
-DROP POLICY IF EXISTS task_steps_select_policy ON public.ai_task_steps;
-DROP POLICY IF EXISTS tasks_select_policy ON public.ai_tasks;
-DROP POLICY IF EXISTS agent_versions_select_policy ON public.agent_versions;
-DROP POLICY IF EXISTS agents_select_policy ON public.agents;
-DROP POLICY IF EXISTS dept_select_policy ON public.departments;
-DROP POLICY IF EXISTS org_select_policy ON public.organizations;
+-- 1. Drop RLS Policies (authenticated)
+DROP POLICY IF EXISTS outputs_select_policy          ON public.ai_outputs;
+DROP POLICY IF EXISTS tasks_select_policy            ON public.ai_tasks;
+DROP POLICY IF EXISTS agent_versions_select_policy   ON public.agent_versions;
+DROP POLICY IF EXISTS agents_select_policy           ON public.agents;
+DROP POLICY IF EXISTS dept_select_policy             ON public.departments;
+DROP POLICY IF EXISTS org_select_policy              ON public.organizations;
 
--- 2. Drop Security Helper Functions
+-- 2. Drop Triggers and Functions
+DROP TRIGGER IF EXISTS trg_agents_version_invariant ON public.agents;
+DROP FUNCTION IF EXISTS public.trg_check_version_belongs_to_agent();
 DROP FUNCTION IF EXISTS public.auth_user_is_group_admin();
 DROP FUNCTION IF EXISTS public.auth_user_has_org_role(text, text[]);
 DROP FUNCTION IF EXISTS public.auth_user_organization_ids();
 
--- 3. Remove Extended Columns
-ALTER TABLE public.ai_outputs 
-  DROP COLUMN IF EXISTS release_status,
-  DROP COLUMN IF EXISTS data_classification,
-  DROP COLUMN IF EXISTS organization_id;
+-- 3. Drop Extended Columns (existing tables)
+ALTER TABLE public.ai_outputs      DROP COLUMN IF EXISTS release_status,
+                                   DROP COLUMN IF EXISTS data_classification,
+                                   DROP COLUMN IF EXISTS organization_id;
 
-ALTER TABLE public.ai_task_steps 
-  DROP COLUMN IF EXISTS recipient_organization_id,
-  DROP COLUMN IF EXISTS sender_organization_id;
+ALTER TABLE public.ai_task_steps   DROP COLUMN IF EXISTS recipient_organization_id,
+                                   DROP COLUMN IF EXISTS sender_organization_id;
 
-ALTER TABLE public.ai_tasks 
-  DROP COLUMN IF EXISTS requested_by_organization_id,
-  DROP COLUMN IF EXISTS cost_center_code,
-  DROP COLUMN IF EXISTS data_classification,
-  DROP COLUMN IF EXISTS department_id,
-  DROP COLUMN IF EXISTS organization_id;
+ALTER TABLE public.ai_tasks        DROP COLUMN IF EXISTS requested_by_organization_id,
+                                   DROP COLUMN IF EXISTS cost_center_code,
+                                   DROP COLUMN IF EXISTS data_classification,
+                                   DROP COLUMN IF EXISTS department_id,
+                                   DROP COLUMN IF EXISTS organization_id;
 
-ALTER TABLE public.agents 
-  DROP COLUMN IF EXISTS current_agent_version_id,
-  DROP COLUMN IF EXISTS cost_center_code,
-  DROP COLUMN IF EXISTS hierarchy_level,
-  DROP COLUMN IF EXISTS department_id,
-  DROP COLUMN IF EXISTS organization_id;
+ALTER TABLE public.agents          DROP CONSTRAINT IF EXISTS fk_agents_current_version,
+                                   DROP COLUMN IF EXISTS current_agent_version_id,
+                                   DROP COLUMN IF EXISTS cost_center_code,
+                                   DROP COLUMN IF EXISTS hierarchy_level,
+                                   DROP COLUMN IF EXISTS department_id,
+                                   DROP COLUMN IF EXISTS organization_id;
 
-ALTER TABLE public.agent_versions 
-  DROP COLUMN IF EXISTS agent_card_hash,
-  DROP COLUMN IF EXISTS agent_card;
+ALTER TABLE public.agent_versions  DROP CONSTRAINT IF EXISTS uq_agent_version,
+                                   DROP COLUMN IF EXISTS agent_card_hash,
+                                   DROP COLUMN IF EXISTS agent_card;
 
--- 4. Drop New Multi-Org Tables
-DROP TABLE IF EXISTS public.ai_policies CASCADE;
+-- 4. Drop New Tables
+DROP TABLE IF EXISTS public.ai_policies              CASCADE;
 DROP TABLE IF EXISTS public.organization_memberships CASCADE;
-DROP TABLE IF EXISTS public.departments CASCADE;
-DROP TABLE IF EXISTS public.organizations CASCADE;
+DROP TABLE IF EXISTS public.departments              CASCADE;
+DROP TABLE IF EXISTS public.organizations            CASCADE;
 
 COMMIT;
 ```

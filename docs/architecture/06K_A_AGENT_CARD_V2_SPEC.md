@@ -1,10 +1,12 @@
 # ĐẶC TẢ THẺ TÁC TỬ TOÀN DIỆN V2 (AGENT CARD V2 SPECIFICATION)
-## PHASE 06K-A — AGENT CONTRACT & IMMUTABLE PERSISTENCE DESIGN
+## PHASE 06K-A.1 — AGENT CONTRACT & IMMUTABLE PERSISTENCE DESIGN (RECONCILED)
 
 **Dự án:** HUY AI AGENCY GROUP V2.0  
 **Hệ thống:** HUY AI CENTER / HAIP CONTROL PLANE  
 **Phiên bản Schema Thẻ Tác tử:** `2.0` (HAIP Agent Card V2 Specification)  
 **Nguyên tắc cốt lõi:** THẺ TÁC TỬ LÀ HỢP ĐỒNG PHÁP LÝ & KỸ THUẬT BẤT BIẾN (CANONICAL IMMUTABLE CONTRACT)  
+
+> **CORRECTION NOTE (06K-A.1):** Sample card replaced with canonical MVP agent `agent-tax-researcher`. Type corrections: `risk.ceiling` and `agents.risk_ceiling` are `integer` (0–4), not string `"R2"`. Org enum verified correct.
 
 ---
 
@@ -247,59 +249,65 @@ Dưới đây là cấu trúc JSON Schema chuẩn hóa cho toàn bộ 25 tác t�
 
 ---
 
-## 3. VÍ DỤ MINH HỌA CANONICAL: SMARTTAX INVOICE OCR SPECIALIST (L1)
+## 3. CANONICAL MVP SAMPLE: SMARTTAX TAX RESEARCHER (L1)
+
+> **Agent ID:** `agent-tax-researcher` — SmartTax AI (org-03-smarttax), Hierarchy Level 1 (Specialist)
 
 ```json
 {
   "schema_version": "2.0",
-  "agent_id": "agent-03-smarttax-ocr-specialist",
+  "agent_id": "agent-tax-researcher",
   "version": "1.0.0",
-  "display_name": "SmartTax Invoice OCR Specialist",
+  "display_name": "SmartTax Tax Researcher",
   "identity": {
     "organization_id": "org-03-smarttax",
-    "department_id": "dept-03-tax-tech",
+    "department_id": "dept-03-tax-research",
     "hierarchy_level": 1
   },
-  "role": "Kỹ thuật viên Bóc tách Hóa đơn Số",
-  "description": "Chuyên trách nhận diện ký tự quang học (OCR), chuẩn hóa siêu dữ liệu hóa đơn điện tử GTGT và đối soát với quy chuẩn Thuế Việt Nam.",
+  "role": "Chuyên viên Nghiên cứu Văn bản Pháp luật Thuế",
+  "description": "Tra cứu, phân tích và tổng hợp văn bản quy phạm pháp luật về thuế (Thông tư, Nghị định, Công văn) của Bộ Tài chính và Tổng cục Thuế Việt Nam. Trả lời câu hỏi nghiệp vụ về chính sách thuế hiện hành.",
   "capabilities": [
-    "tax.invoice.ocr",
-    "tax.invoice.parse",
-    "tax.invoice.validate_vat"
+    "tax.research.circular",
+    "tax.research.decree",
+    "tax.research.official_letter",
+    "tax.policy.summarize",
+    "tax.compliance.check"
   ],
   "accepted_inputs": [
     {
-      "type": "application/pdf",
-      "description": "Bản scan hóa đơn điện tử định dạng PDF"
+      "type": "text/plain",
+      "description": "Câu hỏi nghiệp vụ thuế bằng tiếng Việt"
     },
     {
-      "type": "image/jpeg",
-      "description": "Ảnh chụp chứng từ hóa đơn gốc"
+      "type": "application/json",
+      "schema_ref": "schema://smarttax/tax-query-v1.json",
+      "description": "Cấu trúc truy vấn nghiệp vụ thuế chuẩn hóa"
     }
   ],
   "output_types": [
     {
       "type": "application/json",
-      "schema_ref": "schema://smarttax/invoice-metadata-v1.json",
-      "description": "Dữ liệu JSON chuẩn hóa cấu trúc hóa đơn"
+      "schema_ref": "schema://smarttax/tax-research-result-v1.json",
+      "description": "Kết quả nghiên cứu pháp luật thuế: trích dẫn văn bản, phân tích, kết luận áp dụng"
     }
   ],
   "runtime": {
-    "preferred_model_tier": "MODEL_TIER_1",
+    "preferred_model_tier": "MODEL_TIER_2",
     "execution_environment": "NODE_LOCAL",
-    "timeout_seconds": 120,
+    "timeout_seconds": 240,
     "max_retries": 3
   },
   "risk": {
     "ceiling": 1,
     "allowed_data_classifications": [
+      "INTERNAL",
       "CONFIDENTIAL",
       "RESTRICTED"
     ]
   },
   "cost": {
     "cost_center_code": "CC-03-SMARTTAX",
-    "maximum_cost_tier": "T1"
+    "maximum_cost_tier": "T2"
   },
   "delegation": {
     "can_delegate": false,
@@ -308,32 +316,32 @@ Dưới đây là cấu trúc JSON Schema chuẩn hóa cho toàn bộ 25 tác t�
   },
   "tool_access": {
     "allowed_tools": [
-      "tool-ocr-tesseract",
-      "tool-pdf-parser"
+      "tool-kb-search-smarttax",
+      "tool-pdf-reader"
     ],
     "allowed_capabilities": [
       "storage.read.secure",
-      "text.extract"
+      "knowledge.search.tax"
     ]
   },
   "policy_refs": [
     "pol-smarttax-boundary-01",
-    "pol-vietnam-vat-compliance-2026"
+    "pol-vietnam-tax-compliance-2026"
   ],
   "approval": {
     "human_required_for": [
-      "DISCREPANCY_EXCEEDS_THRESHOLD",
-      "UNRECOGNIZED_SELLER_TAX_ID"
+      "NOVEL_INTERPRETATION_REQUIRED",
+      "CONFLICTING_REGULATORY_REFERENCES"
     ]
   },
   "constraints": {
-    "max_daily_budget_usd": 15.0,
+    "max_daily_budget_usd": 5.0,
     "disallowed_external_domains": ["*"]
   },
   "provenance": {
     "author": "Huy Technology AI Lead Architect",
     "created_at": "2026-09-22T22:00:00Z",
-    "commit_hash": "3b411583bbc8adacfef0374d2c90d237f7b36c6e"
+    "commit_hash": "62f0246de009f1f9b796297fec7ddf494946a567"
   }
 }
 ```

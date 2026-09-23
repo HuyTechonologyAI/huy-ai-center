@@ -233,13 +233,13 @@ UNCHANGED
 UNCHANGED
 
 ## CURRENT_PHASE
-PHASE 06K-A — MULTI-ORG DATABASE ARCHITECTURE + AGENT CARD V2 PERSISTENCE DESIGN
+PHASE 06K-A.1 — DESIGN RECONCILIATION & PRE-MIGRATION GATE
 
 ## NEXT_PHASE
-06K-B — DATABASE MIGRATION & MULTI-ORG SEEDING
+06K-B — MIGRATION DRAFT + DRY-RUN (Isolated Environment — NO production apply)
 
 ## CURRENT_BRANCH
-`feature/06k-a-multi-org-db-design`
+`feature/06k-a1-design-reconciliation`
 
 ---
 
@@ -276,6 +276,24 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] **Phase 06K-A.1 — Design Reconciliation & Pre-Migration Gate:**
+  - Chế độ thực hiện: **DESIGN CORRECTION ONLY** (Zero database mutations, zero production changes).
+  - Đối soát sâu schema production: xác nhận chính xác kiểu dữ liệu (`agents.id = text`, `risk_ceiling/risk_level = integer`, `agent_versions.id = uuid`), loại bỏ các cột không tồn tại (`agents.status`, `ai_tasks.error_code`, `ai_task_steps.step_name`, `ai_task_steps.metadata`).
+  - Sửa 6 Org ID chuẩn hóa (loại bỏ `org-02-edtech-ai`, `org-04-legal-gov`, `org-05-ecommerce-auto`).
+  - Sửa `membership_role` (thay vì `role`) và `status = 'ACTIVE'` (uppercase) trong toàn bộ thiết kế RLS.
+  - Bổ sung design `ai_task_steps` service-role only (không có RLS policy cho authenticated users trong MVP).
+  - Sửa SmartTax: `requested_by_organization_id` không cấp quyền truy cập task hoặc step thô.
+  - Khôi phục 12 HAIP message types chính xác; xóa 11 message types phi chuẩn khỏi toàn bộ tài liệu.
+  - Xóa `ai-jobs-dlq` khỏi thiết kế; chỉ giữ 1 queue `ai-jobs`.
+  - Sửa invariant trigger `trg_agents_version_invariant` để enforce `current_agent_version_id` thuộc đúng agent.
+  - Thay thế mã mẫu Agent Card bằng `agent-tax-researcher` (SmartTax L1 MVP canonical agent).
+  - Sửa `ai_outputs` ERD: chỉ dùng `artifact_ref`, `artifact_type`, `version`, `qa_status`, `metadata`.
+  - Sửa phase sequencing: 06K-B = Draft + Dry-Run only, 06K-C = Production migration.
+  - Sửa bảng legacy: xóa các bảng hư cấu (`categories`, `courses`, `lessons`, `profiles`, `system_settings`).
+  - Cập nhật production SHA: `c2e32438e406ab433bef0d94a43755b3e95490a1`.
+  - Đề xuất (chưa áp dụng) governance `huy-ai-center`: tạo `main` branch, branch protection, CI template.
+  - Đề xuất sửa CI branch matching: `feat/**` → `feature/**` (sẽ áp dụng trong 06K-B).
+  - Ban hành: `docs/PHASE_06K_A1_RECONCILIATION_REPORT.md` và `docs/architecture/06K_A1_REPOSITORY_GOVERNANCE.md`.
 - [x] **Phase 06K-A — Multi-Org Database Architecture + Agent Card V2 Persistence Design:**
   - Chế độ thực hiện: **DESIGN ONLY** (Bảo toàn tuyệt đối 0 DDL, 0 migration, 0 mutation trên Supabase Production `HuyAI`).
   - Đối soát độc lập trạng thái cơ sở dữ liệu: Xác nhận đúng 34 bảng public (19 bảng legacy chứa 239 rows nguyên vẹn 100% + 15 bảng HAIP AI Center). `agents` = 0 rows, `agent_versions` = 0 rows, `ai-jobs` queue = 0 ready messages.
@@ -421,10 +439,10 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_PHASE
-06K-B — DATABASE MIGRATION & MULTI-ORG SEEDING (Sẽ khởi động sau khi có phê duyệt thiết kế từ Human Owner).
+06K-B — MIGRATION DRAFT + DRY-RUN (Isolated Environment — NO production apply. Requires Human Owner approval to start).
 
 ---
 
 ## NEXT_ACTION
-HARD_STOP_ENGAGED (Phase 06K-A hoàn thành xuất sắc toàn bộ tài liệu thiết kế Multi-Org Database Architecture và Agent Card V2 Persistence Design. Hoàn tất 8 tài liệu thiết kế kiến trúc chuẩn mực. Đối soát thực tế Supabase Production HuyAI nguyên vẹn 100%: 34 bảng, 239 dòng dữ liệu legacy được bảo tồn tuyệt đối. Zero DDL, Zero mutations. Dừng lại chờ Human Owner xem xét báo cáo và chỉ thị tiếp theo).
+HARD_STOP_ENGAGED (Phase 06K-A.1 hoàn thành xuất sắc toàn bộ 16 mục chỉnh sửa thiết kế. Kiểm tra schema production: 34 bảng nguyên vẹn, 0 mutations. Tất cả 8 tài liệu kiến trúc đã được reconcile và cam kết vào branch feature/06k-a1-design-reconciliation. Dừng lại chờ Human Owner xem xét và phê duyệt để tiến hành Phase 06K-B Draft + Dry-Run).
 

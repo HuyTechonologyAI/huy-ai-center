@@ -1,131 +1,211 @@
-# HIỆN TRẠNG BASELINE CƠ SỞ DỮ LIỆU SẢN XUẤT
-## PHASE 06K-A — PRODUCTION SCHEMA BASELINE VERIFICATION
+# PHASE 06K-A.1: PRODUCTION SCHEMA BASELINE (RECONCILED)
+## HUY TECHNOLOGY AI GROUP — HAIP CONTROL PLANE
 
-**Dự án:** HUY AI AGENCY GROUP V2.0  
-**Hệ thống:** HUY AI CENTER / HAIP CONTROL PLANE  
-**Cơ sở dữ liệu Supabase Sản xuất:** `HuyAI` (Project Ref: `bdeluacbzbdflxubhpha`)  
-**Thời điểm đối soát Read-Only:** 2026-09-22T22:05:53+07:00  
-**Trạng thái đối soát:** **VERIFIED (100% UNTOUCHED / ZERO MUTATION)**  
+**Document ID:** HAIP-DOC-06K-A1-BASELINE-001  
+**Phase:** 06K-A.1 (Design Reconciliation — Zero Database Mutations)  
+**Inspection Date:** 2026-09-22  
+**Supabase Project:** `HuyAI` (`bdeluacbzbdflxubhpha`)  
+**Status:** RECONCILED BASELINE — AUTHORITATIVE  
 
----
-
-## 1. TỔNG QUAN DANH MỤC 34 BẢNG PUBLIC HIỆN HỮU
-
-Cơ sở dữ liệu sản xuất hiện hữu bao gồm chính xác **34 bảng public**, được phân chia rõ ràng giữa 19 bảng ứng dụng kế thừa (Legacy Application) và 15 bảng AI Control Plane (được thiết lập chuẩn từ Phase 06H):
-
-### 1.1. Nhóm 19 Bảng Kế thừa (Legacy Application Tables - 239 hàng dữ liệu)
-1. `contacts` (0 hàng)
-2. `videos` (1 hàng)
-3. `resources` (1 hàng)
-4. `resource_views` (31 hàng)
-5. `premium_contents` (0 hàng)
-6. `item_reviews` (0 hàng)
-7. `audit_logs` (0 hàng)
-8. `user_activity_metrics` (20 hàng)
-9. `student_points_balance` (3 hàng)
-10. `daily_tasks` (0 hàng)
-11. `task_completions` (0 hàng)
-12. `cms_folders` (2 hàng)
-13. `orders` (177 hàng)
-14. `cms_settings` (3 hàng)
-15. `knowledge_chunks` (0 hàng)
-16. `user_video_progress` (0 hàng)
-17. `user_document_progress` (0 hàng)
-18. `leads` (0 hàng)
-19. `site_content` (1 hàng)
-
-> **Nguyên tắc an toàn:** Tuyệt đối không can thiệp, không thêm khóa ngoại, không thay đổi cấu trúc của 19 bảng kế thừa trên trong suốt quá trình phát triển Phase 06K.
-
-### 1.2. Nhóm 15 Bảng AI Center Control Plane (HAIP 1.0)
-1. `ai_tasks`: Bảng quản lý vòng đời tác vụ AI đa bước (Hiện có 1 hàng từ bài test kiểm định).
-2. `ai_task_steps`: Bảng ghi nhật ký bước thực thi và thông điệp phong bì HAIP (0 hàng).
-3. `ai_outputs`: Bảng lưu trữ kết quả và tạo phẩm AI đầu ra (0 hàng).
-4. `nodes`: Bảng đăng ký node xử lý vật lý (Hiện có 1 hàng: `huy-ai-node-01` - Dell Precision M4800, trạng thái `offline`).
-5. `node_heartbeats`: Bảng lưu nhịp tim kiểm tra liveness của node (0 hàng).
-6. `ai_providers`: Bảng danh mục nhà cung cấp mô hình AI (0 hàng).
-7. `ai_models`: Bảng danh mục mô hình AI (0 hàng).
-8. `tools`: Bảng định nghĩa công cụ tác tử (0 hàng).
-9. `tool_versions`: Bảng phiên bản công cụ (0 hàng).
-10. `tool_capabilities`: Bảng ánh xạ năng lực công cụ (0 hàng).
-11. `agents`: Bảng đăng ký tác tử logic (0 hàng).
-12. `agent_versions`: Bảng phiên bản tác tử bất biến (0 hàng).
-13. `github_projects`: Bảng dự án radar GitHub (0 hàng).
-14. `github_reviews`: Bảng phân tích mã nguồn GitHub (0 hàng).
-15. `github_versions`: Bảng theo dõi phiên bản GitHub (0 hàng).
+> **CORRECTION NOTE:** This document supersedes `06K_A_CURRENT_SCHEMA_BASELINE.md` from Phase 06K-A.  
+> All type, column, and data corrections are based on **live read-only inspection** of the production database.
 
 ---
 
-## 2. LỊCH SỬ MIGRATION ĐÃ ÁP DỤNG TRÊN PRODUCTION
+## 1. Production Table Inventory (Verified)
 
-Hệ thống đã trải qua **7 bản migration chính thức** tại Phase 06H:
-1. `20260921005127_remote_schema.sql`: Khởi tạo baseline remote schema ban đầu.
-2. `20260921010001_ai_operations.sql`: Thiết lập bảng vận hành AI (`ai_tasks`, `ai_task_steps`, `ai_outputs`).
-3. `20260921010002_infrastructure.sql`: Thiết lập hạ tầng node vật lý (`nodes`, `node_heartbeats`).
-4. `20260921010003_ai_registry.sql`: Thiết lập danh mục mô hình, công cụ và tác tử (`ai_providers`, `ai_models`, `tools`, `tool_versions`, `tool_capabilities`, `agents`, `agent_versions`).
-5. `20260921010004_github_radar.sql`: Thiết lập hệ thống phân tích và giám sát mã nguồn GitHub.
-6. `20260921010005_queue_and_governance.sql`: Khởi tạo hàng đợi PGMQ `ai-jobs` và các hàm RPC điều phối lõi (`haip_enqueue_job`, `haip_read_jobs`, `haip_archive_job`, `claim_ai_task`).
-7. `20260921010006_ai_center_security_hardening.sql`: Củng cố bảo mật Row Level Security và phân quyền truy cập.
+Total: **34 public tables** (confirmed).
+
+### 1.1 Legacy Application Tables (19 tables — ZERO TOUCH)
+
+Verified by live inspection on 2026-09-22:
+
+| Table | Row Count | Notes |
+| :--- | ---: | :--- |
+| `contacts` | 0 | — |
+| `videos` | 1 | — |
+| `resources` | 1 | — |
+| `resource_views` | 31 | — |
+| `premium_contents` | 0 | — |
+| `item_reviews` | 0 | — |
+| `audit_logs` | 0 | — |
+| `user_activity_metrics` | 20 | — |
+| `student_points_balance` | 3 | — |
+| `daily_tasks` | 0 | — |
+| `task_completions` | 0 | — |
+| `cms_folders` | 2 | — |
+| `orders` | 177 | Largest legacy dataset |
+| `cms_settings` | 3 | — |
+| `knowledge_chunks` | 0 | — |
+| `user_video_progress` | 0 | — |
+| `user_document_progress` | 0 | — |
+| `leads` | 0 | — |
+| `site_content` | 1 | — |
+
+> [!CAUTION]
+> **DO NOT** list fictional tables like `categories`, `courses`, `lessons`, `profiles`, `system_settings` as production tables. These were **incorrect** references in Phase 06K-A documents. The canonical legacy tables are the 19 tables listed above.
 
 ---
 
-## 3. ĐỐI SOÁT CẤU TRÚC CHI TIẾT CÁC BẢNG LÕI
+### 1.2 AI Center Tables (15 tables)
 
-### 3.1. Bảng `public.agent_versions` (Hiện có: 0 hàng)
-Đã xác thực chính xác **13 cột canonical**:
-- `id` (uuid, PK)
-- `agent_id` (uuid, FK -> agents.id)
-- `version` (text)
-- `capabilities` (text[])
-- `accepted_inputs` (jsonb)
-- `output_types` (jsonb)
-- `runtime` (jsonb)
-- `risk_ceiling` (smallint)
-- `max_parallel_tasks` (integer)
-- `configuration` (jsonb)
-- `metadata` (jsonb)
-- `schema_version` (text)
-- `created_at` (timestamptz)
+| Table | Row Count | Notes |
+| :--- | ---: | :--- |
+| `ai_tasks` | 0 | Clean registry |
+| `ai_task_steps` | 0 | Clean registry |
+| `ai_outputs` | 0 | Clean registry |
+| `nodes` | 1 | `huy-ai-node-01` (OFFLINE) |
+| `node_heartbeats` | 0 | — |
+| `ai_providers` | — | Accessible |
+| `ai_models` | — | Accessible |
+| `tools` | — | Accessible |
+| `tool_versions` | — | Accessible |
+| `tool_capabilities` | — | Accessible |
+| `agents` | 0 | Empty — not yet seeded |
+| `agent_versions` | 0 | Empty — not yet seeded |
+| `github_projects` | — | Accessible |
+| `github_reviews` | — | Accessible |
+| `github_versions` | — | Accessible |
+
+---
+
+## 2. Verified Column Inventory (Production Ground Truth)
+
+### 2.1 Table: `agents`
+
+| Column | Production Status | Data Type (Verified) |
+| :--- | :--- | :--- |
+| `id` | ✅ EXISTS | `text` (canonical ID, e.g. `agent-tax-researcher`) |
+| `name` | ✅ EXISTS | `text` |
+| `description` | ✅ EXISTS | `text` |
+| `capabilities` | ✅ EXISTS | `jsonb` or `text[]` |
+| `configuration` | ✅ EXISTS | `jsonb` |
+| `risk_ceiling` | ✅ EXISTS | `integer` (0–4, NOT text) |
+| `enabled` | ✅ EXISTS | `boolean` |
+| `health_status` | ✅ EXISTS | `text` |
+| `max_parallel_tasks` | ✅ EXISTS | `integer` |
+| `created_at` | ✅ EXISTS | `timestamptz` |
+| `updated_at` | ✅ EXISTS | `timestamptz` |
+| `assigned_capability` | ❌ NOT FOUND | — |
+| `runtime` | ❌ NOT FOUND | — |
+| `hierarchy_level` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+| `status` | ❌ NOT FOUND | Do NOT reference as existing |
+| `is_active` | ❌ NOT FOUND | Do NOT reference |
+| `node_affinity` | ❌ NOT FOUND | — |
 
 > [!IMPORTANT]
-> **Xác nhận không tồn tại cột `agent_card`:** Kiểm tra thực tế xác nhận lỗi `column agent_versions.agent_card does not exist`. Bảng hiện tại hoàn toàn chưa có cột `agent_card`. Trong Phase 06K-A, thiết kế sẽ bổ sung cột tường minh `agent_card jsonb` và `agent_card_hash text`, không giấu dữ liệu trong `configuration` hay `metadata`.
+> **`agents.id` is `text`**, not `uuid`. This is critical for all FK references and RLS policy code.  
+> **`agents.status` does NOT exist**. Use `agents.enabled` (boolean) and `agents.health_status` (text) for health checks.
 
-### 3.2. Bảng `public.agents` (Hiện có: 0 hàng)
-Bao gồm các trường quản trị tác tử:
-- `id` (uuid, PK)
-- `name` (text, UNIQUE)
-- `version` (text)
-- `description` (text)
-- `capabilities` (text[])
-- `risk_ceiling` (smallint)
-- `max_parallel_tasks` (integer)
-- `enabled` (boolean)
-- `health_status` (text)
-- `last_seen_at` (timestamptz)
-- `active_task_count` (integer)
-- `configuration` (jsonb)
-- `metadata` (jsonb)
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
+---
 
-### 3.3. Bảng `public.ai_tasks` (Hiện có: 1 hàng)
-Đã xác thực đầy đủ **45 cột canonical**:
-- `id`, `owner_user_id`, `conversation_id`, `parent_task_id`, `idempotency_key`
-- `haip_version`, `source_app`, `intent`, `priority`, `assigned_capability`
-- `assigned_agent_id`, `depends_on`, `parallel_group`, `completion_condition`
-- `status`, `risk_level`, `risk_context`, `approval_required`, `approval_status`
-- `approved_by`, `approved_at`, `approval_note`, `budget_config`, `estimated_cost_usd`
-- `actual_cost_usd`, `token_usage`, `runtime_ms`, `constraints`, `input_refs`
-- `input`, `expected_outputs`, `output`, `project_context_ref`, `task_memory_ref`
-- `retry_count`, `max_retries`, `review_cycle`, `state_version`, `claimed_by_node_id`
-- `expires_at`, `claimed_at`, `started_at`, `completed_at`, `created_at`, `updated_at`
+### 2.2 Table: `agent_versions`
 
-### 3.4. Bảng `public.nodes` và `node_heartbeats`
-- `public.nodes`: Có đúng 1 node đại diện hạ tầng phần cứng nội bộ:
-  - `id`: `'huy-ai-node-01'`
-  - `name`: `'Dell Precision M4800 Primary AI Node'`
-  - `status`: `'offline'` (Bảo toàn an toàn)
-- `public.node_heartbeats`: 0 hàng.
+| Column | Production Status | Data Type (Verified) |
+| :--- | :--- | :--- |
+| `id` | ✅ EXISTS | `uuid` |
+| `agent_id` | ✅ EXISTS | `text` (FK → `agents.id`) |
+| `version` | ✅ EXISTS | `text` (SemVer) |
+| `capabilities` | ✅ EXISTS | `jsonb` or `text[]` |
+| `accepted_inputs` | ✅ EXISTS | `jsonb` |
+| `output_types` | ✅ EXISTS | `text[]` or `jsonb` |
+| `runtime` | ✅ EXISTS | `text` |
+| `risk_ceiling` | ✅ EXISTS | `integer` (0–4, NOT text) |
+| `max_parallel_tasks` | ✅ EXISTS | `integer` |
+| `configuration` | ✅ EXISTS | `jsonb` |
+| `metadata` | ✅ EXISTS | `jsonb` |
+| `schema_version` | ✅ EXISTS | `text` |
+| `created_at` | ✅ EXISTS | `timestamptz` |
+| `agent_card` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+| `agent_card_hash` | ❌ NOT FOUND | New column (ADD in 06K-B) |
 
-### 3.5. Trạng thái Hàng đợi PGMQ `ai-jobs`
-- Hàm RPC `haip_read_jobs`: Trả về 0 thông điệp.
-- Hàng đợi `ai-jobs`: Trạng thái trống (ready messages = 0), sẵn sàng cho việc tiếp nhận phong bì tác vụ đa tổ chức.
+> [!IMPORTANT]
+> **`agent_versions.id` is `uuid`**. `agent_versions.agent_id` is `text`.  
+> `current_agent_version_id` on `agents` will be `uuid` (FK → `agent_versions.id`). Cross-type FK constraint is valid: `text PK ← uuid FK` is NOT valid. The pointer goes `agents(current_agent_version_id uuid) → agent_versions(id uuid)`.
+
+---
+
+### 2.3 Table: `ai_tasks`
+
+| Column | Production Status | Data Type (Verified) |
+| :--- | :--- | :--- |
+| `id` | ✅ EXISTS | `uuid` |
+| `assigned_agent_id` | ✅ EXISTS | `text` (FK → `agents.id text`) |
+| `risk_level` | ✅ EXISTS | `integer` (0–4, NOT text `"R2"`) |
+| `status` | ✅ EXISTS | `text` |
+| `priority` | ✅ EXISTS | `integer` |
+| `approval_required` | ✅ EXISTS | `boolean` |
+| `approval_status` | ✅ EXISTS | `text` |
+| `retry_count` | ✅ EXISTS | `integer` |
+| `error_code` | ❌ NOT FOUND | Do NOT use in Dispatcher logic |
+| `error_message` | ❌ NOT FOUND | Do NOT use in Dispatcher logic |
+| `organization_id` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+| `department_id` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+| `data_classification` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+| `requested_by_organization_id` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+
+---
+
+### 2.4 Table: `ai_task_steps`
+
+| Column | Production Status | Data Type (Verified) |
+| :--- | :--- | :--- |
+| `id` | ✅ EXISTS | `uuid` |
+| `task_id` | ✅ EXISTS | `uuid` |
+| `message_type` | ✅ EXISTS | `text` (12 canonical HAIP types) |
+| `status` | ✅ EXISTS | `text` |
+| `envelope` | ✅ EXISTS | `jsonb` |
+| `result_payload` | ✅ EXISTS | `jsonb` |
+| `error_code` | ✅ EXISTS | `text` |
+| `error_message` | ✅ EXISTS | `text` |
+| `created_at` | ✅ EXISTS | `timestamptz` |
+| `step_index` | ❌ NOT FOUND | — |
+| `sender_agent_id` | ❌ NOT FOUND | — |
+| `recipient_agent_id` | ❌ NOT FOUND | — |
+| `duration_ms` | ❌ NOT FOUND | — |
+| `step_name` | ❌ NOT FOUND | Do NOT reference — non-canonical |
+| `metadata` | ❌ NOT FOUND | Do NOT reference — non-canonical |
+| `organization_id` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+
+> [!IMPORTANT]
+> **`ai_task_steps` is service-role/server-only in MVP.** No RLS policy should expose raw execution steps to authenticated org users. The `requested_by_organization_id` on `ai_tasks` does NOT grant cross-org read access to `ai_task_steps`.
+
+---
+
+### 2.5 Table: `ai_outputs`
+
+| Column | Production Status | Data Type (Verified) |
+| :--- | :--- | :--- |
+| `id` | ✅ EXISTS | `uuid` |
+| `task_id` | ✅ EXISTS | `uuid` |
+| `artifact_ref` | ✅ EXISTS | `text` |
+| `artifact_type` | ✅ EXISTS | `text` |
+| `version` | ✅ EXISTS | `text` |
+| `qa_status` | ✅ EXISTS | `text` |
+| `metadata` | ✅ EXISTS | `jsonb` |
+| `created_at` | ✅ EXISTS | `timestamptz` |
+| `agent_id` | ❌ NOT FOUND | — |
+| `output_type` | ❌ NOT FOUND | Non-canonical — do NOT use |
+| `content` | ❌ NOT FOUND | Non-canonical — do NOT use |
+| `organization_id` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+| `data_classification` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+| `release_status` | ❌ NOT FOUND | New column (ADD in 06K-B) |
+
+---
+
+## 3. PGMQ Queue Verification
+
+- **Active Queue:** `ai-jobs` (single queue, CONFIRMED)
+- **Ready Messages:** 0
+- **Dead-Letter Queue (`ai-jobs-dlq`):** DOES NOT EXIST. Per Phase 06K-A.1 correction, DLQ is removed from design. Failure handling uses visibility timeout, `retry_count`, and task state transitions.
+
+---
+
+## 4. Phase Sequencing (Corrected)
+
+| Phase | Mode | Description |
+| :--- | :--- | :--- |
+| **06K-A** | Design | Multi-org architecture design documents (completed) |
+| **06K-A.1** | Design Correction | Reconciliation against real production schema (this document) |
+| **06K-B** | Draft + Dry-Run | Executable migration draft; isolated test-environment dry-run; **NO production apply** |
+| **06K-C** | Production Migration | Controlled production apply only after Human Owner approval |
