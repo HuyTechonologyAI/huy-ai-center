@@ -108,6 +108,7 @@ export async function execute(root, opts = {}) {
       const prompt = `You are the sole implementation writer in this isolated task worktree. Implement this plan:\n${plan}\n${brief}\nNever modify the primary worktree, production, main, secrets, or files outside allowed paths. Do not commit or push. Run required local verification. Stop if a permission is missing.`;
       await checked('codex', ['exec', '--sandbox', 'workspace-write', '--ephemeral', prompt], worktree, '', 3600000);
       const entries = (await git(worktree, 'status', '--porcelain', '--untracked-files=all')).split('\n').filter(Boolean);
+      if (entries.length === 0) throw Error('IMPLEMENTATION_EMPTY');
       const changed = entries.map(line => line.slice(3));
       checkScope(changed, task.allowed_paths);
       state.tasks[task.id].status = 'VERIFYING'; await saveState(statePath, state);
