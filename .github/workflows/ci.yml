@@ -6,6 +6,7 @@ on:
       - main
       - 'feat/**'
       - 'feature/**'
+      - 'agent-task/06k-b1-codex-hardening'
       - 'security/**'
       - 'hotfix/**'
       - 'chore/**'
@@ -151,6 +152,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:shared
+      # Supabase owns this disposable database as supabase_admin. The fixture
+      # user needs schema CREATE for baseline tables and database CREATE for pgmq.
+      - name: Provision isolated fixture DDL privileges
+        run: |
+          docker exec "${{ job.services.postgres.id }}" psql -U supabase_admin -d phase06kb_test -v ON_ERROR_STOP=1 \
+            -c 'GRANT CREATE ON DATABASE phase06kb_test TO postgres;' \
+            -c 'GRANT CREATE ON SCHEMA public TO postgres;'
+      - name: Verify image-aware auth bootstrap
+        run: node --test tests/security/auth-bootstrap.test.js
       - run: npm run verify:06k-b
       - run: npm run test:security
       - name: Upload measured DB evidence even on failure

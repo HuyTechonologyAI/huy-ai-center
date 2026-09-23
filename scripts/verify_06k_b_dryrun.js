@@ -132,7 +132,12 @@ async function run() {
       await client.connect();
       const {rows}=await client.query('SELECT current_database() AS database,inet_server_addr() AS server,version() AS version');
       assert.equal(rows[0].database,new URL(url).pathname.slice(1));
-      return {target:rows[0]};
+      const diagnostics = await client.query(`SELECT current_user AS current_user,
+        current_database() AS current_database, pg_get_userbyid(datdba) AS database_owner
+        FROM pg_database WHERE datname = current_database()`);
+      // Catalog identifiers only: never log credentials or connection URLs.
+      console.log('[DB diagnostics]', JSON.stringify(diagnostics.rows[0]));
+      return {target:rows[0], diagnostics:diagnostics.rows[0]};
     });
     let baseline;
     await stage('baseline',async()=>{
