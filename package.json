@@ -9,10 +9,17 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "build:shared": "npm run build --workspace=@huy-ai/config --workspace=@huy-ai/contracts --workspace=@huy-ai/shared",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present && npx tsx --test tests/ai-task-api.test.ts",
+    "test": "npm run test:core",
+    "test:core": "npm run test --workspaces --if-present && npx tsx --test tests/ai-task-api.test.ts tests/architecture-v2-consistency.test.ts tests/ui-ux-v2-tokens.test.ts",
+    "test:portfolio-contract": "npx tsx --test tests/ui-ux-v2-final-polish.test.ts",
     "lint": "npm run lint --workspaces --if-present",
-    "verify:safety": "powershell.exe -ExecutionPolicy Bypass -File ./scripts/verify-safety.ps1"
+    "verify:safety": "powershell.exe -ExecutionPolicy Bypass -File ./scripts/verify-safety.ps1",
+    "bridge:preflight": "powershell.exe -ExecutionPolicy Bypass -File ./automation/agent-bridge/preflight.ps1",
+    "bridge:test": "npm run test:bridge",
+    "test:bridge": "npx tsx --test tests/automation/risk-classifier.test.ts tests/automation/command-guard.test.ts tests/automation/approval-gate.test.ts tests/automation/log-redactor.test.ts tests/automation/task-contract.test.ts tests/automation/dry-run.test.ts tests/automation/security-cases.test.ts",
+    "bridge:dry-run": "powershell.exe -ExecutionPolicy Bypass -File ./automation/agent-bridge/orchestrator.ps1 -DryRun"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

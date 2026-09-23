@@ -1,0 +1,23 @@
+{
+  "R0": {
+    "approval": "AUTO",
+    "description": "Read / Inspect / Summarize / Plan / Document — fully automatic"
+  },
+  "R1": {
+    "approval": "AUTO",
+    "description": "Edit feature branch / Refactor / Tests / Lint / Typecheck — automatic"
+  },
+  "R2": {
+    "approval": "AUTO",
+    "sandbox_required": true,
+    "description": "Build / Commit / Push feature branch / Create PR / Dry-run — automatic, sandbox mandatory"
+  },
+  "R3": {
+    "approval": "HUMAN_REQUIRED",
+    "description": "Merge protected branch / Production deploy / External comms / Production write — human required"
+  },
+  "R4": {
+    "approval": "HUMAN_OWNER_REQUIRED",
+    "description": "Production DDL / Destructive DB / Financial / DNS / IAM / Secret rotation / Force push — Human Owner mandatory"
+  }
+}

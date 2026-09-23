@@ -1,0 +1,43 @@
+{
+  "_comment": "Verification policy: which commands run after implementation, keyed by changed path prefix.",
+  "default": {
+    "commands": [
+      "npm run typecheck",
+      "npm run test"
+    ]
+  },
+  "path_rules": [
+    {
+      "path_prefix": "automation/",
+      "commands": [
+        "npm run typecheck",
+        "npm run test:bridge"
+      ]
+    },
+    {
+      "path_prefix": "packages/",
+      "commands": [
+        "npm run typecheck",
+        "npm run test",
+        "npm run build"
+      ]
+    },
+    {
+      "path_prefix": "docs/",
+      "commands": []
+    },
+    {
+      "path_prefix": "config/",
+      "commands": []
+    },
+    {
+      "path_prefix": ".github/",
+      "commands": []
+    }
+  ],
+  "always_skip_on_paths": [
+    "*.md",
+    "*.json",
+    ".gitignore"
+  ]
+}
