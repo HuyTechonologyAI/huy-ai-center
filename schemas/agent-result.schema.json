@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AgentResult",
+  "type": "object",
+  "required": ["taskId","cycle","status","changedFiles","verificationResults","auditNotes","completedAt"],
+  "properties": {
+    "taskId": { "type": "string" },
+    "planId": { "type": "string" },
+    "cycle": { "type": "integer" },
+    "status": {
+      "type": "string",
+      "enum": ["PASS","FAIL","CORRECTION_REQUIRED","HUMAN_DECISION_REQUIRED","AUTOMATION_BLOCKED","CODEX_UNAVAILABLE","ANTIGRAVITY_UNAVAILABLE","AGENT_PLAN_INVALID","RECOVERY_REQUIRED"]
+    },
+    "changedFiles": { "type": "array", "items": { "type": "string" } },
+    "diffStat": { "type": "string" },
+    "verificationResults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command","exitCode","passed","durationMs"],
+        "properties": {
+          "command": { "type": "string" },
+          "exitCode": { "type": "integer" },
+          "passed": { "type": "boolean" },
+          "stdout": { "type": "string" },
+          "stderr": { "type": "string" },
+          "durationMs": { "type": "integer" }
+        }
+      }
+    },
+    "auditNotes": { "type": "string" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "errorMessage": { "type": "string" }
+  }
+}

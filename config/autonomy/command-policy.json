@@ -1,0 +1,49 @@
+{
+  "_comment": "Command-level policy. Auto-blocked patterns are R3/R4 regardless of AI suggestion.",
+  "auto_blocked": [
+    "git push --force",
+    "git push -f",
+    "git push origin main",
+    "git reset --hard",
+    "git clean -fdx",
+    "vercel --prod",
+    "supabase db push",
+    "supabase migration up",
+    "DROP TABLE",
+    "DROP DATABASE",
+    "TRUNCATE",
+    "DELETE FROM",
+    "env",
+    "printenv",
+    "gh pr merge"
+  ],
+  "r2_sandbox_required": [
+    "npm run build",
+    "npm install",
+    "git push origin feature/*",
+    "git commit",
+    "gh pr create",
+    "gh pr edit"
+  ],
+  "r1_automatic": [
+    "npm run test",
+    "npm run typecheck",
+    "npm run lint",
+    "npx tsx",
+    "git status",
+    "git diff",
+    "git log",
+    "git branch"
+  ],
+  "r0_automatic": [
+    "cat",
+    "ls",
+    "find",
+    "grep",
+    "node --version",
+    "npm --version",
+    "git --version",
+    "agy --version",
+    "codex --version"
+  ]
+}
