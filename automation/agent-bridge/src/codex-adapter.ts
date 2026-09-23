@@ -8,6 +8,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { redact } from "./log-redactor.js";
 import type { CliCheckResult, CliStatus } from "./types.js";
 
@@ -16,10 +17,8 @@ import type { CliCheckResult, CliStatus } from "./types.js";
 // ─────────────────────────────────────────────────
 
 export function checkCodex(): CliCheckResult {
-  const result = spawnSync("codex", ["--version"], {
-    encoding: "utf-8",
-    timeout: 5000,
-    shell: true,
+  const result = runCodex(["--version"], {
+    timeoutMs: 5000,
   });
 
   if (result.error || result.status === null || result.status !== 0) {
@@ -96,12 +95,9 @@ export async function execCodexTask(
     req.prompt,
   ];
 
-  const result = spawnSync("codex", args, {
-    encoding: "utf-8",
+  const result = runCodex(args, {
     cwd: req.worktreePath,
-    timeout: (req.timeoutSeconds ?? 1800) * 1000,
-    env: { ...process.env },
-    shell: true,
+    timeoutMs: (req.timeoutSeconds ?? 1800) * 1000,
   });
 
   const stdout = redact(result.stdout ?? "");
@@ -179,6 +175,42 @@ function isCodexAuthError(text: string): boolean {
     text.includes("authentication failed") ||
     text.includes("auth error")
   );
+}
+
+
+interface CodexRunOptions {
+  cwd?: string;
+  timeoutMs: number;
+}
+
+/**
+ * Execute the npm-installed Codex CLI without cmd.exe argument rewriting.
+ * This mirrors the Antigravity adapter and prevents large multiline prompts
+ * from being corrupted on Windows.
+ */
+function runCodex(args: string[], options: CodexRunOptions) {
+  const common = {
+    encoding: "utf-8" as const,
+    cwd: options.cwd,
+    timeout: options.timeoutMs,
+    env: { ...process.env },
+  };
+
+  if (process.platform === "win32") {
+    const npmBin = process.env.APPDATA
+      ? `${process.env.APPDATA}\\npm\\codex.ps1`
+      : "";
+
+    if (npmBin && existsSync(npmBin)) {
+      return spawnSync(
+        "powershell.exe",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", npmBin, ...args],
+        { ...common, shell: false }
+      );
+    }
+  }
+
+  return spawnSync("codex", args, { ...common, shell: process.platform === "win32" });
 }
 
 // ─────────────────────────────────────────────────
