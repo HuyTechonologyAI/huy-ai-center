@@ -420,12 +420,23 @@ PRODUCTION_MIGRATED_STABLE
 
 ---
 
+## PHASE_06K_B_1_STATE
+- **STATUS:** COMPLETED (Pre-production Migration Evidence & Fail-Closed Hardening)
+- **DATABASE_ISOLATION_GATE:** CONFIGURED (`.github/workflows/ci.yml`, Job: `06K-B Isolated DB Integration` with blocking isolated Postgres 17 service)
+- **CANONICAL_HASHING:** RECURSIVE_DETERMINISTIC (`@huy-ai/contracts` `canonicalSha256`, nested mutation sensitive, key-order invariant)
+- **CLASSIFICATION_CEILING:** FAIL_CLOSED (`data_classification_rank(unknown)` returns NULL, SQL comparison evaluates to NULL)
+- **CANONICAL_SEED_DRIFT_PROTECTION:** ACTIVE (Post-insert validation DO block verifies 6 orgs and 65 depts; aborts with `CANONICAL_SEED_DRIFT` on mismatch)
+- **EVIDENCE_GENERATION:** DYNAMIC_LIVE_CATALOG_MEASURED (All schema metrics, counts, constraints, test passes captured from PostgreSQL catalogs and test runners)
+- **PRODUCTION_SCOPE:** ZERO_TOUCH (Production `bdeluacbzbdflxubhpha` untouched; isolated `phase06kb_test` on loopback used exclusively)
+
+---
+
 ## TEST_STATUS
-- **Contracts & HAIP Unit Tests:** PASS (25/25 tests).
-- **Core Tests:** PASS (52/52 tests).
+- **Contracts & HAIP Unit Tests:** PASS (30/30 tests).
+- **Core Tests:** PASS (58/58 tests).
 - **Automation Bridge Tests:** PASS (99/99 tests).
-- **06K-B Multi-Org Security Tests:** PASS (34/34 tests).
-- **06K-B Automated Dry Run:** PASS (Apply -> Idempotency -> Rollback -> Reapply).
+- **06K-B Multi-Org Security Tests:** PASS (39/39 tests across 7 suites).
+- **06K-B Automated Dry Run Lifecycle:** PASS (All 12 stages: preflight, baseline, baseline-contract, apply, second-apply, schema-after, negative-tests, security-tests, rollback, baseline-verification, reapply, final-verification).
 - **TypeScript Compile:** PASS (Toàn bộ workspaces).
 - **Quality Gate:** 100% PASS.
 
@@ -442,6 +453,6 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_ACTION
-HARD_STOP_ENGAGED (Phase 06K-B hoàn tất trọn vẹn toàn bộ 56 điều khoản: 5 file migration draft additive/idempotent, 1 file rollback đảo ngược hoàn chỉnh, 34/34 security tests PASS, dry run 2 tầng PASS trên local Supabase stack độc lập, 0 chạm production. Đã tạo PR vào main và dừng lại chờ Human Owner duyệt bằng chứng trước khi cấp quyền Phase 06K-C).
+HARD_STOP_ENGAGED (Phase 06K-B.1 hoàn tất củng cố fail-closed hardening và evidence generation: 39/39 security tests PASS, 12/12 stages dry run lifecycle PASS trên isolated database `phase06kb_test`, 0 chạm production. Nhánh feature/06k-b-migration-dry-run đã sẵn sàng tại PR #1. Dừng lại chờ Human Owner phê duyệt trước khi cấp quyền Phase 06K-C).
 
 

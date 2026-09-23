@@ -26,9 +26,10 @@ ALTER TABLE public.ai_outputs
     ADD COLUMN IF NOT EXISTS release_status       text DEFAULT 'DRAFT'
                              CHECK (release_status IN ('DRAFT','QA_APPROVED','PUBLIC_APPROVED','REVOKED'));
 
--- 4. Deterministic Data Classification Rank Function
+-- 4. Deterministic Data Classification Rank Function (Fail-Closed)
 -- Evaluates security ceilings mathematically rather than lexicographically:
 -- PUBLIC (1) < INTERNAL (2) < CONFIDENTIAL (3) < RESTRICTED (4)
+-- Invalid or unknown classifications return NULL to enforce fail-closed authorization.
 CREATE OR REPLACE FUNCTION public.data_classification_rank(cls text)
 RETURNS integer
 LANGUAGE sql
@@ -41,7 +42,7 @@ AS $$
     WHEN 'INTERNAL' THEN 2
     WHEN 'CONFIDENTIAL' THEN 3
     WHEN 'RESTRICTED' THEN 4
-    ELSE 0
+    ELSE NULL
   END;
 $$;
 

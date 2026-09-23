@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "principle": "AI_AGENT_IS_NEVER_EQUIVALENT_TO_HUMAN_APPROVER",
+  "escalation_chain": [
+    "Department Review",
+    "Company Review",
+    "Group Governance",
+    "Human Owner Approval"
+  ],
+  "policies": [
+    {
+      "risk_level": 0,
+      "name": "Read & Analysis",
+      "human_approval_required": false,
+      "ai_review_required": false,
+      "action": "AUTO_EXECUTE",
+      "description": "Read-only operations, vector searches, metadata telemetry, and data conversions"
+    },
+    {
+      "risk_level": 1,
+      "name": "Draft Content Generation",
+      "human_approval_required": false,
+      "ai_review_required": true,
+      "action": "AUTO_EXECUTE_WITH_PEER_REVIEW",
+      "description": "Internal drafts, lesson plans, educational scripts, and technical outlines"
+    },
+    {
+      "risk_level": 2,
+      "name": "Controlled Sandbox Execution",
+      "human_approval_required": false,
+      "ai_review_required": true,
+      "action": "AUTO_SANDBOX_REQUIRES_POLICY_FOR_PROMOTION",
+      "description": "Staging code execution, synthetic testing, video rendering in container"
+    },
+    {
+      "risk_level": 3,
+      "name": "Production Write / External Communications",
+      "human_approval_required": true,
+      "approver_role": "HUMAN_EDITORIAL_OR_COMPLIANCE_LEAD",
+      "action": "REQUIRE_HUMAN_APPROVAL",
+      "description": "Publishing public videos, deploying web apps, sending client emails, live database writes"
+    },
+    {
+      "risk_level": 4,
+      "name": "Critical Financial, Legal, or Destructive Action",
+      "human_approval_required": true,
+      "approver_role": "HUMAN_SYSTEM_OWNER",
+      "action": "REQUIRE_HUMAN_OWNER_APPROVAL",
+      "description": "Formal tax filing submission, banking transaction, secret rotation, data deletion"
+    }
+  ],
+  "sla": {
+    "timeout_seconds": 86400,
+    "on_timeout_action": "EXPIRE_TASK"
+  }
+}

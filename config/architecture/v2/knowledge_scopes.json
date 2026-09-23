@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "format": "URI_PATTERN",
+  "pattern": "^kb://[a-z0-9_-]+/[a-z0-9_-]+/.*$",
+  "inviolable_rule": "CROSS_ORG_KNOWLEDGE_ACCESS_MUST_BE_EXPLICITLY_DECLARED",
+  "scopes": [
+    { "uri": "kb://org-01-huytech/platform/*", "organization_id": "org-01-huytech", "domain": "platform", "description": "Platform architecture, HAIP specifications, and MCP protocol docs" },
+    { "uri": "kb://org-01-huytech/infra/*", "organization_id": "org-01-huytech", "domain": "infra", "description": "Dell M4800 on-prem specs, Coolify setup, and Traefik routing" },
+
+    { "uri": "kb://org-02-aischool/curriculum/*", "organization_id": "org-02-aischool", "domain": "curriculum", "description": "Official Dispatch 5512 (CV 5512) and 2018 General Education Program" },
+    { "uri": "kb://org-02-aischool/pedagogy/*", "organization_id": "org-02-aischool", "domain": "pedagogy", "description": "Active learning methods, Bloom taxonomy, and rubric guidelines" },
+
+    { "uri": "kb://org-03-smarttax/tax/*", "organization_id": "org-03-smarttax", "domain": "tax", "description": "Vietnam Corporate Income Tax (CIT), VAT, and Personal Income Tax (PIT) codes" },
+    { "uri": "kb://org-03-smarttax/legal/*", "organization_id": "org-03-smarttax", "domain": "legal", "description": "Law on Enterprises, Commercial Law, and contractual precedents" },
+    { "uri": "kb://org-03-smarttax/compliance/*", "organization_id": "org-03-smarttax", "domain": "compliance", "description": "Statutory reporting deadlines, penalties, and tax audit guides" },
+
+    { "uri": "kb://org-04-media-tech/brand/*", "organization_id": "org-04-media-tech", "domain": "brand", "description": "Tech Media brand voice, developer tone, and visual guidelines" },
+    { "uri": "kb://org-05-media-edu/brand/*", "organization_id": "org-05-media-edu", "domain": "brand", "description": "Education Media brand voice, teacher empathy, and graphic assets" },
+    { "uri": "kb://org-06-media-creative/brand/*", "organization_id": "org-06-media-creative", "domain": "brand", "description": "Creative Media brand voice, viral video structures, and sound guides" }
+  ]
+}

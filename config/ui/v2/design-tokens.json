@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0.0",
+  "system": "HUY AI Design System",
+  "target_brand": "HUY TECHNOLOGY AI GROUP",
+  "color": {
+    "dark": {
+      "bg": {
+        "primary": "#070B14",
+        "secondary": "#0A1124",
+        "tertiary": "#0F1A36",
+        "canvas": "#04070D"
+      },
+      "surface": {
+        "primary": "#0F172A",
+        "secondary": "#1E293B",
+        "elevated": "#1E293BCC",
+        "glass": "rgba(15, 23, 42, 0.65)",
+        "glass_border": "rgba(255, 255, 255, 0.08)",
+        "glass_border_hover": "rgba(0, 229, 255, 0.3)"
+      },
+      "text": {
+        "primary": "#FFFFFF",
+        "secondary": "#94A3B8",
+        "muted": "#64748B",
+        "inverse": "#070B14",
+        "accent": "#00E5FF"
+      },
+      "border": {
+        "subtle": "rgba(255, 255, 255, 0.08)",
+        "medium": "rgba(255, 255, 255, 0.16)",
+        "strong": "rgba(255, 255, 255, 0.24)",
+        "focus": "#00E5FF"
+      }
+    },
+    "light": {
+      "bg": {
+        "primary": "#F8FAFC",
+        "secondary": "#F1F5F9",
+        "tertiary": "#E2E8F0",
+        "canvas": "#FFFFFF"
+      },
+      "surface": {
+        "primary": "#FFFFFF",
+        "secondary": "#F8FAFC",
+        "elevated": "#FFFFFFEE",
+        "glass": "rgba(255, 255, 255, 0.8)",
+        "glass_border": "rgba(0, 0, 0, 0.08)",
+        "glass_border_hover": "rgba(0, 112, 243, 0.3)"
+      },
+      "text": {
+        "primary": "#0F172A",
+        "secondary": "#475569",
+        "muted": "#94A3B8",
+        "inverse": "#FFFFFF",
+        "accent": "#0284C7"
+      },
+      "border": {
+        "subtle": "rgba(0, 0, 0, 0.08)",
+        "medium": "rgba(0, 0, 0, 0.16)",
+        "strong": "rgba(0, 0, 0, 0.24)",
+        "focus": "#0284C7"
+      }
+    },
+    "brand": {
+      "primary": "#00E5FF",
+      "primary_hover": "#33EBFF",
+      "secondary": "#0070F3",
+      "secondary_hover": "#1E86FF",
+      "accent_glow": "rgba(0, 229, 255, 0.4)",
+      "gradient_primary": "linear-gradient(135deg, #00E5FF 0%, #0070F3 100%)",
+      "gradient_dark": "linear-gradient(180deg, #070B14 0%, #0A1124 100%)",
+      "gradient_surface": "linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.5) 100%)"
+    },
+    "semantic": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    }
+  },
+  "typography": {
+    "families": {
+      "display": "'Space Grotesk', 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      "body": "'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      "mono": "'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace"
+    },
+    "sizes": {
+      "xs": "0.75rem",
+      "sm": "0.875rem",
+      "base": "1rem",
+      "lg": "1.125rem",
+      "xl": "1.25rem",
+      "2xl": "1.5rem",
+      "3xl": "1.875rem",
+      "4xl": "2.25rem",
+      "5xl": "3rem",
+      "6xl": "3.75rem",
+      "7xl": "4.5rem"
+    },
+    "weights": {
+      "regular": "400",
+      "medium": "500",
+      "semibold": "600",
+      "bold": "700",
+      "extrabold": "800",
+      "black": "900"
+    },
+    "line_heights": {
+      "none": "1",
+      "tight": "1.15",
+      "snug": "1.3",
+      "normal": "1.5",
+      "relaxed": "1.625",
+      "loose": "2"
+    },
+    "letter_spacing": {
+      "tighter": "-0.04em",
+      "tight": "-0.02em",
+      "normal": "0em",
+      "wide": "0.02em",
+      "wider": "0.05em",
+      "widest": "0.1em"
+    }
+  },
+  "spacing": {
+    "0": "0px",
+    "1": "4px",
+    "2": "8px",
+    "3": "12px",
+    "4": "16px",
+    "5": "20px",
+    "6": "24px",
+    "8": "32px",
+    "10": "40px",
+    "12": "48px",
+    "16": "64px",
+    "20": "80px",
+    "24": "96px",
+    "32": "128px"
+  },
+  "radii": {
+    "none": "0px",
+    "sm": "4px",
+    "md": "8px",
+    "lg": "12px",
+    "xl": "16px",
+    "2xl": "24px",
+    "3xl": "32px",
+    "full": "9999px"
+  },
+  "elevation": {
+    "level0": "none",
+    "level1": "0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3)",
+    "level2": "0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4)",
+    "level3": "0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5)",
+    "level4": "0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6)",
+    "glow_primary": "0 0 20px rgba(0, 229, 255, 0.25)",
+    "glow_primary_strong": "0 0 35px rgba(0, 229, 255, 0.45)"
+  },
+  "breakpoints": {
+    "mobile": "390px",
+    "tablet": "768px",
+    "laptop": "1280px",
+    "desktop": "1440px"
+  },
+  "motion": {
+    "durations": {
+      "instant": "100ms",
+      "fast": "200ms",
+      "normal": "350ms",
+      "slow": "500ms",
+      "reveal": "700ms"
+    },
+    "easings": {
+      "linear": "linear",
+      "ease_in": "cubic-bezier(0.4, 0, 1, 1)",
+      "ease_out": "cubic-bezier(0, 0, 0.2, 1)",
+      "ease_in_out": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "spring": "cubic-bezier(0.16, 1, 0.3, 1)"
+    }
+  },
+  "z_index": {
+    "deep_background": -10,
+    "canvas": 0,
+    "content": 1,
+    "elevated": 10,
+    "sticky_header": 40,
+    "backdrop": 50,
+    "modal_drawer": 60,
+    "popover_tooltip": 70,
+    "toast": 80
+  },
+  "container": {
+    "max_width": {
+      "sm": "640px",
+      "md": "768px",
+      "lg": "1024px",
+      "xl": "1280px",
+      "2xl": "1440px"
+    },
+    "padding": {
+      "mobile": "16px",
+      "tablet": "24px",
+      "desktop": "32px"
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "generated_for": "PHASE_06J_UX",
+  "public_ecosystem": [
+    {
+      "id": "org-01-huytech",
+      "display_name": "HUY TECHNOLOGY AI GROUP",
+      "short_description": "Trung tâm điều phối AI, nghiên cứu mô hình đa tác tử và hạ tầng công nghệ lõi.",
+      "brand_role": "Parent Holding / Technology Platform",
+      "public_capabilities": [
+        "Autonomous Multi-Agent Orchestration",
+        "Enterprise Automation Systems",
+        "Private AI Infrastructure & RAG"
+      ],
+      "public_product_groups": [
+        "AI Agency as a Service (AaaS)",
+        "Enterprise Workflow Automation",
+        "On-Premise AI Infrastructure Hosting"
+      ],
+      "public_website_target": "https://huycncdsai.io.vn",
+      "public_status": "ACTIVE"
+    },
+    {
+      "id": "org-02-aischool",
+      "display_name": "GVCNCDSAI AI SCHOOL",
+      "short_description": "Học viện đào tạo và hệ thống AI Copilot giáo dục chuẩn hóa theo Công văn 5512.",
+      "brand_role": "AI Education & Academy",
+      "public_capabilities": [
+        "CV 5512 Lesson Plan Generation",
+        "Pedagogical Presentation Decks",
+        "Adaptive Socratic Student Tutoring"
+      ],
+      "public_product_groups": [
+        "Teacher AI Copilot",
+        "Interactive Slide & Mindmap Studio",
+        "Digital Learning Platform & Certifications"
+      ],
+      "public_website_target": "https://gvcncdsai.io.vn",
+      "public_status": "ACTIVE"
+    },
+    {
+      "id": "org-03-smarttax",
+      "display_name": "SMARTTAX AI",
+      "short_description": "Trợ lý thông minh pháp lý & thuế với tra cứu căn cứ pháp luật và đối soát chuyên gia CPA.",
+      "brand_role": "Tax & Legal Intelligence",
+      "public_capabilities": [
+        "Statutory Law & Circular Research",
+        "Deterministic Legal Citation Verification",
+        "Corporate Tax Deduction Preparation"
+      ],
+      "public_product_groups": [
+        "Tax & Legal Q&A Search (Mode A)",
+        "Tax Document Assistant (Mode B)",
+        "Licensed CPA Review Gateway (Mode C)"
+      ],
+      "public_website_target": "https://smarttax-ai.vercel.app",
+      "public_status": "ACTIVE"
+    },
+    {
+      "id": "org-04-media-tech",
+      "display_name": "HUY TECH MEDIA",
+      "short_description": "Kênh truyền thông chuyên sâu về AI, tự động hóa quy trình và chuyển đổi số doanh nghiệp.",
+      "brand_role": "Technology Media Agency",
+      "public_capabilities": [
+        "Developer AI Tutorials",
+        "Tech Architecture Breakdowns",
+        "Corporate Digital Case Studies"
+      ],
+      "public_product_groups": [
+        "Tech Newsletters & Deep Dives",
+        "Educational Tech Video Series",
+        "Enterprise Digital Transformation Media"
+      ],
+      "public_website_target": "https://huycncdsai.io.vn/media",
+      "public_status": "ACTIVE"
+    },
+    {
+      "id": "org-05-media-edu",
+      "display_name": "GVCNCDSAI MEDIA",
+      "short_description": "Kênh truyền thông giáo dục, phương pháp giảng dạy STEM và đồng hành cùng nhà giáo.",
+      "brand_role": "Education Media Agency",
+      "public_capabilities": [
+        "Pedagogical Growth Content",
+        "Classroom STEM Infographics",
+        "Student Study Skill Guides"
+      ],
+      "public_product_groups": [
+        "Teacher Growth Video Series",
+        "Classroom AI Guidebooks",
+        "Student Inspiration Podcasts"
+      ],
+      "public_website_target": "https://gvcncdsai.io.vn/media",
+      "public_status": "ACTIVE"
+    },
+    {
+      "id": "org-06-media-creative",
+      "display_name": "HUY CREATIVE MEDIA",
+      "short_description": "Hãng sáng tạo nội dung giải trí, âm nhạc AI và định dạng video ngắn đa nền tảng.",
+      "brand_role": "Creative & Entertainment Media",
+      "public_capabilities": [
+        "AI Music Composition & Stems",
+        "Atmospheric Soundscapes",
+        "Creative Viral Short-Form Video"
+      ],
+      "public_product_groups": [
+        "Royalty-Free AI Music Packs",
+        "Creative Video Shorts",
+        "Lifestyle & Entertainment Audio"
+      ],
+      "public_website_target": "https://huycncdsai.io.vn/creative",
+      "public_status": "ACTIVE"
+    }
+  ]
+}

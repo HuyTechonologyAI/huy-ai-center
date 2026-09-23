@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "format": "URI_PATTERN",
+  "pattern": "^data://[a-z0-9_-]+/(public|internal|confidential|restricted)/\\*$",
+  "inviolable_rule": "WILDCARD_DATA_SCOPES_FORBIDDEN_BY_DEFAULT",
+  "scopes": [
+    { "uri": "data://org-01-huytech/public/*", "classification": "PUBLIC", "organization_id": "org-01-huytech", "description": "Public technology release docs and announcements" },
+    { "uri": "data://org-01-huytech/internal/*", "classification": "INTERNAL", "organization_id": "org-01-huytech", "description": "Internal engineering specs and operational metrics" },
+
+    { "uri": "data://org-02-aischool/public/*", "classification": "PUBLIC", "organization_id": "org-02-aischool", "description": "Public syllabus outlines and sample lesson plans" },
+    { "uri": "data://org-02-aischool/internal/*", "classification": "INTERNAL", "organization_id": "org-02-aischool", "description": "Internal pedagogical guidelines and question repositories" },
+    { "uri": "data://org-02-aischool/confidential/*", "classification": "CONFIDENTIAL", "organization_id": "org-02-aischool", "description": "Student assessment scores, student profiles, and teacher notes" },
+
+    { "uri": "data://org-03-smarttax/public/*", "classification": "PUBLIC", "organization_id": "org-03-smarttax", "description": "Public tax law summaries and official circular announcements" },
+    { "uri": "data://org-03-smarttax/internal/*", "classification": "INTERNAL", "organization_id": "org-03-smarttax", "description": "Internal tax research memos and legal precedent analysis" },
+    { "uri": "data://org-03-smarttax/confidential/*", "classification": "CONFIDENTIAL", "organization_id": "org-03-smarttax", "description": "Client intake briefs and preliminary tax calculations" },
+    { "uri": "data://org-03-smarttax/restricted/*", "classification": "RESTRICTED", "organization_id": "org-03-smarttax", "description": "Taxpayer identification numbers, bank ledgers, and formal filings" },
+
+    { "uri": "data://org-04-media-tech/public/*", "classification": "PUBLIC", "organization_id": "org-04-media-tech", "description": "Published tech tutorials, newsletters, and case studies" },
+    { "uri": "data://org-04-media-tech/internal/*", "classification": "INTERNAL", "organization_id": "org-04-media-tech", "description": "Draft tech scripts, editorial outlines, and design assets" },
+
+    { "uri": "data://org-05-media-edu/public/*", "classification": "PUBLIC", "organization_id": "org-05-media-edu", "description": "Published educational videos, infographics, and teacher guides" },
+    { "uri": "data://org-05-media-edu/internal/*", "classification": "INTERNAL", "organization_id": "org-05-media-edu", "description": "Draft education scripts and storyboard drafts" },
+
+    { "uri": "data://org-06-media-creative/public/*", "classification": "PUBLIC", "organization_id": "org-06-media-creative", "description": "Published creative videos, music stems, and viral audio" },
+    { "uri": "data://org-06-media-creative/internal/*", "classification": "INTERNAL", "organization_id": "org-06-media-creative", "description": "Draft creative scripts, concept prompts, and audio stems" }
+  ]
+}

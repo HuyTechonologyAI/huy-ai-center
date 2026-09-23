@@ -18,6 +18,7 @@ jobs:
   # 1. CORE QUALITY GATE (BLOCKING — SELF-CONTAINED HUY AI CENTER)
   # ============================================================================
   quality-gate:
+    needs: db-integration
     name: Quality Gate
     runs-on: ubuntu-latest
     continue-on-error: false
@@ -49,6 +50,9 @@ jobs:
 
       - name: Run Bridge Automation Tests
         run: npm run test:bridge
+
+      - name: Run Multi-Org Security Tests (Static Invariant Mode)
+        run: npm run test:security
 
   # ============================================================================
   # 2. LEGACY LINT AUDIT (NON-BLOCKING DIAGNOSTIC)
@@ -118,3 +122,42 @@ jobs:
         working-directory: huy-ai-center
         run: npm run test:portfolio-contract
         continue-on-error: true
+
+  db-integration:
+    name: 06K-B Isolated DB Integration
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    env:
+      REQUIRE_06K_B_DB: 'true'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/phase06kb_test
+    services:
+      postgres:
+        image: public.ecr.aws/supabase/postgres:17.6.1.167
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: phase06kb_test
+        ports:
+          - 54322:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d phase06kb_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:shared
+      - run: npm run verify:06k-b
+      - run: npm run test:security
+      - name: Upload measured DB evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 06k-b-evidence
+          path: .artifacts/06k-b/
+          include-hidden-files: true
+          if-no-files-found: error

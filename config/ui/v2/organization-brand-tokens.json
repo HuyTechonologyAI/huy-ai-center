@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0.0",
+  "system": "HUY AI Design System - Organization & Risk UI Brand Tokens",
+  "organizations": {
+    "org-01-huytech": {
+      "id": "org-01-huytech",
+      "display_name": "HUY TECHNOLOGY AI GROUP",
+      "brand_role": "Parent Holding / Technology Platform",
+      "colors": {
+        "primary": "#00E5FF",
+        "secondary": "#0070F3",
+        "surface": "rgba(0, 229, 255, 0.06)",
+        "border": "rgba(0, 229, 255, 0.25)",
+        "border_hover": "#00E5FF",
+        "glow": "rgba(0, 229, 255, 0.35)",
+        "badge_bg": "rgba(0, 229, 255, 0.12)",
+        "badge_text": "#00E5FF"
+      },
+      "gradient": "linear-gradient(135deg, #00E5FF 0%, #0070F3 100%)",
+      "logo": {
+        "icon": "Cpu",
+        "svg_symbol": "hexagon-circuit"
+      }
+    },
+    "org-02-aischool": {
+      "id": "org-02-aischool",
+      "display_name": "GVCNCDSAI AI SCHOOL",
+      "brand_role": "AI Education & Academy",
+      "colors": {
+        "primary": "#00FF85",
+        "secondary": "#10B981",
+        "surface": "rgba(0, 255, 133, 0.06)",
+        "border": "rgba(0, 255, 133, 0.25)",
+        "border_hover": "#00FF85",
+        "glow": "rgba(0, 255, 133, 0.35)",
+        "badge_bg": "rgba(0, 255, 133, 0.12)",
+        "badge_text": "#00FF85"
+      },
+      "gradient": "linear-gradient(135deg, #00FF85 0%, #10B981 100%)",
+      "logo": {
+        "icon": "GraduationCap",
+        "svg_symbol": "academic-shield"
+      }
+    },
+    "org-03-smarttax": {
+      "id": "org-03-smarttax",
+      "display_name": "SMARTTAX AI",
+      "brand_role": "Tax & Legal Intelligence",
+      "colors": {
+        "primary": "#3B82F6",
+        "secondary": "#F59E0B",
+        "surface": "rgba(59, 130, 246, 0.06)",
+        "border": "rgba(59, 130, 246, 0.25)",
+        "border_hover": "#60A5FA",
+        "glow": "rgba(59, 130, 246, 0.35)",
+        "badge_bg": "rgba(59, 130, 246, 0.12)",
+        "badge_text": "#60A5FA"
+      },
+      "gradient": "linear-gradient(135deg, #3B82F6 0%, #F59E0B 100%)",
+      "logo": {
+        "icon": "Calculator",
+        "svg_symbol": "legal-scale-ledger"
+      }
+    },
+    "org-04-media-tech": {
+      "id": "org-04-media-tech",
+      "display_name": "HUY TECH MEDIA",
+      "brand_role": "Technology Media Agency",
+      "colors": {
+        "primary": "#00D2FF",
+        "secondary": "#0055FF",
+        "surface": "rgba(0, 210, 255, 0.06)",
+        "border": "rgba(0, 210, 255, 0.25)",
+        "border_hover": "#00D2FF",
+        "glow": "rgba(0, 210, 255, 0.35)",
+        "badge_bg": "rgba(0, 210, 255, 0.12)",
+        "badge_text": "#00D2FF"
+      },
+      "gradient": "linear-gradient(135deg, #00D2FF 0%, #0055FF 100%)",
+      "logo": {
+        "icon": "Tv",
+        "svg_symbol": "terminal-broadcast"
+      }
+    },
+    "org-05-media-edu": {
+      "id": "org-05-media-edu",
+      "display_name": "GVCNCDSAI MEDIA",
+      "brand_role": "Education Media Agency",
+      "colors": {
+        "primary": "#10B981",
+        "secondary": "#059669",
+        "surface": "rgba(16, 185, 129, 0.06)",
+        "border": "rgba(16, 185, 129, 0.25)",
+        "border_hover": "#34D399",
+        "glow": "rgba(16, 185, 129, 0.35)",
+        "badge_bg": "rgba(16, 185, 129, 0.12)",
+        "badge_text": "#34D399"
+      },
+      "gradient": "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+      "logo": {
+        "icon": "BookOpen",
+        "svg_symbol": "open-book-beacon"
+      }
+    },
+    "org-06-media-creative": {
+      "id": "org-06-media-creative",
+      "display_name": "HUY CREATIVE MEDIA",
+      "brand_role": "Creative & Entertainment Media",
+      "colors": {
+        "primary": "#8B5CF6",
+        "secondary": "#EC4899",
+        "surface": "rgba(139, 92, 246, 0.06)",
+        "border": "rgba(139, 92, 246, 0.25)",
+        "border_hover": "#A78BFA",
+        "glow": "rgba(139, 92, 246, 0.35)",
+        "badge_bg": "rgba(139, 92, 246, 0.12)",
+        "badge_text": "#C084FC"
+      },
+      "gradient": "linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)",
+      "logo": {
+        "icon": "Sparkles",
+        "svg_symbol": "spectrum-spark"
+      }
+    }
+  },
+  "risk_ui_tokens": {
+    "R0": {
+      "level": 0,
+      "label": "Read / Safe",
+      "badge_bg": "rgba(148, 163, 184, 0.15)",
+      "badge_text": "#94A3B8",
+      "border": "rgba(148, 163, 184, 0.3)",
+      "indicator_dot": "#94A3B8"
+    },
+    "R1": {
+      "level": 1,
+      "label": "Draft / Low",
+      "badge_bg": "rgba(59, 130, 246, 0.15)",
+      "badge_text": "#60A5FA",
+      "border": "rgba(59, 130, 246, 0.3)",
+      "indicator_dot": "#3B82F6"
+    },
+    "R2": {
+      "level": 2,
+      "label": "Controlled",
+      "badge_bg": "rgba(16, 185, 129, 0.15)",
+      "badge_text": "#34D399",
+      "border": "rgba(16, 185, 129, 0.3)",
+      "indicator_dot": "#10B981"
+    },
+    "R3": {
+      "level": 3,
+      "label": "Approval Required",
+      "badge_bg": "rgba(245, 158, 11, 0.15)",
+      "badge_text": "#FBBF24",
+      "border": "rgba(245, 158, 11, 0.3)",
+      "indicator_dot": "#F59E0B"
+    },
+    "R4": {
+      "level": 4,
+      "label": "Critical",
+      "badge_bg": "rgba(239, 68, 68, 0.15)",
+      "badge_text": "#F87171",
+      "border": "rgba(239, 68, 68, 0.3)",
+      "indicator_dot": "#EF4444"
+    }
+  }
+}

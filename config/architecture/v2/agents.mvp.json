@@ -1,0 +1,488 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "roster_size": 25,
+  "status": "FROZEN_MVP_DESIGN_TIME_NOT_SEEDED",
+  "agents": [
+    {
+      "id": "agent-group-ceo",
+      "name": "Group Executive Orchestrator",
+      "organization_id": "org-01-huytech",
+      "department_id": null,
+      "management_level": 4,
+      "reports_to_agent_id": null,
+      "capabilities": [
+        "group.plan",
+        "group.delegate",
+        "group.status.read",
+        "group.cost.read",
+        "group.risk.read"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_3",
+        "maximum_tier": "MODEL_TIER_3",
+        "fallback_tiers": ["MODEL_TIER_2"]
+      },
+      "risk_ceiling": 3
+    },
+    {
+      "id": "agent-huytech-orchestrator",
+      "name": "Huy Technology Company Orchestrator",
+      "organization_id": "org-01-huytech",
+      "department_id": null,
+      "management_level": 3,
+      "reports_to_agent_id": "agent-group-ceo",
+      "capabilities": [
+        "company.plan",
+        "company.delegate",
+        "company.status.read",
+        "company.cost.read"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_3",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 3
+    },
+    {
+      "id": "agent-aischool-orchestrator",
+      "name": "GVCNCDSAI AI School Company Orchestrator",
+      "organization_id": "org-02-aischool",
+      "department_id": null,
+      "management_level": 3,
+      "reports_to_agent_id": "agent-group-ceo",
+      "capabilities": [
+        "company.plan",
+        "company.delegate",
+        "company.status.read",
+        "company.cost.read"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_3",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 3
+    },
+    {
+      "id": "agent-smarttax-orchestrator",
+      "name": "SmartTax AI Company Orchestrator",
+      "organization_id": "org-03-smarttax",
+      "department_id": null,
+      "management_level": 3,
+      "reports_to_agent_id": "agent-group-ceo",
+      "capabilities": [
+        "company.plan",
+        "company.delegate",
+        "company.status.read",
+        "company.cost.read"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_3",
+        "maximum_tier": "MODEL_TIER_3",
+        "fallback_tiers": ["MODEL_TIER_2"]
+      },
+      "risk_ceiling": 3
+    },
+    {
+      "id": "agent-media-tech-orchestrator",
+      "name": "Huy Tech Media Company Orchestrator",
+      "organization_id": "org-04-media-tech",
+      "department_id": null,
+      "management_level": 3,
+      "reports_to_agent_id": "agent-group-ceo",
+      "capabilities": [
+        "company.plan",
+        "company.delegate",
+        "company.status.read",
+        "company.cost.read"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 3
+    },
+    {
+      "id": "agent-media-edu-orchestrator",
+      "name": "GVCNCDSAI Media Company Orchestrator",
+      "organization_id": "org-05-media-edu",
+      "department_id": null,
+      "management_level": 3,
+      "reports_to_agent_id": "agent-group-ceo",
+      "capabilities": [
+        "company.plan",
+        "company.delegate",
+        "company.status.read",
+        "company.cost.read"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 3
+    },
+    {
+      "id": "agent-media-creative-orchestrator",
+      "name": "Huy Creative Media Company Orchestrator",
+      "organization_id": "org-06-media-creative",
+      "department_id": null,
+      "management_level": 3,
+      "reports_to_agent_id": "agent-group-ceo",
+      "capabilities": [
+        "company.plan",
+        "company.delegate",
+        "company.status.read",
+        "company.cost.read"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 3
+    },
+    {
+      "id": "agent-huytech-engineering-manager",
+      "name": "Huy Technology Engineering Manager",
+      "organization_id": "org-01-huytech",
+      "department_id": "dept-01-engineering",
+      "management_level": 2,
+      "reports_to_agent_id": "agent-huytech-orchestrator",
+      "capabilities": [
+        "department.plan",
+        "department.assign",
+        "department.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-huytech-security-manager",
+      "name": "Huy Technology Security & Policy Manager",
+      "organization_id": "org-01-huytech",
+      "department_id": "dept-01-security",
+      "management_level": 2,
+      "reports_to_agent_id": "agent-huytech-orchestrator",
+      "capabilities": [
+        "department.plan",
+        "department.assign",
+        "department.review",
+        "security.policy.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_3",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 3
+    },
+    {
+      "id": "agent-aischool-academic-manager",
+      "name": "GVCNCDSAI AI School Academic Affairs Manager",
+      "organization_id": "org-02-aischool",
+      "department_id": "dept-02-academic",
+      "management_level": 2,
+      "reports_to_agent_id": "agent-aischool-orchestrator",
+      "capabilities": [
+        "department.plan",
+        "department.assign",
+        "department.review",
+        "education.content.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-aischool-multimedia-manager",
+      "name": "GVCNCDSAI AI School Multimedia Manager",
+      "organization_id": "org-02-aischool",
+      "department_id": "dept-02-multimedia",
+      "management_level": 2,
+      "reports_to_agent_id": "agent-aischool-orchestrator",
+      "capabilities": [
+        "department.plan",
+        "department.assign",
+        "department.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-smarttax-tax-manager",
+      "name": "SmartTax Tax Research Manager",
+      "organization_id": "org-03-smarttax",
+      "department_id": "dept-03-tax-research",
+      "management_level": 2,
+      "reports_to_agent_id": "agent-smarttax-orchestrator",
+      "capabilities": [
+        "department.plan",
+        "department.assign",
+        "department.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_3",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-smarttax-legal-manager",
+      "name": "SmartTax Legal Research Manager",
+      "organization_id": "org-03-smarttax",
+      "department_id": "dept-03-legal-research",
+      "management_level": 2,
+      "reports_to_agent_id": "agent-smarttax-orchestrator",
+      "capabilities": [
+        "department.plan",
+        "department.assign",
+        "department.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_3",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-media-tech-strategy-manager",
+      "name": "Huy Tech Media Strategy Manager",
+      "organization_id": "org-04-media-tech",
+      "department_id": "dept-04-strategy",
+      "management_level": 2,
+      "reports_to_agent_id": "agent-media-tech-orchestrator",
+      "capabilities": [
+        "department.plan",
+        "department.assign",
+        "department.review",
+        "media.brand.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-media-edu-strategy-manager",
+      "name": "GVCNCDSAI Media Strategy Manager",
+      "organization_id": "org-05-media-edu",
+      "department_id": "dept-05-strategy",
+      "management_level": 2,
+      "reports_to_agent_id": "agent-media-edu-orchestrator",
+      "capabilities": [
+        "department.plan",
+        "department.assign",
+        "department.review",
+        "media.brand.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-media-creative-strategy-manager",
+      "name": "Huy Creative Media Strategy Manager",
+      "organization_id": "org-06-media-creative",
+      "department_id": "dept-06-strategy",
+      "management_level": 2,
+      "reports_to_agent_id": "agent-media-creative-orchestrator",
+      "capabilities": [
+        "department.plan",
+        "department.assign",
+        "department.review",
+        "media.brand.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-dev-specialist",
+      "name": "Software Development Specialist",
+      "organization_id": "org-01-huytech",
+      "department_id": "dept-01-engineering",
+      "management_level": 1,
+      "reports_to_agent_id": "agent-huytech-engineering-manager",
+      "capabilities": [
+        "engineering.codegen",
+        "engineering.code.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_1",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_0"]
+      },
+      "risk_ceiling": 1
+    },
+    {
+      "id": "agent-security-auditor",
+      "name": "Security & Policy Auditor",
+      "organization_id": "org-01-huytech",
+      "department_id": "dept-01-security",
+      "management_level": 1,
+      "reports_to_agent_id": "agent-huytech-security-manager",
+      "capabilities": [
+        "security.audit",
+        "security.policy.review"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_1",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_0"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-lesson-designer",
+      "name": "Pedagogical Lesson Designer",
+      "organization_id": "org-02-aischool",
+      "department_id": "dept-02-lesson-design",
+      "management_level": 1,
+      "reports_to_agent_id": "agent-aischool-academic-manager",
+      "capabilities": [
+        "education.lesson.design"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 1
+    },
+    {
+      "id": "agent-assessment-specialist",
+      "name": "Educational Assessment Specialist",
+      "organization_id": "org-02-aischool",
+      "department_id": "dept-02-assessment",
+      "management_level": 1,
+      "reports_to_agent_id": "agent-aischool-academic-manager",
+      "capabilities": [
+        "education.assessment.build"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 1
+    },
+    {
+      "id": "agent-tax-researcher",
+      "name": "Tax Law Researcher",
+      "organization_id": "org-03-smarttax",
+      "department_id": "dept-03-tax-research",
+      "management_level": 1,
+      "reports_to_agent_id": "agent-smarttax-tax-manager",
+      "capabilities": [
+        "tax.research",
+        "tax.source.verify"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_3",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 2
+    },
+    {
+      "id": "agent-legal-citation-verifier",
+      "name": "Legal Citation Verifier",
+      "organization_id": "org-03-smarttax",
+      "department_id": "dept-03-citation",
+      "management_level": 1,
+      "reports_to_agent_id": "agent-smarttax-legal-manager",
+      "capabilities": [
+        "legal.research",
+        "legal.citation.verify"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_1",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_0"]
+      },
+      "risk_ceiling": 1
+    },
+    {
+      "id": "agent-tech-media-producer",
+      "name": "Tech Media Script Producer",
+      "organization_id": "org-04-media-tech",
+      "department_id": "dept-04-script",
+      "management_level": 1,
+      "reports_to_agent_id": "agent-media-tech-strategy-manager",
+      "capabilities": [
+        "media.research",
+        "media.script.create",
+        "media.asset.prepare"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 1
+    },
+    {
+      "id": "agent-edu-media-producer",
+      "name": "Education Media Script Producer",
+      "organization_id": "org-05-media-edu",
+      "department_id": "dept-05-script",
+      "management_level": 1,
+      "reports_to_agent_id": "agent-media-edu-strategy-manager",
+      "capabilities": [
+        "media.research",
+        "media.script.create",
+        "media.asset.prepare"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 1
+    },
+    {
+      "id": "agent-creative-media-producer",
+      "name": "Creative Media Script & Audio Producer",
+      "organization_id": "org-06-media-creative",
+      "department_id": "dept-06-script",
+      "management_level": 1,
+      "reports_to_agent_id": "agent-media-creative-strategy-manager",
+      "capabilities": [
+        "media.research",
+        "media.script.create",
+        "media.asset.prepare"
+      ],
+      "model_policy": {
+        "preferred_tier": "MODEL_TIER_2",
+        "maximum_tier": "MODEL_TIER_2",
+        "fallback_tiers": ["MODEL_TIER_1"]
+      },
+      "risk_ceiling": 1
+    }
+  ]
+}
