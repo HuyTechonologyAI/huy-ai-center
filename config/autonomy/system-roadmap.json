@@ -28,7 +28,8 @@
         "schemas/",
         "tests/automation/",
         "docs/automation/",
-        "package.json"
+        "package.json",
+        "PROJECT_STATE.md"
       ],
       "verification": [
         "npm run typecheck",
