@@ -28,7 +28,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
-$BridgeSrc = Join-Path $RepoRoot "automation/agent-bridge/src"
+$BridgeCli = Join-Path $RepoRoot "automation/agent-bridge/src/cli.ts"
 
 Write-Host "`n============================================================" -ForegroundColor Cyan
 Write-Host " AI-DEV-BRIDGE-A ORCHESTRATOR" -ForegroundColor Cyan
@@ -48,7 +48,7 @@ if ($DryRun -and -not $TaskFile) {
     exit 0
 }
 
-# ── 2. Task contract ────────────────────────────────────────────
+# -- 2. Task contract --------------------------------------------
 if (-not $TaskFile) {
     Write-Host "[orchestrator] ERROR: -TaskFile is required when not in DryRun-only mode." -ForegroundColor Red
     exit 1
@@ -60,43 +60,28 @@ if (-not (Test-Path $TaskFile)) {
 }
 
 Write-Host "[orchestrator] Loading task contract: $TaskFile" -ForegroundColor Yellow
-$contractJson = Get-Content $TaskFile -Raw
-
-# ── 3. Execute via Node.js bridge ──────────────────────────────
-$runnerScript = @"
-import { validateContract, runTask, preflight } from '$($BridgeSrc -replace '\\','/')/index.js';
-import { writeFileSync } from 'node:fs';
-
-const reportPath = '.artifacts/bridge-run-report.json';
-
-const contract = JSON.parse(process.argv[2]);
-const validation = validateContract(contract);
-
-if (!validation.valid) {
-  console.error('[bridge] Contract invalid:', validation.errors.join('; '));
-  process.exit(2);
-}
-
-console.log('[bridge] Contract valid. Starting task:', contract.taskId);
-
-const state = await runTask(validation.contract, process.cwd());
-
-console.log('[bridge] Task complete. Status:', state.status);
-writeFileSync(reportPath, JSON.stringify(state, null, 2));
-process.exit(state.status === 'COMPLETE' ? 0 : 1);
-"@
+$resolvedTaskFile = Resolve-Path $TaskFile
 
 if ($DryRun) {
-    Write-Host "[orchestrator] DRY-RUN: Would execute task contract validation and risk gate." -ForegroundColor Green
-    Write-Host "[orchestrator] Contract JSON preview:" -ForegroundColor DarkGray
-    Write-Host $contractJson -ForegroundColor DarkGray
-    exit 0
+    Write-Host "[orchestrator] DRY-RUN mode: Validating task contract via CLI..." -ForegroundColor Yellow
+    Push-Location $RepoRoot
+    try {
+        npx tsx $BridgeCli --task "$resolvedTaskFile" --preflight
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        Pop-Location
+    }
+    Write-Host "[orchestrator] DRY-RUN validation complete." -ForegroundColor Green
+    exit $exitCode
 }
+
+# -- 3. Execute via CLI entrypoint ------------------------------
+Write-Host "[orchestrator] Invoking bridge CLI: $BridgeCli" -ForegroundColor Cyan
 
 Push-Location $RepoRoot
 try {
-    $escapedJson = $contractJson -replace '"', '\"'
-    node --input-type=module --loader tsx/esm "$BridgeSrc/index.ts" $escapedJson 2>&1
+    npx tsx $BridgeCli --task "$resolvedTaskFile"
     $exitCode = $LASTEXITCODE
 }
 finally {
@@ -107,10 +92,19 @@ if ($exitCode -eq 0) {
     Write-Host "`n[orchestrator] TASK COMPLETE: PASS" -ForegroundColor Green
 }
 elseif ($exitCode -eq 2) {
-    Write-Host "`n[orchestrator] TASK FAILED: Contract invalid" -ForegroundColor Red
+    Write-Host "`n[orchestrator] TASK FAILED: Contract schema invalid" -ForegroundColor Red
+}
+elseif ($exitCode -eq 3) {
+    Write-Host "`n[orchestrator] TASK PAUSED: HUMAN_GATE required (R3/R4 action)" -ForegroundColor Yellow
+}
+elseif ($exitCode -eq 4) {
+    Write-Host "`n[orchestrator] TASK BLOCKED: Automation limit reached or CLI unavailable" -ForegroundColor DarkYellow
+}
+elseif ($exitCode -eq 5) {
+    Write-Host "`n[orchestrator] TASK FAILED: Agent plan or audit invalid" -ForegroundColor Red
 }
 else {
-    Write-Host "`n[orchestrator] TASK STATUS: See .artifacts/ for details" -ForegroundColor Yellow
+    Write-Host "`n[orchestrator] TASK STATUS: Non-zero exit code $exitCode. See .artifacts/ for details." -ForegroundColor Yellow
 }
 
 Write-Host "============================================================`n" -ForegroundColor Cyan

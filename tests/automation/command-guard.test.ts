@@ -88,4 +88,20 @@ describe("Command Guard", () => {
     // gh pr create is R2 = AUTO
     assert.equal(checkCommandSync("gh pr create --title 'feat'"), "ALLOW");
   });
+
+  it("FAIL CLOSED: unknown command requires human approval", () => {
+    assert.equal(checkCommandSync("arbitrary-unknown-binary --flag"), "HUMAN_REQUIRED");
+  });
+
+  it("HUMAN_REQUIRED: rm -rf", () => {
+    assert.equal(checkCommandSync("rm -rf src/"), "HUMAN_REQUIRED");
+  });
+
+  it("HUMAN_REQUIRED: Remove-Item -Recurse", () => {
+    assert.equal(checkCommandSync("Remove-Item -Recurse foo"), "HUMAN_REQUIRED");
+  });
+
+  it("HUMAN_REQUIRED: curl", () => {
+    assert.equal(checkCommandSync("curl https://api.com"), "HUMAN_REQUIRED");
+  });
 });

@@ -130,6 +130,21 @@ export function validateContract(pathOrObject: string | unknown): {
     errors.push("sourceControl.mergeAllowed MUST be false — merge is always R3/HUMAN");
   }
 
+  // Validate taskBranch does not target protected branches
+  const repo = c["repository"] as Record<string, unknown> | undefined;
+  if (repo && typeof repo["taskBranch"] === "string") {
+    const lowerBranch = (repo["taskBranch"] as string).toLowerCase().trim();
+    if (
+      lowerBranch === "main" ||
+      lowerBranch === "master" ||
+      lowerBranch.startsWith("prod") ||
+      lowerBranch.startsWith("release") ||
+      lowerBranch.includes("--force")
+    ) {
+      errors.push(`repository.taskBranch cannot target protected ref '${repo["taskBranch"]}'`);
+    }
+  }
+
   if (errors.length > 0) {
     return { valid: false, errors };
   }

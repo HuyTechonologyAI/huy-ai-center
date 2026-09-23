@@ -1,5 +1,5 @@
 {
-  "_comment": "Command-level policy. Auto-blocked patterns are R3/R4 regardless of AI suggestion.",
+  "_comment": "Authoritative command policy. Hard-coded invariants have highest precedence, followed by this policy. Unknown commands FAIL CLOSED to R3/HUMAN_REQUIRED.",
   "auto_blocked": [
     "git push --force",
     "git push -f",
@@ -11,11 +11,21 @@
     "supabase migration up",
     "DROP TABLE",
     "DROP DATABASE",
+    "DROP SCHEMA",
     "TRUNCATE",
     "DELETE FROM",
     "env",
     "printenv",
-    "gh pr merge"
+    "gh pr merge",
+    "rm -rf",
+    "Remove-Item -Recurse",
+    "Remove-Item .* -Recurse",
+    "curl",
+    "wget",
+    "secret-rotat",
+    "cloudflare",
+    "dns.*change",
+    "iam.*change"
   ],
   "r2_sandbox_required": [
     "npm run build",
@@ -33,7 +43,11 @@
     "git status",
     "git diff",
     "git log",
-    "git branch"
+    "git branch",
+    "git checkout -b",
+    "npm run test:bridge",
+    "npm run bridge:test",
+    "npm run build:shared"
   ],
   "r0_automatic": [
     "cat",
@@ -44,6 +58,7 @@
     "npm --version",
     "git --version",
     "agy --version",
-    "codex --version"
+    "codex --version",
+    "gh --version"
   ]
 }

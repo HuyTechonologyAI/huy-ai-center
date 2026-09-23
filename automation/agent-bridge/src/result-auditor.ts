@@ -1,42 +1,83 @@
 /**
  * RESULT AUDITOR — Post-implementation review collector
- * Phase: AI-DEV-BRIDGE-A
+ * Phase: AI-DEV-BRIDGE-A.1 (Guarded Verification & Complete Diff Parsing)
  *
- * Collects git diff, verification results, and passes
+ * Collects git diff, changed files (including untracked), and passes
  * summarized evidence to Antigravity for auditing.
+ * Every verification command must pass through command-guard before execution.
  * Never sends secrets.
  */
 
 import { spawnSync } from "node:child_process";
 import { redact, safeJsonStringify } from "./log-redactor.js";
+import { checkCommandSync } from "./command-guard.js";
 import type { VerificationResult, AgentResult, AgentResultStatus } from "./types.js";
 
 // ─────────────────────────────────────────────────
-// Collect diff statistics from worktree
+// Collect diff statistics from worktree (including untracked)
 // ─────────────────────────────────────────────────
 
 export function collectDiffStat(worktreePath: string): string {
-  const result = spawnSync("git", ["diff", "--stat", "HEAD"], {
+  const diffResult = spawnSync("git", ["diff", "--stat", "HEAD"], {
     cwd: worktreePath,
     encoding: "utf-8",
   });
-  return redact(result.stdout ?? "").trim();
+
+  const statusResult = spawnSync("git", ["status", "--porcelain"], {
+    cwd: worktreePath,
+    encoding: "utf-8",
+  });
+
+  let output = (diffResult.stdout ?? "").trim();
+
+  // Parse untracked files
+  const untracked = (statusResult.stdout ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("??"))
+    .map((l) => l.replace(/^\?\?\s+/, ""));
+
+  if (untracked.length > 0) {
+    output += (output ? "\n\n" : "") + `Untracked files (${untracked.length}):\n` +
+      untracked.map((f) => ` + ${f}`).join("\n");
+  }
+
+  return redact(output || "No changes detected").trim();
 }
 
+/**
+ * Collect all changed files: modified, added, deleted, renamed, untracked.
+ * Uses `git status --porcelain` to capture all filesystem modifications.
+ */
 export function collectChangedFiles(worktreePath: string): string[] {
-  const result = spawnSync(
-    "git",
-    ["diff", "--name-only", "HEAD"],
-    { cwd: worktreePath, encoding: "utf-8" }
-  );
-  return (result.stdout ?? "")
-    .trim()
-    .split("\n")
-    .filter(Boolean);
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    cwd: worktreePath,
+    encoding: "utf-8",
+  });
+
+  if (result.status !== 0 || !result.stdout) {
+    return [];
+  }
+
+  const lines = result.stdout.trim().split("\n").filter(Boolean);
+  const files: string[] = [];
+
+  for (const line of lines) {
+    // Format: XY <path> or XY <oldPath> -> <newPath>
+    const pathPart = line.slice(3).trim();
+    if (pathPart.includes(" -> ")) {
+      const parts = pathPart.split(" -> ");
+      files.push(parts[1].trim());
+    } else {
+      files.push(pathPart);
+    }
+  }
+
+  return files;
 }
 
 // ─────────────────────────────────────────────────
-// Run verification commands
+// Run verification commands (guarded by command-guard)
 // ─────────────────────────────────────────────────
 
 export function runVerificationCommands(params: {
@@ -48,6 +89,21 @@ export function runVerificationCommands(params: {
   const results: VerificationResult[] = [];
 
   for (const command of commands) {
+    // Security check: Must pass command guard
+    const guardDecision = checkCommandSync(command);
+
+    if (guardDecision !== "ALLOW") {
+      results.push({
+        command,
+        exitCode: -1,
+        passed: false,
+        stdout: "",
+        stderr: `GUARD_BLOCKED: Verification command '${command}' rejected by policy (decision: ${guardDecision})`,
+        durationMs: 0,
+      });
+      continue;
+    }
+
     const [cmd, ...args] = command.split(" ");
     const start = Date.now();
 

@@ -1,14 +1,14 @@
 /**
  * ANTIGRAVITY ADAPTER — Bridge to Antigravity CLI (agy)
- * Phase: AI-DEV-BRIDGE-A
+ * Phase: AI-DEV-BRIDGE-A.1 (Auth States, Plan Retry & Audit Invalidation)
  *
  * Wraps `agy -p "<prompt>"` for headless planning and auditing.
- * Handles unavailability and auth failure gracefully.
+ * Handles unavailability, auth failure, and retries invalid plan/audit outputs.
  */
 
 import { spawnSync } from "node:child_process";
 import { redact } from "./log-redactor.js";
-import type { AgentPlan, AgentResult, AgentResultStatus, CliCheckResult } from "./types.js";
+import type { AgentPlan, CliCheckResult } from "./types.js";
 
 // ─────────────────────────────────────────────────
 // Pre-flight check
@@ -18,9 +18,10 @@ export function checkAntigravity(): CliCheckResult {
   const result = spawnSync("agy", ["--version"], {
     encoding: "utf-8",
     timeout: 5000,
+    shell: true,
   });
 
-  if (result.error || result.status === null) {
+  if (result.error || result.status === null || result.status !== 0) {
     return {
       name: "antigravity",
       installed: false,
@@ -31,19 +32,18 @@ export function checkAntigravity(): CliCheckResult {
 
   const version = (result.stdout || result.stderr || "").trim().split("\n")[0];
 
-  // Auth check: if agy requires login it typically prints an auth error
-  // We do a quick --version pass which should be auth-free
+  // Do not mark authenticated = true merely because --version succeeds
   return {
     name: "antigravity",
     installed: true,
-    authenticated: true, // agy --version doesn't require auth
-    status: "READY",
+    authenticated: false,
+    status: "AUTH_UNKNOWN",
     version,
   };
 }
 
 // ─────────────────────────────────────────────────
-// Generate a plan using Antigravity
+// Generate a plan using Antigravity (with 1 retry)
 // ─────────────────────────────────────────────────
 
 export interface AgyPlanRequest {
@@ -64,29 +64,38 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
 
   const prompt = buildPlanningPrompt(req);
 
-  const result = spawnSync("agy", ["-p", prompt, "--output-format", "text"], {
-    encoding: "utf-8",
-    cwd: req.repositoryRoot,
-    timeout: (req.timeoutSeconds ?? 120) * 1000,
-    env: { ...process.env },
-  });
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const result = spawnSync("agy", ["-p", prompt, "--output-format", "text"], {
+      encoding: "utf-8",
+      cwd: req.repositoryRoot,
+      timeout: (req.timeoutSeconds ?? 120) * 1000,
+      env: { ...process.env },
+      shell: true,
+    });
 
-  const stdout = redact(result.stdout ?? "");
-  const stderr = redact(result.stderr ?? "");
-  const output = stdout || stderr;
+    const stdout = redact(result.stdout ?? "");
+    const stderr = redact(result.stderr ?? "");
+    const output = stdout || stderr;
 
-  if (result.status !== 0 || !output) {
-    console.warn(
-      `[antigravity-adapter] agy returned status=${result.status}. Output: ${output.slice(0, 300)}`
-    );
-    return buildUnavailablePlan(req.taskId, "AGENT_PLAN_INVALID");
+    if (isAgyAuthError(output)) {
+      return buildUnavailablePlan(req.taskId, "HUMAN_AUTH_REQUIRED");
+    }
+
+    if (result.status === 0 && output) {
+      const plan = parsePlanOutput(req.taskId, output);
+      if (plan.steps.length > 0) {
+        return plan;
+      }
+    }
+
+    console.warn(`[antigravity-adapter] Plan attempt ${attempt} invalid or empty. Retrying...`);
   }
 
-  return parsePlanOutput(req.taskId, output);
+  return buildUnavailablePlan(req.taskId, "AGENT_PLAN_INVALID");
 }
 
 // ─────────────────────────────────────────────────
-// Audit a Codex result using Antigravity
+// Audit a Codex result using Antigravity (with 1 retry)
 // ─────────────────────────────────────────────────
 
 export interface AgyAuditRequest {
@@ -100,7 +109,14 @@ export interface AgyAuditRequest {
 
 export async function auditResult(
   req: AgyAuditRequest
-): Promise<"PASS" | "CORRECTION_REQUIRED" | "HUMAN_DECISION_REQUIRED" | "ANTIGRAVITY_UNAVAILABLE"> {
+): Promise<
+  | "PASS"
+  | "CORRECTION_REQUIRED"
+  | "HUMAN_DECISION_REQUIRED"
+  | "ANTIGRAVITY_UNAVAILABLE"
+  | "HUMAN_AUTH_REQUIRED"
+  | "AUDIT_INVALID"
+> {
   const check = checkAntigravity();
   if (!check.installed) return "ANTIGRAVITY_UNAVAILABLE";
 
@@ -126,25 +142,43 @@ CORRECTION_REQUIRED = the implementation has issues that can be fixed automatica
 HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a human must resolve.
 `.trim();
 
-  const result = spawnSync(
-    "agy",
-    ["-p", prompt, "--output-format", "text"],
-    {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const result = spawnSync("agy", ["-p", prompt, "--output-format", "text"], {
       encoding: "utf-8",
       cwd: req.repositoryRoot,
       timeout: (req.timeoutSeconds ?? 90) * 1000,
+      shell: true,
+    });
+
+    const output = redact(result.stdout ?? "").trim().toUpperCase();
+
+    if (isAgyAuthError(output)) {
+      return "HUMAN_AUTH_REQUIRED";
     }
+
+    if (output.includes("CORRECTION_REQUIRED")) return "CORRECTION_REQUIRED";
+    if (output.includes("HUMAN_DECISION_REQUIRED")) return "HUMAN_DECISION_REQUIRED";
+    if (output.includes("PASS")) return "PASS";
+
+    console.warn(`[antigravity-adapter] Audit attempt ${attempt} returned unrecognized response: ${output.slice(0, 100)}`);
+  }
+
+  // Do not silently convert malformed agent output to PASS
+  return "AUDIT_INVALID";
+}
+
+function isAgyAuthError(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    lower.includes("unauthenticated") ||
+    lower.includes("please login") ||
+    lower.includes("login required") ||
+    lower.includes("not logged in") ||
+    lower.includes("invalid api key") ||
+    lower.includes("api_key_invalid") ||
+    lower.includes("authentication failed") ||
+    lower.includes("auth error")
   );
-
-  const output = redact(result.stdout ?? "").trim().toUpperCase();
-
-  if (output.includes("CORRECTION_REQUIRED")) return "CORRECTION_REQUIRED";
-  if (output.includes("HUMAN_DECISION_REQUIRED")) return "HUMAN_DECISION_REQUIRED";
-  if (output.includes("PASS")) return "PASS";
-
-  // Unknown response — escalate
-  console.warn(`[antigravity-adapter] Unexpected audit response: ${output.slice(0, 200)}`);
-  return "CORRECTION_REQUIRED";
 }
 
 // ─────────────────────────────────────────────────
@@ -195,7 +229,7 @@ function parsePlanOutput(taskId: string, output: string): AgentPlan {
 
 function buildUnavailablePlan(taskId: string, reason: string): AgentPlan {
   return {
-    planId: `plan-${taskId}-unavailable`,
+    planId: `plan-${taskId}-${reason.toLowerCase()}`,
     taskId,
     model: "unavailable",
     generatedAt: new Date().toISOString(),

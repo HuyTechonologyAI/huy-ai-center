@@ -23,17 +23,31 @@ function sanitizeTaskId(taskId: string): string {
 
 /**
  * Create an isolated worktree for the given task.
- * Creates a new branch from the current HEAD.
+ * Creates a new branch from baseBranch.
+ * Reconciled contract: taskBranch is authoritative after validation.
  */
 export function createWorktree(params: {
   taskId: string;
   baseBranch: string;
   repositoryRoot: string;
+  taskBranch?: string;
 }): WorktreeInfo {
-  const { taskId, baseBranch, repositoryRoot } = params;
+  const { taskId, baseBranch, repositoryRoot, taskBranch } = params;
   const safeId = sanitizeTaskId(taskId);
   const path = join(repositoryRoot, WORKTREES_ROOT, safeId);
-  const branch = `agent-task/${safeId}`;
+
+  const branch = (taskBranch && taskBranch.trim()) ? taskBranch.trim() : `agent-task/${safeId}`;
+
+  // Security guard: Prevent protected refs from being used as task branch
+  const lowerBranch = branch.toLowerCase();
+  if (
+    lowerBranch === "main" ||
+    lowerBranch === "master" ||
+    lowerBranch.startsWith("prod") ||
+    lowerBranch.startsWith("release")
+  ) {
+    throw new Error(`SECURITY_VIOLATION: Protected branch '${branch}' cannot be used as taskBranch.`);
+  }
 
   if (!existsSync(join(repositoryRoot, WORKTREES_ROOT))) {
     mkdirSync(join(repositoryRoot, WORKTREES_ROOT), { recursive: true });

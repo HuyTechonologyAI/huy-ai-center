@@ -100,6 +100,12 @@ export type AgentResultStatus =
   | "CODEX_UNAVAILABLE"
   | "ANTIGRAVITY_UNAVAILABLE"
   | "AGENT_PLAN_INVALID"
+  | "AUDIT_INVALID"
+  | "SCOPE_VIOLATION"
+  | "SANDBOX_VIOLATION"
+  | "PERMISSION_DENIED"
+  | "EXECUTION_TIMEOUT"
+  | "HUMAN_AUTH_REQUIRED"
   | "RECOVERY_REQUIRED";
 
 export interface VerificationResult {
@@ -189,9 +195,11 @@ export interface AutonomyPolicy {
 // ─────────────────────────────────────────────────
 
 export type CliStatus =
-  | "READY"
-  | "UNAVAILABLE"
-  | "HUMAN_AUTH_REQUIRED";
+  | "INSTALLED"
+  | "AUTH_READY"
+  | "AUTH_UNKNOWN"
+  | "HUMAN_AUTH_REQUIRED"
+  | "UNAVAILABLE";
 
 export interface CliCheckResult {
   name: string;
