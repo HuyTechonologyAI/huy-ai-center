@@ -151,7 +151,13 @@ export async function execCodexTask(
     return {
       success: false,
       stdout,
-      stderr: "SANDBOX_VIOLATION: Operation denied by workspace-write sandbox",
+      stderr: [
+        "SANDBOX_VIOLATION: Operation denied by workspace-write sandbox",
+        "Original stderr (redacted):",
+        stderr.slice(-4000),
+        "Original stdout tail (redacted):",
+        stdout.slice(-2000),
+      ].join("\n"),
       exitCode: result.status,
       blocked: true,
       blockReason: "SANDBOX_VIOLATION",
@@ -168,7 +174,13 @@ export async function execCodexTask(
     return {
       success: false,
       stdout,
-      stderr: "PERMISSION_DENIED: File or process permission denied",
+      stderr: [
+        "PERMISSION_DENIED: File or process permission denied",
+        "Original stderr (redacted):",
+        stderr.slice(-4000),
+        "Original stdout tail (redacted):",
+        stdout.slice(-2000),
+      ].join("\n"),
       exitCode: result.status,
       blocked: true,
       blockReason: "PERMISSION_DENIED",
