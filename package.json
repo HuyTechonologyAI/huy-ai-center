@@ -22,7 +22,9 @@
     "test:security": "npx tsx --test tests/security/multi-org-isolation.test.ts",
     "test:db:clean": "node scripts/clean_test_db.js",
     "verify:06k-b": "node scripts/verify_06k_b_dryrun.js",
-    "bridge:dry-run": "powershell.exe -ExecutionPolicy Bypass -File ./automation/agent-bridge/orchestrator.ps1 -DryRun"
+    "bridge:dry-run": "powershell.exe -ExecutionPolicy Bypass -File ./automation/agent-bridge/orchestrator.ps1 -DryRun",
+    "bridge:a2a": "node automation/agent-bridge/a2a-runner.mjs",
+    "test:a2a": "node --test tests/automation/a2a-runner.test.mjs"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
