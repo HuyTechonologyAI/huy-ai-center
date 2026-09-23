@@ -4,8 +4,8 @@
   "objective": "Upgrade the existing Codex × Antigravity bridge from one-task orchestration to a fail-closed serial DAG backlog runner. Antigravity is planner/auditor only and must never edit implementation files while Codex owns a task worktree. Codex is the only implementation writer. Add exclusive worktree/path leases, dependency resolution with cycle detection, runtime task state, automatic R0-R2 execution, max 3 correction cycles using existing runner, guarded feature-branch push, optional PR creation when authenticated GitHub CLI is available, and hard human gates for R3/R4 or main merge. Default maxConcurrency must be 1 to eliminate collisions. Runtime state and leases must stay under .artifacts and never be committed. The runner must read config/autonomy/system-roadmap.json and execute only tasks whose dependencies are completed. It must stop or block downstream tasks at HUMAN_GATE without skipping phase dependencies.",
   "repository": {
     "root": ".",
-    "baseRef": "main",
-    "taskBranch": "feature/ai-dev-bridge-b-autonomous-backlog"
+    "baseRef": "origin/feature/ai-dev-bridge-b-autonomous-backlog",
+    "taskBranch": "agent-task/bridge-b-autonomous-backlog"
   },
   "scope": {
     "allowedPaths": [
