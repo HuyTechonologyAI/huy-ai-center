@@ -84,6 +84,7 @@ export async function execute(root, opts = {}) {
     const completed = new Set(Object.entries(state.tasks).filter(([, v]) => v.status === 'COMPLETED').map(([k]) => k));
     for (const task of tasks) {
       if (state.tasks[task.id]?.status === 'COMPLETED') continue;
+      if (state.tasks[task.id]?.status === 'BLOCKED') return { status: 'BLOCKED', taskId: task.id, reason: state.tasks[task.id].reason };
       const decision = decideTask(task, completed);
       if (decision === 'BLOCKED') continue;
       if (decision === 'HUMAN_GATE') {
