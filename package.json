@@ -19,6 +19,8 @@
     "bridge:preflight": "powershell.exe -ExecutionPolicy Bypass -File ./automation/agent-bridge/preflight.ps1",
     "bridge:test": "npm run test:bridge",
     "test:bridge": "npx tsx --test tests/automation/risk-classifier.test.ts tests/automation/command-guard.test.ts tests/automation/approval-gate.test.ts tests/automation/log-redactor.test.ts tests/automation/task-contract.test.ts tests/automation/dry-run.test.ts tests/automation/security-cases.test.ts",
+    "test:security": "npx tsx --test tests/security/multi-org-isolation.test.ts",
+    "verify:06k-b": "node scripts/verify_06k_b_dryrun.js",
     "bridge:dry-run": "powershell.exe -ExecutionPolicy Bypass -File ./automation/agent-bridge/orchestrator.ps1 -DryRun"
   },
   "devDependencies": {
