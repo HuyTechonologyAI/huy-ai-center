@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateRoadmap, decideTask, checkScope } from '../../automation/agent-bridge/a2a-runner.mjs';
+import { validateRoadmap, decideTask, checkScope, parseGitStatus } from '../../automation/agent-bridge/a2a-runner.mjs';
 
 const task = (id, depends_on = [], risk = 'R2') => ({ id, depends_on, risk, allowed_paths: ['automation/'] });
 const road = tasks => ({ mode: 'SERIAL_FAIL_CLOSED', max_concurrency: 1, tasks });
@@ -23,4 +23,11 @@ test('enforces allowed scope and production denial', () => {
   assert.throws(() => checkScope(['supabase/migrations/x.sql'], ['supabase/']), /SCOPE_VIOLATION/);
   assert.throws(() => checkScope(['.env'], ['.env']), /SCOPE_VIOLATION/);
   assert.throws(() => checkScope(['apps/x.ts'], ['automation/']), /SCOPE_VIOLATION/);
+});
+
+test('keeps the two Git porcelain columns before path scope checks', () => {
+  assert.deepEqual(parseGitStatus(' M automation/a.ts\n?? tests/automation/b.ts'), [
+    { code: ' M', path: 'automation/a.ts' },
+    { code: '??', path: 'tests/automation/b.ts' },
+  ]);
 });
