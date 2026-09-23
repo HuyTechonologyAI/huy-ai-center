@@ -29,7 +29,7 @@ const dryRunContract: TaskContract = {
   objective: "Create tests/fixtures/agent-bridge-dry-run/README.md explaining the bridge dry-run",
   repository: {
     root: process.cwd(),
-    baseRef: "feature/ai-dev-bridge-a-codex-antigravity",
+    baseRef: "HEAD",
     taskBranch: "agent-task/bridge-dry-run-001",
   },
   scope: {
