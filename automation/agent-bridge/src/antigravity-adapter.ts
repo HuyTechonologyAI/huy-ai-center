@@ -7,6 +7,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { redact } from "./log-redactor.js";
 import type { AgentPlan, CliCheckResult } from "./types.js";
 
@@ -15,10 +16,8 @@ import type { AgentPlan, CliCheckResult } from "./types.js";
 // ─────────────────────────────────────────────────
 
 export function checkAntigravity(): CliCheckResult {
-  const result = spawnSync("agy", ["--version"], {
-    encoding: "utf-8",
-    timeout: 5000,
-    shell: true,
+  const result = runAgy(["--version"], {
+    timeoutMs: 5000,
   });
 
   if (result.error || result.status === null || result.status !== 0) {
@@ -65,19 +64,11 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
   const prompt = buildPlanningPrompt(req);
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    // Feed the prompt through stdin instead of the shell command line.
-    // This avoids Windows cmd.exe quoting/multiline corruption while keeping
-    // compatibility with the npm-installed agy shim.
-    const result = spawnSync(
-      "agy",
-      ["--print", "--input-format", "text", "--output-format", "text"],
+    const result = runAgy(
+      ["-p", prompt, "--output-format", "text"],
       {
-        input: prompt,
-        encoding: "utf-8",
         cwd: req.repositoryRoot,
-        timeout: (req.timeoutSeconds ?? 120) * 1000,
-        env: { ...process.env },
-        shell: true,
+        timeoutMs: (req.timeoutSeconds ?? 120) * 1000,
       }
     );
 
@@ -96,7 +87,10 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
       }
     }
 
-    console.warn(`[antigravity-adapter] Plan attempt ${attempt} invalid or empty. Retrying...`);
+    console.warn(
+      `[antigravity-adapter] Plan attempt ${attempt} invalid or empty. ` +
+      `exit=${String(result.status)} stderr=${redact(result.stderr ?? "").slice(0, 300)} Retrying...`
+    );
   }
 
   return buildUnavailablePlan(req.taskId, "AGENT_PLAN_INVALID");
@@ -151,18 +145,11 @@ HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a huma
 `.trim();
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    // Use stdin for the audit prompt as well so Windows shell parsing cannot
-    // alter multiline content or punctuation in the prompt.
-    const result = spawnSync(
-      "agy",
-      ["--print", "--input-format", "text", "--output-format", "text"],
+    const result = runAgy(
+      ["-p", prompt, "--output-format", "text"],
       {
-        input: prompt,
-        encoding: "utf-8",
         cwd: req.repositoryRoot,
-        timeout: (req.timeoutSeconds ?? 90) * 1000,
-        env: { ...process.env },
-        shell: true,
+        timeoutMs: (req.timeoutSeconds ?? 90) * 1000,
       }
     );
 
@@ -200,6 +187,42 @@ function isAgyAuthError(text: string): boolean {
 // ─────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────
+
+interface AgyRunOptions {
+  cwd?: string;
+  timeoutMs: number;
+}
+
+/**
+ * Execute the npm-installed Antigravity CLI without routing the prompt through
+ * cmd.exe. On Windows the npm PowerShell shim is invoked explicitly so
+ * multiline prompts are passed as a single argv value.
+ */
+function runAgy(args: string[], options: AgyRunOptions) {
+  const common = {
+    encoding: "utf-8" as const,
+    cwd: options.cwd,
+    timeout: options.timeoutMs,
+    env: { ...process.env },
+  };
+
+  if (process.platform === "win32") {
+    const npmBin = process.env.APPDATA
+      ? `${process.env.APPDATA}\\npm\\agy.ps1`
+      : "";
+
+    if (npmBin && existsSync(npmBin)) {
+      return spawnSync(
+        "powershell.exe",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", npmBin, ...args],
+        { ...common, shell: false }
+      );
+    }
+  }
+
+  return spawnSync("agy", args, { ...common, shell: process.platform === "win32" });
+}
+
 
 function buildPlanningPrompt(req: AgyPlanRequest): string {
   return `
