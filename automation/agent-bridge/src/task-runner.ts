@@ -192,8 +192,20 @@ export async function runTask(
 
     if (codexResult.blocked) {
       lastStatus = (codexResult.blockReason as AgentResultStatus) ?? "FAIL";
+      writeArtifact(artifactDir, `codex-cycle-${cycle}-blocked.json`, {
+        blockReason: codexResult.blockReason,
+        exitCode: codexResult.exitCode,
+        stderr: codexResult.stderr,
+      });
       if (lastStatus === "HUMAN_AUTH_REQUIRED") {
         state.status = "HUMAN_GATE";
+        writeArtifact(artifactDir, "audit.json", {
+          finalStatus: "HUMAN_AUTH_REQUIRED",
+          source: "CODEX",
+          cycle,
+          exitCode: codexResult.exitCode,
+          stderr: codexResult.stderr,
+        });
         return state;
       }
       break;
@@ -260,6 +272,11 @@ export async function runTask(
     if (auditDecision === "HUMAN_AUTH_REQUIRED") {
       state.status = "HUMAN_GATE";
       lastStatus = "HUMAN_AUTH_REQUIRED";
+      writeArtifact(artifactDir, "audit.json", {
+        finalStatus: "HUMAN_AUTH_REQUIRED",
+        source: "ANTIGRAVITY_AUDIT",
+        cycle,
+      });
       return state;
     }
 
