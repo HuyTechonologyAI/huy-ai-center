@@ -116,8 +116,13 @@ export async function execCodexTask(
     };
   }
 
-  // Check for authentication error
-  if (isCodexAuthError(combined)) {
+  const isSuccess = (result.status ?? 1) === 0;
+
+  // Only classify authentication failures when the CLI itself failed.
+  // Successful Codex stdout may legitimately contain phrases such as
+  // "login required" while discussing optional tooling, which must not
+  // create a false HUMAN_GATE.
+  if (!isSuccess && isCodexAuthError(`${stderr}\n${stdout}`)) {
     return {
       success: false,
       stdout,
@@ -151,8 +156,6 @@ export async function execCodexTask(
       blockReason: "PERMISSION_DENIED",
     };
   }
-
-  const isSuccess = (result.status ?? 1) === 0;
 
   return {
     success: isSuccess,
