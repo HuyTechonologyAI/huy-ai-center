@@ -195,7 +195,8 @@ export async function runTask(
       writeArtifact(artifactDir, `codex-cycle-${cycle}-blocked.json`, {
         blockReason: codexResult.blockReason,
         exitCode: codexResult.exitCode,
-        stderr: codexResult.stderr,
+        stdoutTail: codexResult.stdout.slice(-4000),
+        stderrTail: codexResult.stderr.slice(-4000),
       });
       if (lastStatus === "HUMAN_AUTH_REQUIRED") {
         state.status = "HUMAN_GATE";
