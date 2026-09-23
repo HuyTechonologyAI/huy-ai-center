@@ -65,13 +65,21 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
   const prompt = buildPlanningPrompt(req);
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const result = spawnSync("agy", ["-p", prompt, "--output-format", "text"], {
-      encoding: "utf-8",
-      cwd: req.repositoryRoot,
-      timeout: (req.timeoutSeconds ?? 120) * 1000,
-      env: { ...process.env },
-      shell: true,
-    });
+    // Feed the prompt through stdin instead of the shell command line.
+    // This avoids Windows cmd.exe quoting/multiline corruption while keeping
+    // compatibility with the npm-installed agy shim.
+    const result = spawnSync(
+      "agy",
+      ["--print", "--input-format", "text", "--output-format", "text"],
+      {
+        input: prompt,
+        encoding: "utf-8",
+        cwd: req.repositoryRoot,
+        timeout: (req.timeoutSeconds ?? 120) * 1000,
+        env: { ...process.env },
+        shell: true,
+      }
+    );
 
     const stdout = redact(result.stdout ?? "");
     const stderr = redact(result.stderr ?? "");
@@ -143,12 +151,20 @@ HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a huma
 `.trim();
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const result = spawnSync("agy", ["-p", prompt, "--output-format", "text"], {
-      encoding: "utf-8",
-      cwd: req.repositoryRoot,
-      timeout: (req.timeoutSeconds ?? 90) * 1000,
-      shell: true,
-    });
+    // Use stdin for the audit prompt as well so Windows shell parsing cannot
+    // alter multiline content or punctuation in the prompt.
+    const result = spawnSync(
+      "agy",
+      ["--print", "--input-format", "text", "--output-format", "text"],
+      {
+        input: prompt,
+        encoding: "utf-8",
+        cwd: req.repositoryRoot,
+        timeout: (req.timeoutSeconds ?? 90) * 1000,
+        env: { ...process.env },
+        shell: true,
+      }
+    );
 
     const output = redact(result.stdout ?? "").trim().toUpperCase();
 
