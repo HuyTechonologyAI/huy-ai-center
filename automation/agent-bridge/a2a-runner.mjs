@@ -55,7 +55,7 @@ function run(binary, args, cwd, input, timeout = 600000) {
 
 async function checked(binary, args, cwd, input, timeout) {
   const result = await run(binary, args, cwd, input, timeout);
-  if (CAPACITY.test(result.stdout + result.stderr)) throw Error('TOOL_CAPACITY_WAIT');
+  if (result.code !== 0 && CAPACITY.test(result.stdout + result.stderr)) throw Error('TOOL_CAPACITY_WAIT');
   if (result.code !== 0 || INVALID.test(result.stdout + result.stderr)) throw Error(`${binary.toUpperCase()}_FAILED:${(result.stderr || result.stdout).slice(0,400)}`);
   return result.stdout.trim();
 }
@@ -97,6 +97,15 @@ export async function execute(root, opts = {}) {
       const existingBranch = await git(worktree, 'branch', '--show-current').catch(() => '');
       if (existingBranch !== taskBranch) throw Error(`TASK_WORKTREE_REQUIRED:${worktree}`);
       if (await git(worktree, 'status', '--porcelain')) throw Error('TASK_WORKTREE_DIRTY');
+      const leaseDir = join(artifacts, 'leases');
+      await mkdir(leaseDir, { recursive: true });
+      const leasePath = join(leaseDir, `${task.id}.json`);
+      let lease;
+      try { lease = await open(leasePath, 'wx', 0o600); } catch (e) { if (e.code === 'EEXIST') throw Error('TASK_LEASE_ACTIVE'); throw e; }
+      await lease.writeFile(JSON.stringify({ taskId: task.id, pid: process.pid, worktreePath: worktree, taskBranch, owner: 'CODEX_IMPLEMENTER', allowedPaths: task.allowed_paths, acquiredAt: new Date().toISOString() }));
+      await lease.close();
+      const rolePath = join(artifacts, 'phase-ownership.json');
+      try {
       state.tasks[task.id] = { status: 'PLANNING', branch: taskBranch, updatedAt: new Date().toISOString() };
       await saveState(statePath, state);
       const brief = `Task: ${task.title}\nObjective: ${task.objective}\nAllowed paths: ${task.allowed_paths.join(', ')}\nRisk: ${task.risk}\nVerification: ${task.verification.join(', ')}`;
@@ -105,6 +114,7 @@ export async function execute(root, opts = {}) {
       const plan = await checked('agy', ['-p', `READ_ONLY PLANNER. Use supplied source content. Do not use tools, commands or write files. Return a concrete implementation plan for:\n${brief}\n${context}`, '--output-format', 'text'], worktree);
       if (!plan) throw Error('AGENT_PLAN_INVALID');
       state.tasks[task.id].status = 'IMPLEMENTING'; await saveState(statePath, state);
+      await saveState(rolePath, { taskId: task.id, phase: 'IMPLEMENTING', writeOwner: 'CODEX', antigravityMode: 'READ_ONLY_AUDITOR' });
       const prompt = `You are the sole implementation writer in this isolated task worktree. Implement this plan:\n${plan}\n${brief}\nNever modify the primary worktree, production, main, secrets, or files outside allowed paths. Do not commit or push. Run required local verification. Stop if a permission is missing.`;
       await checked('codex', ['exec', '--sandbox', 'workspace-write', '--ephemeral', prompt], worktree, '', 3600000);
       const entries = (await git(worktree, 'status', '--porcelain', '--untracked-files=all')).split('\n').filter(Boolean);
@@ -112,18 +122,30 @@ export async function execute(root, opts = {}) {
       const changed = entries.map(line => line.slice(3));
       checkScope(changed, task.allowed_paths);
       state.tasks[task.id].status = 'VERIFYING'; await saveState(statePath, state);
+      await checked('npm', ['run', 'build:shared'], worktree, '', 3600000);
       for (const command of task.verification) {
         if (!['npm run typecheck', 'npm run test:bridge', 'npm run build:shared', 'npm run test:core'].includes(command)) throw Error(`VERIFICATION_NOT_ALLOWED:${command}`);
         await checked('npm', command.split(' ').slice(1), worktree, '', 3600000);
       }
       const trackedDiff = await git(worktree, 'diff', 'HEAD', '--', ...entries.filter(line => !line.startsWith('?? ')).map(line => line.slice(3)));
       const untracked = await Promise.all(entries.filter(line => line.startsWith('?? ')).map(async line => `${line.slice(3)}:\n${(await readFile(join(worktree, line.slice(3)), 'utf8')).slice(0, 12000)}`));
-      const diff = (trackedDiff + '\n' + untracked.join('\n')).slice(0, 90000);
+      const diff = trackedDiff + '\n' + untracked.join('\n');
+      if (diff.length > 90000) throw Error('AUDIT_CONTEXT_TOO_LARGE');
       state.tasks[task.id].status = 'AUDITING'; await saveState(statePath, state);
+      await saveState(rolePath, { taskId: task.id, phase: 'AUDITING', writeOwner: 'NONE', antigravityMode: 'READ_ONLY_AUDITOR' });
       const audit = await checked('agy', ['-p', `READ_ONLY FINAL AUDITOR. Do not run commands or write files. Review task and changed files. Respond exactly PASS or CORRECTION_REQUIRED with reasons.\n${brief}\nPlan:\n${plan}\nChanges:\n${diff}`, '--output-format', 'text'], worktree);
       if (!/^PASS\b/.test(audit)) throw Error(`AUDIT_NOT_PASS:${audit.slice(0,300)}`);
-      state.tasks[task.id].status = 'AWAITING_REVIEW'; await saveState(statePath, state);
-      return { status: 'AWAITING_REVIEW', taskId: task.id, worktree, changed };
+      if (!opts.execute) { state.tasks[task.id].status = 'AWAITING_REVIEW'; await saveState(statePath, state); return { status: 'AWAITING_REVIEW', taskId: task.id, worktree, changed }; }
+      // Only these two branch namespaces are writable. Git never receives a main ref.
+      if (!/^agent-task\/[a-z0-9-]+$/.test(taskBranch) || !/^feature\/[a-z0-9-]+$/.test(branch)) throw Error('BRANCH_GUARD');
+      await git(worktree, 'add', '--', ...changed);
+      await git(worktree, 'commit', '-m', `automation(bridge): ${task.id}`);
+      await git(worktree, 'push', 'origin', taskBranch);
+      await git(root, 'merge', '--ff-only', taskBranch);
+      await git(root, 'push', 'origin', branch);
+      state.tasks[task.id].status = 'COMPLETED'; completed.add(task.id); await saveState(statePath, state);
+      return { status: 'COMPLETED', taskId: task.id, branch, changed };
+      } finally { await unlink(rolePath).catch(() => {}); await unlink(leasePath).catch(() => {}); }
     }
     return { status: 'NO_READY_TASK' };
   } catch (e) {
@@ -134,5 +156,5 @@ export async function execute(root, opts = {}) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  execute(process.argv[2] ?? process.cwd()).then(r => { console.log(JSON.stringify(r, null, 2)); }).catch(e => { console.error(e.message); process.exitCode = 1; });
+  execute(process.cwd(), { execute: process.argv.includes('--execute') }).then(r => { console.log(JSON.stringify(r, null, 2)); }).catch(e => { console.error(e.message); process.exitCode = 1; });
 }
