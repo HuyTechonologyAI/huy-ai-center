@@ -133,8 +133,21 @@ export async function execCodexTask(
     };
   }
 
-  // Check for sandbox denial
-  if (combined.includes("sandbox") && (combined.includes("denied") || combined.includes("violation") || combined.includes("blocked"))) {
+  // Only classify sandbox / permission failures when Codex itself exits non-zero.
+  // Successful model output may mention words such as "sandbox", "blocked",
+  // "violation", or "permission denied" while explaining the task; those are
+  // not execution failures.
+  const failureText = `${stderr}\n${stdout}`.toLowerCase();
+
+  if (
+    !isSuccess &&
+    failureText.includes("sandbox") &&
+    (
+      failureText.includes("denied") ||
+      failureText.includes("violation") ||
+      failureText.includes("blocked")
+    )
+  ) {
     return {
       success: false,
       stdout,
@@ -145,8 +158,13 @@ export async function execCodexTask(
     };
   }
 
-  // Check for permission failure
-  if (combined.includes("permission denied") || combined.includes("eacces")) {
+  if (
+    !isSuccess &&
+    (
+      failureText.includes("permission denied") ||
+      failureText.includes("eacces")
+    )
+  ) {
     return {
       success: false,
       stdout,
