@@ -65,10 +65,11 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const result = runAgy(
-      ["-p", prompt, "--output-format", "text"],
+      ["--print", "--input-format", "text", "--output-format", "text"],
       {
         cwd: req.repositoryRoot,
         timeoutMs: (req.timeoutSeconds ?? 120) * 1000,
+        input: prompt,
       }
     );
 
@@ -146,10 +147,11 @@ HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a huma
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const result = runAgy(
-      ["-p", prompt, "--output-format", "text"],
+      ["--print", "--input-format", "text", "--output-format", "text"],
       {
         cwd: req.repositoryRoot,
         timeoutMs: (req.timeoutSeconds ?? 90) * 1000,
+        input: prompt,
       }
     );
 
@@ -191,6 +193,7 @@ function isAgyAuthError(text: string): boolean {
 interface AgyRunOptions {
   cwd?: string;
   timeoutMs: number;
+  input?: string;
 }
 
 /**
@@ -204,6 +207,7 @@ function runAgy(args: string[], options: AgyRunOptions) {
     cwd: options.cwd,
     timeout: options.timeoutMs,
     env: { ...process.env },
+    input: options.input,
   };
 
   if (process.platform === "win32") {
