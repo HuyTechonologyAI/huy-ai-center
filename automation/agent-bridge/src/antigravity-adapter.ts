@@ -65,7 +65,7 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const result = runAgy(
-      ["--print", "--input-format", "text", "--output-format", "text"],
+      ["--input-format", "text", "--output-format", "text"],
       {
         cwd: req.repositoryRoot,
         timeoutMs: (req.timeoutSeconds ?? 120) * 1000,
@@ -147,7 +147,7 @@ HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a huma
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const result = runAgy(
-      ["--print", "--input-format", "text", "--output-format", "text"],
+      ["--input-format", "text", "--output-format", "text"],
       {
         cwd: req.repositoryRoot,
         timeoutMs: (req.timeoutSeconds ?? 90) * 1000,
