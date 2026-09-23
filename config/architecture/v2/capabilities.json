@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "standard": "CANONICAL_DOT_SEPARATED_LOWERCASE",
+  "principle": "CAPABILITY_DOES_NOT_GRANT_AUTHORITY",
+  "capabilities": [
+    { "id": "group.plan", "domain": "group", "description": "Decompose high-level multi-organization user goals into subsidiary task DAGs" },
+    { "id": "group.delegate", "domain": "group", "description": "Emit cross-company delegation envelopes to subsidiary company orchestrators" },
+    { "id": "group.status.read", "domain": "group", "description": "Read aggregated task progress and state indicators across all business units" },
+    { "id": "group.cost.read", "domain": "group", "description": "Read aggregated cost center expenditures and token consumption rollups" },
+    { "id": "group.risk.read", "domain": "group", "description": "Inspect risk distribution and pending human approval counts" },
+
+    { "id": "company.plan", "domain": "company", "description": "Plan subsidiary project roadmaps and decompose missions into departmental tasks" },
+    { "id": "company.delegate", "domain": "company", "description": "Dispatch tasks to departmental manager agents or external BUs via HAIP" },
+    { "id": "company.status.read", "domain": "company", "description": "Read subsidiary task completion states, worker health, and queue latency" },
+    { "id": "company.cost.read", "domain": "company", "description": "Read departmental token burn rate and subsidiary cost center quotas" },
+
+    { "id": "department.plan", "domain": "department", "description": "Formulate departmental task steps and execution schedules" },
+    { "id": "department.assign", "domain": "department", "description": "Assign granular task steps to specialist agents within departmental scope" },
+    { "id": "department.review", "domain": "department", "description": "Conduct internal departmental quality check on specialist outputs" },
+
+    { "id": "engineering.codegen", "domain": "engineering", "description": "Generate application source code, API schemas, and test scripts" },
+    { "id": "engineering.code.review", "domain": "engineering", "description": "Audit code quality, AST syntax, and test coverage" },
+
+    { "id": "security.audit", "domain": "security", "description": "Audit security posture, key rotation, and RLS boundary compliance" },
+    { "id": "security.policy.review", "domain": "security", "description": "Validate policy decisions, data classification scopes, and authorization rules" },
+
+    { "id": "education.lesson.design", "domain": "education", "description": "Draft 4-phase pedagogical lesson plans compliant with CV 5512 standards" },
+    { "id": "education.assessment.build", "domain": "education", "description": "Formulate Bloom-aligned questions, test matrices, and diagnostic rubrics" },
+    { "id": "education.content.review", "domain": "education", "description": "Verify pedagogical correctness and curriculum alignment" },
+
+    { "id": "tax.research", "domain": "tax", "description": "Analyze corporate income tax, VAT, and depreciation deductions" },
+    { "id": "tax.source.verify", "domain": "tax", "description": "Verify tax data against official decrees and gazette publications" },
+
+    { "id": "legal.research", "domain": "legal", "description": "Analyze commercial law, enterprise codes, and contractual clauses" },
+    { "id": "legal.citation.verify", "domain": "legal", "description": "Deterministically verify active statutory validity and cross-references" },
+
+    { "id": "media.research", "domain": "media", "description": "Research market trends, keyword search volumes, and audience interest" },
+    { "id": "media.script.create", "domain": "media", "description": "Author educational, technical, or creative media scripts and storyboards" },
+    { "id": "media.asset.prepare", "domain": "media", "description": "Prepare visual, slide, infographic, or audio asset generation prompts" },
+    { "id": "media.brand.review", "domain": "media", "description": "Verify brand voice, visual aesthetics, and copyright safety" },
+    { "id": "media.publish.request", "domain": "media", "description": "Submit verified, approved media pack to scheduling and publishing queue" },
+    { "id": "media.analytics.read", "domain": "media", "description": "Read public audience engagement metrics, retention, and sentiment" }
+  ]
+}

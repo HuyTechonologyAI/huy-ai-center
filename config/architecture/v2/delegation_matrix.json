@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "default_policy": "DENY",
+  "rules": [
+    {
+      "id": "del-01-parent-to-sub",
+      "source_org": "org-01-huytech",
+      "target_org": "*",
+      "intent": "PLATFORM_TECHNICAL_ASSISTANCE",
+      "allowed_classifications": ["INTERNAL"],
+      "action": "ALLOW",
+      "condition": "Must be emitted by authorized platform orchestrator or infra specialist"
+    },
+    {
+      "id": "del-02-school-to-edumedia",
+      "source_org": "org-02-aischool",
+      "target_org": "org-05-media-edu",
+      "intent": "GENERATE_CAMPAIGN_MEDIA",
+      "allowed_classifications": ["PUBLIC"],
+      "action": "ALLOW",
+      "condition": "Artifact must have approval_status = APPROVED and pii_redacted = true"
+    },
+    {
+      "id": "del-03-tax-to-techmedia",
+      "source_org": "org-03-smarttax",
+      "target_org": "org-04-media-tech",
+      "intent": "SYNDICATE_EDUCATIONAL_BRIEF",
+      "allowed_classifications": ["PUBLIC"],
+      "action": "ALLOW",
+      "condition": "Artifact must be PUBLIC_APPROVED with legal citations verified by dept-03-legal-qa"
+    },
+    {
+      "id": "del-04-media-to-parent",
+      "source_org": "org-04-media-tech",
+      "target_org": "org-01-huytech",
+      "intent": "SUBMIT_ANALYTICS_ROLLUP",
+      "allowed_classifications": ["INTERNAL"],
+      "action": "ALLOW",
+      "condition": "Aggregated audience metrics only; no viewer PII"
+    },
+    {
+      "id": "del-05-edumedia-to-parent",
+      "source_org": "org-05-media-edu",
+      "target_org": "org-01-huytech",
+      "intent": "SUBMIT_ANALYTICS_ROLLUP",
+      "allowed_classifications": ["INTERNAL"],
+      "action": "ALLOW",
+      "condition": "Aggregated audience metrics only; no viewer PII"
+    },
+    {
+      "id": "del-06-creativemedia-to-parent",
+      "source_org": "org-06-media-creative",
+      "target_org": "org-01-huytech",
+      "intent": "SUBMIT_ANALYTICS_ROLLUP",
+      "allowed_classifications": ["INTERNAL"],
+      "action": "ALLOW",
+      "condition": "Aggregated audience metrics only; no viewer PII"
+    },
+    {
+      "id": "del-07-creative-audio-to-media",
+      "source_org": "org-06-media-creative",
+      "target_org": "org-04-media-tech",
+      "intent": "SUPPLY_AUDIO_STEM",
+      "allowed_classifications": ["PUBLIC"],
+      "action": "ALLOW",
+      "condition": "Royalty-free AI music stem with clearance metadata"
+    },
+    {
+      "id": "del-08-creative-audio-to-edumedia",
+      "source_org": "org-06-media-creative",
+      "target_org": "org-05-media-edu",
+      "intent": "SUPPLY_AUDIO_STEM",
+      "allowed_classifications": ["PUBLIC"],
+      "action": "ALLOW",
+      "condition": "Royalty-free AI music stem with clearance metadata"
+    },
+
+    {
+      "id": "deny-media-to-smarttax-raw",
+      "source_org": "org-04-media-tech",
+      "target_org": "org-03-smarttax",
+      "intent": "*",
+      "allowed_classifications": ["CONFIDENTIAL", "RESTRICTED"],
+      "action": "DENY",
+      "reason": "Media organizations are strictly barred from querying SmartTax client data or raw legal cases"
+    },
+    {
+      "id": "deny-edumedia-to-smarttax-raw",
+      "source_org": "org-05-media-edu",
+      "target_org": "org-03-smarttax",
+      "intent": "*",
+      "allowed_classifications": ["CONFIDENTIAL", "RESTRICTED"],
+      "action": "DENY",
+      "reason": "Media organizations are strictly barred from querying SmartTax client data or raw legal cases"
+    },
+    {
+      "id": "deny-creative-to-smarttax-raw",
+      "source_org": "org-06-media-creative",
+      "target_org": "org-03-smarttax",
+      "intent": "*",
+      "allowed_classifications": ["CONFIDENTIAL", "RESTRICTED"],
+      "action": "DENY",
+      "reason": "Creative Media is strictly barred from accessing SmartTax client or tax data"
+    },
+    {
+      "id": "deny-media-to-school-confidential",
+      "source_org": "org-05-media-edu",
+      "target_org": "org-02-aischool",
+      "intent": "*",
+      "allowed_classifications": ["CONFIDENTIAL"],
+      "action": "DENY",
+      "reason": "Education Media cannot access confidential student profiles or teacher notes"
+    }
+  ]
+}

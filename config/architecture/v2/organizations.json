@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "organizations": [
+    {
+      "id": "org-01-huytech",
+      "name": "HUY TECHNOLOGY AI GROUP",
+      "role": "Parent Holding / Technology / Group Control",
+      "cost_center": "CC-01-HUYTECH",
+      "confidentiality_tier": "INTERNAL",
+      "description": "Corporate parent holding governing ecosystem infrastructure, cybersecurity, AI R&D, and group orchestration."
+    },
+    {
+      "id": "org-02-aischool",
+      "name": "GVCNCDSAI AI SCHOOL",
+      "role": "Education / AI School",
+      "cost_center": "CC-02-AISCHOOL",
+      "confidentiality_tier": "CONFIDENTIAL",
+      "description": "AI education academy providing teacher copilots, curriculum standards (CV 5512), student tutoring, and LMS platforms."
+    },
+    {
+      "id": "org-03-smarttax",
+      "name": "SMARTTAX AI",
+      "role": "Tax / Legal / Compliance",
+      "cost_center": "CC-03-SMARTTAX",
+      "confidentiality_tier": "RESTRICTED",
+      "description": "Tax and legal compliance intelligence engine with citation verification, corporate tax computation, and CPA review gates."
+    },
+    {
+      "id": "org-04-media-tech",
+      "name": "HUY TECH MEDIA",
+      "role": "Technology / AI / Automation Media",
+      "cost_center": "CC-04-MEDIA-TECH",
+      "confidentiality_tier": "PUBLIC",
+      "description": "Specialized media agency producing tutorials, tech breakdowns, corporate AI case studies, and approved educational briefs."
+    },
+    {
+      "id": "org-05-media-edu",
+      "name": "GVCNCDSAI MEDIA",
+      "role": "Education / Teacher / Student / STEM Media",
+      "cost_center": "CC-05-MEDIA-EDU",
+      "confidentiality_tier": "PUBLIC",
+      "description": "Educational media agency publishing teacher development guides, STEM infographics, and student learning assets."
+    },
+    {
+      "id": "org-06-media-creative",
+      "name": "HUY CREATIVE MEDIA",
+      "role": "Music / Entertainment / Creative Media",
+      "cost_center": "CC-06-MEDIA-CREATIVE",
+      "confidentiality_tier": "PUBLIC",
+      "description": "Creative entertainment media agency producing AI soundscapes, music stems, and creative viral formats."
+    }
+  ]
+}

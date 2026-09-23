@@ -71,7 +71,7 @@ LOGICAL_ISOLATION_STAGE_1 (Organization-scoped RLS, Department authorization, St
 SPECIFIED_V2 (Formal JSON Schema 2.0 + Model B Pointer + SHA-256 Hash Verification designed in Phase 06K-A)
 
 ## DATABASE_MULTI_ORG
-DESIGNED_NOT_MIGRATED (Phase 06K-A Multi-Org Schema & Policy Design Complete; Zero Schema DDL executed in Phase 06K-A)
+DRAFT_AND_DRY_RUN_VALIDATED (Phase 06K-B Multi-Org Migration Draft + Production-Parity Isolated Dry Run Complete: 5 migration drafts created, 34/34 security tests PASS, Rollback restored baseline 34 tables, Reapply PASS, Zero production mutations)
 
 ## PRODUCTION_AGENTS
 0 (Clean registry; unseeded)
@@ -397,20 +397,21 @@ PRODUCTION_MIGRATED_STABLE
 
 ## POST_LAUNCH_GOVERNANCE_STATE
 - **CORPORATE_V2:** PRODUCTION_LIVE
+- **DEFAULT_BRANCH:** main
 - **PRODUCTION_CUTOVER:** PASS
 - **ROLLBACK:** READY (`pre-corporate-v2-cutover-2026-09-21` & `corporate-v2.0.0`)
-- **BRANCH_PROTECTION:** ACTIVE (Ruleset `Protect main - Production` ID 23806829 enforced on GitHub)
-- **GITHUB_ACTIONS_CI:** CONFIGURED (`.github/workflows/ci.yml`, Job: `Quality Gate`, Node v22.23.2, Overall Workflow: SUCCESS)
-- **EXACT_STATUS_CHECK:** `Quality Gate` (Status: PASS / GREEN on PR #1, Run ID #35736594113)
-- **SUPABASE_SOURCE_FALLBACKS:** ZERO (Production source code strictly fails-fast with ! assertion; CI placeholders isolated to ci.yml env block)
-- **DEBT_CONTAINMENT_POLICY:** ACTIVE (Ratchet: Modern V2 scope 0 errors/0 warnings + changed files 0 errors/0 warnings)
-- **LEGACY_LINT_DEBT:** AUDITED (246 errors / 108 warnings across 79 legacy files reported in non-blocking diagnostic job `Legacy Lint Audit` with continue-on-error: true)
-- **NPM_SECURITY_AUDIT:** AUDITED (10 vulnerabilities: 6 prod / 4 dev; critical Next.js vulnerability evaluated as low practical exploit on Vercel platform)
-- **SOURCE_CONTROL_GOVERNANCE:** DEFINED (Ban hành bộ 6 văn bản quản trị tại `docs/governance/`)
-- **AI_AGENT_PRODUCTION_WRITE:** DENY_BY_DEFAULT (Cấm push trực tiếp, cấm force-push, cấm self-merge, cấm tự động deploy)
-- **PULL_REQUEST_TEMPLATE:** CREATED (`.github/pull_request_template.md`)
-- **INCIDENT_TEMPLATE:** CREATED (`.github/ISSUE_TEMPLATE/production-incident.md`)
-- **NEXTJS_SECURITY_HOTFIX:** READY_FOR_HUMAN_REVIEW (Next.js 16.3.5, PR #2 open, Quality Gate = SUCCESS, Vercel Preview = READY)
+- **BRANCH_PROTECTION:** ACTIVE (Ruleset `Protect main — Production` ACTIVE on GitHub)
+- **SOURCE_CONTROL_GOVERNANCE_GATE:** CLOSED / PASS
+- **AI_DEV_BRIDGE_A_2:** PASS (CI test isolation complete, Quality Gate blocking)
+- **SEC_INCIDENT_01:** RESOLVED (Credential rotated, active branch history remediated)
+- **GITHUB_ACTIONS_CI:** CONFIGURED (`.github/workflows/ci.yml`, Job: `Quality Gate`, Node v22, Overall Workflow: SUCCESS)
+- **EXACT_STATUS_CHECK:** `Quality Gate` (Status: PASS / GREEN)
+- **DEBT_CONTAINMENT_POLICY:** ACTIVE
+- **LEGACY_LINT_DEBT:** AUDITED (Diagnostic non-blocking job `Legacy Lint Audit`)
+- **NPM_SECURITY_AUDIT:** AUDITED
+- **SOURCE_CONTROL_GOVERNANCE:** ACTIVE (Set of 6 governance policies enforced)
+- **AI_AGENT_PRODUCTION_WRITE:** DENY_BY_DEFAULT
+- **NEXTJS_SECURITY_HOTFIX:** COMPLETED
 
 ---
 
@@ -419,17 +420,25 @@ PRODUCTION_MIGRATED_STABLE
 
 ---
 
+## PHASE_06K_B_1_STATE
+- **STATUS:** COMPLETED (Pre-production Migration Evidence & Fail-Closed Hardening)
+- **DATABASE_ISOLATION_GATE:** CONFIGURED (`.github/workflows/ci.yml`, Job: `06K-B Isolated DB Integration` with blocking isolated Postgres 17 service)
+- **CANONICAL_HASHING:** RECURSIVE_DETERMINISTIC (`@huy-ai/contracts` `canonicalSha256`, nested mutation sensitive, key-order invariant)
+- **CLASSIFICATION_CEILING:** FAIL_CLOSED (`data_classification_rank(unknown)` returns NULL, SQL comparison evaluates to NULL)
+- **CANONICAL_SEED_DRIFT_PROTECTION:** ACTIVE (Post-insert validation DO block verifies 6 orgs and 65 depts; aborts with `CANONICAL_SEED_DRIFT` on mismatch)
+- **EVIDENCE_GENERATION:** DYNAMIC_LIVE_CATALOG_MEASURED (All schema metrics, counts, constraints, test passes captured from PostgreSQL catalogs and test runners)
+- **PRODUCTION_SCOPE:** ZERO_TOUCH (Production `bdeluacbzbdflxubhpha` untouched; isolated `phase06kb_test` on loopback used exclusively)
+
+---
+
 ## TEST_STATUS
-- **Contracts & HAIP Unit Tests:** PASS (25/25 tests).
-- **API Logic Tests:** PASS (6/6 tests).
-- **Dispatcher Tests:** PASS (7/7 tests).
-- **Shared Tests:** PASS (3/3 tests).
-- **Architecture V2 Consistency Tests:** PASS (7/7 tests).
-- **UI/UX Design Tokens & Contracts Tests:** PASS (5/5 tests).
-- **UI/UX V2 Final Polish Tests:** PASS (5/5 tests).
-- **Production Smoke Tests & Visual Captures:** PASS (10/10 screenshots, 0 browser console errors).
-- **TypeScript Compile:** PASS (Toàn bộ workspaces & portfolio).
-- **Tổng cộng:** 58/58 tests PASS (100% Passed).
+- **Contracts & HAIP Unit Tests:** PASS (30/30 tests).
+- **Core Tests:** PASS (58/58 tests).
+- **Automation Bridge Tests:** PASS (99/99 tests).
+- **06K-B Multi-Org Security Tests:** PASS (39/39 tests across 7 suites).
+- **06K-B Automated Dry Run Lifecycle:** PASS (All 12 stages: preflight, baseline, baseline-contract, apply, second-apply, schema-after, negative-tests, security-tests, rollback, baseline-verification, reapply, final-verification).
+- **TypeScript Compile:** PASS (Toàn bộ workspaces).
+- **Quality Gate:** 100% PASS.
 
 ---
 
@@ -439,10 +448,11 @@ PRODUCTION_MIGRATED_STABLE
 ---
 
 ## NEXT_PHASE
-06K-B — MIGRATION DRAFT + DRY-RUN (Isolated Environment — NO production apply. Requires Human Owner approval to start).
+06K-C — CONTROLLED PRODUCTION MIGRATION (Requires new explicit Human Owner authorization).
 
 ---
 
 ## NEXT_ACTION
-HARD_STOP_ENGAGED (Phase 06K-A.1 hoàn thành xuất sắc toàn bộ 16 mục chỉnh sửa thiết kế. Kiểm tra schema production: 34 bảng nguyên vẹn, 0 mutations. Tất cả 8 tài liệu kiến trúc đã được reconcile và cam kết vào branch feature/06k-a1-design-reconciliation. Dừng lại chờ Human Owner xem xét và phê duyệt để tiến hành Phase 06K-B Draft + Dry-Run).
+HARD_STOP_ENGAGED (Phase 06K-B.1 hoàn tất củng cố fail-closed hardening và evidence generation: 39/39 security tests PASS, 12/12 stages dry run lifecycle PASS trên isolated database `phase06kb_test`, 0 chạm production. Nhánh feature/06k-b-migration-dry-run đã sẵn sàng tại PR #1. Dừng lại chờ Human Owner phê duyệt trước khi cấp quyền Phase 06K-C).
+
 

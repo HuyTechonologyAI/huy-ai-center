@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "description": "Abstract Tool Permissions Model for MCP and System Tools",
+  "permissions": [
+    { "id": "tool.web.search", "risk_level": 0, "sensitive": false, "description": "Search public internet and web search engines" },
+    { "id": "tool.db.read", "risk_level": 0, "sensitive": false, "description": "Execute scoped SELECT queries via MCP database adapter" },
+    { "id": "tool.db.write", "risk_level": 3, "sensitive": true, "description": "Execute mutation queries (INSERT/UPDATE/DELETE) on authorized tables" },
+    { "id": "tool.docs.parse", "risk_level": 0, "sensitive": false, "description": "Parse unstructured PDFs, tables, and docs via Docling/OCR" },
+    { "id": "tool.storage.read", "risk_level": 0, "sensitive": false, "description": "Read storage artifacts from authorized bucket namespaces" },
+    { "id": "tool.storage.write", "risk_level": 1, "sensitive": false, "description": "Write storage artifacts to authorized task staging buckets" },
+    { "id": "tool.codegen", "risk_level": 1, "sensitive": false, "description": "Synthesize or refactor code files in sandbox workspace" },
+    { "id": "tool.test", "risk_level": 2, "sensitive": false, "description": "Execute automated test suites and linters in sandbox" },
+    { "id": "tool.deploy.prepare", "risk_level": 2, "sensitive": false, "description": "Assemble deployment manifests and container builds" },
+    { "id": "tool.deploy.execute", "risk_level": 3, "sensitive": true, "description": "Deploy applications or microservices to production nodes" },
+    { "id": "tool.media.image", "risk_level": 1, "sensitive": false, "description": "Generate graphic images, diagrams, and thumbnails" },
+    { "id": "tool.media.video", "risk_level": 2, "sensitive": false, "description": "Render motion video assets via local FFmpeg tool" },
+    { "id": "tool.media.audio", "risk_level": 1, "sensitive": false, "description": "Generate voiceover audio, soundscapes, or music stems" },
+    { "id": "tool.social.prepare", "risk_level": 1, "sensitive": false, "description": "Prepare social media posts, descriptions, and tags" },
+    { "id": "tool.social.publish", "risk_level": 3, "sensitive": true, "description": "Publish live public content to external platforms (YouTube, Facebook, etc.)" },
+    { "id": "tool.email.prepare", "risk_level": 1, "sensitive": false, "description": "Draft email communications and newsletters" },
+    { "id": "tool.email.send", "risk_level": 3, "sensitive": true, "description": "Dispatch outbound emails to external recipients" },
+    { "id": "tool.github.read", "risk_level": 0, "sensitive": false, "description": "Read GitHub issues, PRs, and repositories" },
+    { "id": "tool.github.write", "risk_level": 3, "sensitive": true, "description": "Push commits, open PRs, or modify repository settings" },
+    { "id": "tool.system.health.read", "risk_level": 0, "sensitive": false, "description": "Read CPU, RAM, queue backlog, and node telemetry" },
+    { "id": "tool.system.admin", "risk_level": 4, "sensitive": true, "description": "Manage database credentials, secrets, and system configurations" }
+  ],
+  "inviolable_rule": "SENSITIVE_PERMISSIONS_NEVER_IMPLICITLY_GRANTED"
+}

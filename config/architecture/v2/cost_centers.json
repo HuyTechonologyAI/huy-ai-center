@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0",
+  "inviolable_rule": "AGENTS_CANNOT_INCREASE_BUDGET_OR_MOVE_ALLOCATIONS",
+  "cost_centers": [
+    {
+      "code": "CC-01-HUYTECH",
+      "organization_id": "org-01-huytech",
+      "name": "Huy Technology Parent Cost Center",
+      "initial_monthly_cap_usd": 10.00,
+      "daily_soft_cap_usd": 0.50,
+      "description": "Platform infrastructure, cloud database, proxy routing, and R&D compute"
+    },
+    {
+      "code": "CC-02-AISCHOOL",
+      "organization_id": "org-02-aischool",
+      "name": "GVCNCDSAI AI School Cost Center",
+      "initial_monthly_cap_usd": 8.00,
+      "daily_soft_cap_usd": 0.40,
+      "description": "Curriculum generation, lesson plans, quiz bank synthesis, and student tutoring"
+    },
+    {
+      "code": "CC-03-SMARTTAX",
+      "organization_id": "org-03-smarttax",
+      "name": "SmartTax AI Cost Center",
+      "initial_monthly_cap_usd": 7.00,
+      "daily_soft_cap_usd": 0.35,
+      "description": "Tax statutory research, legal citation audits, and document drafting"
+    },
+    {
+      "code": "CC-04-MEDIA-TECH",
+      "organization_id": "org-04-media-tech",
+      "name": "Huy Tech Media Cost Center",
+      "initial_monthly_cap_usd": 2.00,
+      "daily_soft_cap_usd": 0.10,
+      "description": "Tech tutorial scripts, automation case study media, and developer guides"
+    },
+    {
+      "code": "CC-05-MEDIA-EDU",
+      "organization_id": "org-05-media-edu",
+      "name": "GVCNCDSAI Media Cost Center",
+      "initial_monthly_cap_usd": 1.50,
+      "daily_soft_cap_usd": 0.10,
+      "description": "Educational infographics, teacher growth videos, and STEM content"
+    },
+    {
+      "code": "CC-06-MEDIA-CREATIVE",
+      "organization_id": "org-06-media-creative",
+      "name": "Huy Creative Media Cost Center",
+      "initial_monthly_cap_usd": 1.50,
+      "daily_soft_cap_usd": 0.10,
+      "description": "AI sound design, music stems, and viral creative shorts"
+    }
+  ]
+}
