@@ -41,6 +41,8 @@ npm run bridge:backlog:status
 npm run bridge:backlog:run
 ```
 
-A successful invocation completes at most one task, pushes its task branch, fast-forwards the feature branch, and pushes that feature branch. Review `.artifacts/agent-bridge/backlog-state.json` for status. Subsequent invocations advance the DAG, stopping behind the R4 production gate. A pre-existing lease or `RUNNING` state requires inspection of the owning process/worktree; the runner never removes a stale lease automatically. If the first task worktree already exists, it must be clean on `agent-task/bridge-b-autonomous-backlog`.
+A successful invocation completes at most one task, pushes its task branch, fast-forwards the feature branch, and pushes that feature branch. Review `.artifacts/agent-bridge/backlog-state.json` for status. Subsequent invocations advance the DAG, stopping behind the R4 production gate. A pre-existing lease or `RUNNING` state requires inspection of the owning process/worktree; the runner never removes a stale lease automatically. If the first task worktree already exists, it must be clean on `agent-task/06k-c-readiness`.
+
+After the live acceptance and a supervised first task succeed, `npm run bridge:backlog:run-all` processes eligible tasks serially until a human gate, blocked task, or empty queue. It never merges into `main`.
 
 Keep scheduled execution disabled until typecheck, the required live acceptance, and one supervised eligible task pass on that machine.
