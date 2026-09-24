@@ -105,6 +105,7 @@ export interface AgyAuditRequest {
   taskId: string;
   objective: string;
   diffStat: string;
+  reviewDiff?: string;
   verificationSummary: string;
   repositoryRoot: string;
   timeoutSeconds?: number;
@@ -131,6 +132,9 @@ Objective: ${req.objective}
 
 Git diff stat:
 ${redact(req.diffStat)}
+
+Complete changed source patch:
+${redact(req.reviewDiff ?? '')}
 
 Verification results:
 ${req.verificationSummary}

@@ -45,6 +45,41 @@ export function collectDiffStat(worktreePath: string): string {
   return redact(output || "No changes detected").trim();
 }
 
+/** Supply the reviewer with actual patch content; fail closed on large or binary diffs. */
+export function collectReviewDiff(worktreePath: string): string {
+  const listing = spawnSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { cwd: worktreePath, encoding: 'utf8' });
+  if (listing.status !== 0) throw Error('REVIEW_STATUS_FAILED');
+  const untrackedFiles = (listing.stdout ?? '').split('\0').filter(Boolean);
+  const tracked = spawnSync('git', ['diff', '--no-ext-diff', '--binary', 'HEAD', '--'], { cwd: worktreePath, encoding: 'utf8', maxBuffer: 512_000 });
+  if (tracked.status !== 0 || tracked.error) throw Error('REVIEW_DIFF_FAILED');
+  const untracked = untrackedFiles.map(path => {
+    const result = spawnSync('git', ['diff', '--no-index', '--', '/dev/null', path], { cwd: worktreePath, encoding: 'utf8', maxBuffer: 512_000 });
+    if (result.status !== 1 || result.error || /Binary files differ/.test(result.stdout ?? '')) throw Error('REVIEW_UNTRACKED_DIFF_INVALID');
+    return result.stdout ?? '';
+  });
+  const diff = [tracked.stdout ?? '', ...untracked].join('\n');
+  if (!diff || diff.length > 100_000 || /GIT binary patch|Binary files differ/.test(diff)) throw Error('REVIEW_DIFF_UNAVAILABLE');
+  if (redact(diff) !== diff) throw Error('REVIEW_DIFF_SENSITIVE');
+  return diff;
+}
+
+export function enforceEditBudget(diff: string): void {
+  let edits = 0;
+  let newFile = false;
+  let newLines = 0;
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      if (newFile && newLines > 200) throw Error('NEW_FILE_OVER_200_LINES');
+      newFile = false; newLines = 0;
+    }
+    if (line.startsWith('new file mode ')) newFile = true;
+    if (line.startsWith('+') && !line.startsWith('+++')) { edits++; if (newFile) newLines++; }
+    if (line.startsWith('-') && !line.startsWith('---')) edits++;
+  }
+  if (newFile && newLines > 200) throw Error('NEW_FILE_OVER_200_LINES');
+  if (edits > 200) throw Error('EDIT_OVER_200_LINES');
+}
+
 /**
  * Collect all changed files: modified, added, deleted, renamed, untracked.
  * Uses `git status --porcelain` to capture all filesystem modifications.
