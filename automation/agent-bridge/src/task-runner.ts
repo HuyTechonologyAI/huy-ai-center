@@ -16,7 +16,7 @@ import type {
 } from "./types.js";
 import { classifyTask, maxRisk, requiresHuman } from "./risk-classifier.js";
 import { evaluateGate, buildApprovalRequest } from "./approval-gate.js";
-import { generatePlan, auditResult } from "./antigravity-adapter.js";
+import { generatePlan, auditResultDetailed } from "./antigravity-adapter.js";
 import {
   checkCodex,
   execCodexTask,
@@ -308,7 +308,7 @@ export async function runTask(
     const reviewDiff = collectReviewDiff(worktree.path);
     if (checkpoint) enforceEditBudget(reviewDiff);
 
-    const auditDecision = await auditResult({
+    const audit = await auditResultDetailed({
       taskId: contract.taskId,
       objective: contract.objective,
       planSummary: plan.steps.map(step => step.description).join('\n'),
@@ -317,6 +317,8 @@ export async function runTask(
       verificationSummary: verSummary,
       repositoryRoot,
     });
+    const auditDecision = audit.decision;
+    writeArtifact(artifactDir, `auditor-cycle-${cycle}.json`, audit);
     if (gitPorcelain(repositoryRoot) !== coordinatorBeforePlan) throw new Error("AUDITOR_MODIFIED_COORDINATOR");
 
     if (auditDecision === "HUMAN_AUTH_REQUIRED") {
@@ -330,7 +332,7 @@ export async function runTask(
       return state;
     }
 
-    auditorFeedback = `Auditor returned: ${auditDecision}`;
+    auditorFeedback = `Auditor returned: ${auditDecision}. ${audit.reason}`;
 
     const effectiveStatus: AgentResultStatus =
       auditDecision === "PASS" && verPass
@@ -347,7 +349,7 @@ export async function runTask(
       changedFiles,
       diffStat,
       verificationResults: verifications,
-      auditNotes: `Audit cycle ${cycle}: ${auditDecision} (verifications: ${verPass ? "PASS" : "FAIL"})`,
+      auditNotes: `Audit cycle ${cycle}: ${auditDecision}; ${audit.reason} (verifications: ${verPass ? "PASS" : "FAIL"})`,
     });
 
     state.result = result;
@@ -388,6 +390,10 @@ export async function runTask(
       break;
     }
 
+    if (result.status === 'AUDIT_INVALID' || result.status === 'ANTIGRAVITY_UNAVAILABLE') {
+      break;
+    }
+
     // CORRECTION_REQUIRED / FAIL -> continue loop
     console.log(`[task-runner] Cycle ${cycle} → ${result.status}, retrying with feedback...`);
   }
@@ -398,6 +404,7 @@ export async function runTask(
     finalStatus: "AUTOMATION_BLOCKED",
     cycles: state.cycles,
     lastStatus,
+    auditorFeedback,
   });
 
   return state;

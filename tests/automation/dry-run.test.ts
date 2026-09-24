@@ -133,20 +133,15 @@ describe("A. SAFE_DEGRADATION_TEST", () => {
     );
   });
 
-  it("Safe execution degradation: runTask does not crash when CLI is unavailable", async () => {
+  it("Elevated-risk task stops at the gate before invoking either AI", async () => {
     const taskId = `bridge-dry-run-${randomUUID()}`;
     const contract = { ...dryRunContract, taskId,
+      risk: { level: 'R3' as const, reason: 'Verify the human gate' },
       repository: { ...dryRunContract.repository, taskBranch: `agent-task/${taskId}` } };
     const state = await runTask(contract, process.cwd());
-    assert.ok(state);
-    assert.ok(
-      state.status === "BLOCKED" ||
-      state.status === "COMPLETE" ||
-      state.status === "HUMAN_GATE" ||
-      state.status === "FAILED",
-      `Unexpected task state status: ${state.status}`
-    );
-    cleanPassedFixture(contract, state.status);
+    assert.equal(state.status, 'HUMAN_GATE');
+    assert.equal(state.cycles, 0);
+    assert.equal(state.worktree, undefined);
   });
 });
 
@@ -192,7 +187,7 @@ describe("C. ORCHESTRATOR_CLI_INVOCATION_TEST", () => {
     const res = spawnSync("npx", ["tsx", cliPath, "--preflight"], {
       cwd: process.cwd(),
       encoding: "utf-8",
-      shell: true,
+      shell: false,
       timeout: 15000,
     });
     assert.equal(res.status, 0, `cli.ts --preflight failed: ${res.stderr || res.stdout}`);
@@ -207,7 +202,7 @@ describe("C. ORCHESTRATOR_CLI_INVOCATION_TEST", () => {
       const res = spawnSync("npx", ["tsx", cliPath, tempFile], {
         cwd: process.cwd(),
         encoding: "utf-8",
-        shell: true,
+        shell: false,
         timeout: 10000,
       });
       assert.equal(res.status, 2, "Invalid contract must return exit code 2");
@@ -226,7 +221,7 @@ describe("C. ORCHESTRATOR_CLI_INVOCATION_TEST", () => {
       const res = spawnSync("npx", ["tsx", cliPath, tempFile], {
         cwd: process.cwd(),
         encoding: "utf-8",
-        shell: true,
+        shell: false,
         timeout: 10000,
       });
       assert.equal(res.status, 2, "Contract missing fields must return exit code 2");

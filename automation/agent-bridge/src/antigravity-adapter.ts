@@ -112,6 +112,46 @@ export interface AgyAuditRequest {
   timeoutSeconds?: number;
 }
 
+export type AuditDecision = "PASS" | "CORRECTION_REQUIRED" | "HUMAN_DECISION_REQUIRED"
+  | "ANTIGRAVITY_UNAVAILABLE" | "HUMAN_AUTH_REQUIRED" | "AUDIT_INVALID";
+
+export async function auditResultDetailed(req: AgyAuditRequest): Promise<{ decision: AuditDecision; reason: string }> {
+  const check = checkAntigravity();
+  if (!check.installed) return { decision: 'ANTIGRAVITY_UNAVAILABLE', reason: 'Antigravity CLI unavailable' };
+
+  const prompt = `You are an independent reviewer of an automation task.
+Task ID: ${req.taskId}
+Objective: ${req.objective}
+Plan: ${redact(req.planSummary ?? '')}
+Diff stat: ${redact(req.diffStat)}
+Complete patch: ${redact(req.reviewDiff ?? '')}
+Verification results: ${redact(req.verificationSummary)}
+Verify the objective against the actual patch and applicable checks. For a documentation-only
+change, verify requested content in the patch, scope, and verification results. Check API,
+schema, and code tests when relevant; do not require unrelated checks.
+Respond with exactly two lines:
+PASS | CORRECTION_REQUIRED | HUMAN_DECISION_REQUIRED
+REASON: one specific, brief reason backed by the patch or verification output.
+Use CORRECTION_REQUIRED for a fixable defect and HUMAN_DECISION_REQUIRED for ambiguity.`;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const result = runAgy(['--input-format', 'text', '--output-format', 'text'], {
+      cwd: req.repositoryRoot, timeoutMs: (req.timeoutSeconds ?? 90) * 1000, input: prompt,
+    });
+    const stdout = redact(result.stdout ?? '').trim();
+    const stderr = redact(result.stderr ?? '').trim();
+    if (result.status !== 0 && isAgyAuthError(`${stderr}\n${stdout}`)) {
+      return { decision: 'HUMAN_AUTH_REQUIRED', reason: 'Antigravity authentication required' };
+    }
+    if (result.status === 0) {
+      const match = /^(PASS|CORRECTION_REQUIRED|HUMAN_DECISION_REQUIRED)\s*\r?\nREASON:\s*(.+)$/i.exec(stdout);
+      if (match) return { decision: match[1].toUpperCase() as AuditDecision, reason: match[2].slice(0, 500) };
+    }
+    console.warn(`[antigravity-adapter] Audit attempt ${attempt} invalid: exit=${String(result.status)} error=${String(result.error ?? '')} stderr=${stderr.slice(0, 300)} stdout=${stdout.slice(0, 100)}`);
+  }
+  return { decision: 'AUDIT_INVALID', reason: 'Antigravity failed or returned an invalid audit response twice' };
+}
+
 export async function auditResult(
   req: AgyAuditRequest
 ): Promise<
@@ -122,67 +162,7 @@ export async function auditResult(
   | "HUMAN_AUTH_REQUIRED"
   | "AUDIT_INVALID"
 > {
-  const check = checkAntigravity();
-  if (!check.installed) return "ANTIGRAVITY_UNAVAILABLE";
-
-  const prompt = `
-You are auditing a completed automation task.
-
-Task ID: ${req.taskId}
-Objective: ${req.objective}
-
-Approved plan steps:
-${redact(req.planSummary ?? '')}
-
-Git diff stat:
-${redact(req.diffStat)}
-
-Complete changed source patch:
-${redact(req.reviewDiff ?? '')}
-
-Verification results:
-${req.verificationSummary}
-
-Based on the above, respond with ONE of the following (nothing else):
-PASS
-CORRECTION_REQUIRED
-HUMAN_DECISION_REQUIRED
-
-PASS = the implementation meets the objective and all verifications pass.
-Check requirement against plan, plan against patch, changed code against tests,
-caller against provider, schema against types and data, and docs against behavior.
-If any relevant comparison cannot be verified from the supplied evidence, return CORRECTION_REQUIRED.
-CORRECTION_REQUIRED = the implementation has issues that can be fixed automatically.
-HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a human must resolve.
-`.trim();
-
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const result = runAgy(
-      ["--input-format", "text", "--output-format", "text"],
-      {
-        cwd: req.repositoryRoot,
-        timeoutMs: (req.timeoutSeconds ?? 90) * 1000,
-        input: prompt,
-      }
-    );
-
-    const output = redact(result.stdout ?? "").trim().toUpperCase();
-
-    if (result.status !== 0 && isAgyAuthError(
-      `${redact(result.stderr ?? "")}\n${redact(result.stdout ?? "")}`
-    )) {
-      return "HUMAN_AUTH_REQUIRED";
-    }
-
-    if (output === "CORRECTION_REQUIRED") return "CORRECTION_REQUIRED";
-    if (output === "HUMAN_DECISION_REQUIRED") return "HUMAN_DECISION_REQUIRED";
-    if (output === "PASS") return "PASS";
-
-    console.warn(`[antigravity-adapter] Audit attempt ${attempt} returned unrecognized response: ${output.slice(0, 100)}`);
-  }
-
-  // Do not silently convert malformed agent output to PASS
-  return "AUDIT_INVALID";
+  return (await auditResultDetailed(req)).decision;
 }
 
 function isAgyAuthError(text: string): boolean {
