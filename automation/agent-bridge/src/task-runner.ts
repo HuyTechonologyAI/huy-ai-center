@@ -94,6 +94,8 @@ export async function runTask(
   // ── 3. Planning (Antigravity with retry) ────────────────────────
   state.status = "PLANNING";
 
+  const coordinatorBeforePlan = gitPorcelain(repositoryRoot);
+
   const plan = await generatePlan({
     taskId: contract.taskId,
     title: contract.title,
@@ -103,6 +105,7 @@ export async function runTask(
     repositoryRoot,
     timeoutSeconds: 120,
   });
+  if (gitPorcelain(repositoryRoot) !== coordinatorBeforePlan) throw new Error("PLANNER_MODIFIED_COORDINATOR");
 
   state.plan = { ...plan, approvedByGate: true };
   writeArtifact(artifactDir, "plan.json", plan);
@@ -125,13 +128,29 @@ export async function runTask(
     return state;
   }
 
+  if (plan.rawOutput === "ANTIGRAVITY_UNAVAILABLE") {
+    state.status = "BLOCKED";
+    writeArtifact(artifactDir, "audit.json", { finalStatus: "ANTIGRAVITY_UNAVAILABLE" });
+    return state;
+  }
+
   // ── 4. Worktree isolation (taskBranch authoritative) ───────────
-  const worktree = createWorktree({
-    taskId: contract.taskId,
-    baseBranch: contract.repository.baseRef,
-    repositoryRoot,
-    taskBranch: contract.repository.taskBranch,
-  });
+  let worktree: ReturnType<typeof createWorktree>;
+  try {
+    worktree = createWorktree({
+      taskId: contract.taskId,
+      baseBranch: contract.repository.baseRef,
+      repositoryRoot,
+      taskBranch: contract.repository.taskBranch,
+    });
+  } catch (error) {
+    state.status = "BLOCKED";
+    writeArtifact(artifactDir, "audit.json", {
+      finalStatus: "TASK_WORKTREE_UNAVAILABLE",
+      reason: String(error),
+    });
+    return state;
+  }
   state.worktree = worktree;
 
   // ── 5. Self-correction implementation loop ─────────────────────
@@ -269,6 +288,7 @@ export async function runTask(
       verificationSummary: verSummary,
       repositoryRoot,
     });
+    if (gitPorcelain(repositoryRoot) !== coordinatorBeforePlan) throw new Error("AUDITOR_MODIFIED_COORDINATOR");
 
     if (auditDecision === "HUMAN_AUTH_REQUIRED") {
       state.status = "HUMAN_GATE";
@@ -287,7 +307,7 @@ export async function runTask(
       auditDecision === "PASS" && verPass
         ? "PASS"
         : auditDecision === "ANTIGRAVITY_UNAVAILABLE"
-        ? (verPass ? "PASS" : "FAIL")
+        ? "ANTIGRAVITY_UNAVAILABLE"
         : (auditDecision as AgentResultStatus);
 
     const result = buildAgentResult({
@@ -413,6 +433,7 @@ export function safeScopedCommit(params: {
     cwd: worktreePath,
     encoding: "utf-8",
   });
+  if (statusResult.status !== 0) throw new Error("GIT_STATUS_FAILED");
 
   const stagedFiles: string[] = [];
   const rejectedFiles: string[] = [];
@@ -458,19 +479,22 @@ export function safeScopedCommit(params: {
 
     // File is safe to stage
     if (status.includes("D")) {
-      spawnSync("git", ["rm", filePath], { cwd: worktreePath, encoding: "utf-8" });
+      const removed = spawnSync("git", ["rm", "--", filePath], { cwd: worktreePath, encoding: "utf-8" });
+      if (removed.status !== 0) throw new Error("GIT_RM_FAILED");
     } else {
-      spawnSync("git", ["add", filePath], { cwd: worktreePath, encoding: "utf-8" });
+      const added = spawnSync("git", ["add", "--", filePath], { cwd: worktreePath, encoding: "utf-8" });
+      if (added.status !== 0) throw new Error("GIT_ADD_FAILED");
     }
     stagedFiles.push(filePath);
   }
 
   if (stagedFiles.length > 0) {
     const message = `automation(bridge): ${title} [${taskId}]`;
-    spawnSync("git", ["commit", "-m", message], {
+    const committed = spawnSync("git", ["commit", "-m", message], {
       cwd: worktreePath,
       encoding: "utf-8",
     });
+    if (committed.status !== 0) throw new Error("GIT_COMMIT_FAILED");
     console.log(`[task-runner] Committed ${stagedFiles.length} file(s): ${message}`);
   } else {
     console.log("[task-runner] No eligible scoped files to commit.");
@@ -487,6 +511,12 @@ function ensureDir(path: string): void {
   if (!existsSync(path)) {
     mkdirSync(path, { recursive: true });
   }
+}
+
+function gitPorcelain(cwd: string): string {
+  const result = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd, encoding: "utf-8" });
+  if (result.status !== 0) throw new Error("GIT_STATUS_FAILED");
+  return result.stdout;
 }
 
 function writeArtifact(dir: string, filename: string, data: unknown): void {

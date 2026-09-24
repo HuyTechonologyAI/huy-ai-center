@@ -59,7 +59,9 @@ export function collectChangedFiles(worktreePath: string): string[] {
     return [];
   }
 
-  const lines = result.stdout.trim().split("\n").filter(Boolean);
+  // Porcelain's first two columns can contain spaces; trimming the whole
+  // output removes a leading status column and corrupts the first filename.
+  const lines = result.stdout.split("\n").filter(Boolean);
   const files: string[] = [];
 
   for (const line of lines) {
@@ -105,13 +107,17 @@ export function runVerificationCommands(params: {
     }
 
     const [cmd, ...args] = command.split(" ");
+    if (cmd !== "npm" || args[0] !== "run" || args.length !== 2 || !/^[a-z0-9:-]+$/.test(args[1])) {
+      results.push({ command, exitCode: -1, passed: false, stderr: "VERIFICATION_COMMAND_INVALID", durationMs: 0 });
+      continue;
+    }
     const start = Date.now();
 
     const result = spawnSync(cmd, args, {
       cwd,
       encoding: "utf-8",
       timeout: timeoutMs,
-      shell: true,
+      shell: false,
     });
 
     const durationMs = Date.now() - start;

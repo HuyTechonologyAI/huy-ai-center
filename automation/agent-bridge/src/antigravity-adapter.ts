@@ -163,9 +163,9 @@ HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a huma
       return "HUMAN_AUTH_REQUIRED";
     }
 
-    if (output.includes("CORRECTION_REQUIRED")) return "CORRECTION_REQUIRED";
-    if (output.includes("HUMAN_DECISION_REQUIRED")) return "HUMAN_DECISION_REQUIRED";
-    if (output.includes("PASS")) return "PASS";
+    if (output === "CORRECTION_REQUIRED") return "CORRECTION_REQUIRED";
+    if (output === "HUMAN_DECISION_REQUIRED") return "HUMAN_DECISION_REQUIRED";
+    if (output === "PASS") return "PASS";
 
     console.warn(`[antigravity-adapter] Audit attempt ${attempt} returned unrecognized response: ${output.slice(0, 100)}`);
   }
