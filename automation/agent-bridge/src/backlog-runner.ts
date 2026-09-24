@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { runTask } from './task-runner.js';
+import { checkpointStage, readLatestCheckpoint } from './checkpoints.js';
 import type { TaskContract, RiskLevel } from './types.js';
 
 export interface RoadmapNode {
@@ -69,6 +70,27 @@ function lease(path: string, node: RoadmapNode, branch: string, worktree: string
   return () => unlinkSync(path);
 }
 
+/** Accept only a real CLI receipt, tied to the unchanged bridge implementation. */
+export function assertLiveAcceptance(root: string): void {
+  const dir = join(root, '.artifacts/agent-bridge/acceptance');
+  if (!existsSync(dir)) throw Error('LIVE_E2E_ACCEPTANCE_REQUIRED');
+  const candidates = readdirSync(dir).filter(name => /^bridge-e2e-live-[a-f0-9-]{36}\.json$/.test(name));
+  for (const name of candidates) {
+    let receipt: { status?: string; featureCommit?: string; audit?: { finalStatus?: string;
+      result?: { status?: string; verificationResults?: { passed: boolean }[] } } };
+    try { receipt = JSON.parse(readFileSync(join(dir, name), 'utf8')); } catch { continue; }
+    if (receipt.status !== 'COMPLETE' || receipt.audit?.finalStatus !== 'PASS' ||
+        receipt.audit.result?.status !== 'PASS' || !receipt.audit.result.verificationResults?.length ||
+        !receipt.audit.result.verificationResults.every(v => v.passed) ||
+        !/^[a-f0-9]{40}$/.test(receipt.featureCommit ?? '')) continue;
+    const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', receipt.featureCommit!, 'HEAD'], { cwd: root });
+    const changed = spawnSync('git', ['diff', '--quiet', receipt.featureCommit!, 'HEAD', '--',
+      'automation/agent-bridge/', 'config/autonomy/', 'package.json'], { cwd: root });
+    if (ancestor.status === 0 && changed.status === 0) return;
+  }
+  throw Error('LIVE_E2E_ACCEPTANCE_REQUIRED');
+}
+
 export async function runBacklog(root: string, execute = false): Promise<{ status: string; taskId?: string; reason?: string }> {
   root = resolve(root);
   const roadmap = JSON.parse(readFileSync(join(root, 'config/autonomy/system-roadmap.json'), 'utf8')) as Roadmap;
@@ -86,15 +108,22 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
     // Execution still requires an immutable, clean coordination worktree.
     if (execute && git(root, 'status', '--porcelain')) throw Error('PRIMARY_WORKTREE_DIRTY');
     for (const node of ordered) {
-      if (state.tasks[node.id]?.status === 'COMPLETED') continue;
+      const latest = readLatestCheckpoint(root, node.id);
+      if (state.tasks[node.id]?.status === 'COMPLETED') {
+        if (latest?.stage !== 'DELIVERY') throw Error('COMPLETION_CHECKPOINT_MISSING');
+        continue;
+      }
       if (node.depends_on.some(id => state.tasks[id]?.status !== 'COMPLETED')) continue;
       if (state.tasks[node.id]?.status === 'BLOCKED' || state.tasks[node.id]?.status === 'RUNNING') return { status: 'BLOCKED', taskId: node.id, reason: state.tasks[node.id].reason ?? 'Inspect previous run before resuming' };
+      if (latest) return { status: 'BLOCKED', taskId: node.id, reason: 'Inspect and reconcile unfinished checkpoint before resuming' };
       const update = (status: Status, reason?: string) => {
         state.tasks[node.id] = { status, reason, branch: `agent-task/${node.id}`, updatedAt: new Date().toISOString() }; persist(statePath, state);
       };
       if (GATED.has(node.risk) || node.human_gate) { update('HUMAN_GATE', `Owner approval required for ${node.risk}`); return { status: 'HUMAN_GATE', taskId: node.id }; }
       if (!execute) return { status: 'READY', taskId: node.id };
+      assertLiveAcceptance(root);
       const contract = projectRoadmapNodeToContract(node, branch);
+      if (!contract.verification.commands.length) throw Error('VERIFICATION_REQUIRED');
       const worktree = join(root, '.agent-worktrees', node.id === 'bridge-b-core' ? 'bridge-b-autonomous-backlog' : node.id);
       if (existsSync(worktree)) {
         if (git(worktree, 'branch', '--show-current') !== contract.repository.taskBranch || git(worktree, 'status', '--porcelain')) throw Error('TASK_WORKTREE_UNSAFE');
@@ -104,8 +133,11 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
       const release = lease(join(leases, `${node.id}.json`), node, contract.repository.taskBranch, worktree);
       try {
         update('RUNNING');
+        checkpointStage(root, { taskId: node.id, stage: 'RECEIVED', owner: 'COORDINATOR',
+          objective: node.objective, evidence: { node, baseRef: git(root, 'rev-parse', 'HEAD') },
+          method: 'validated roadmap DAG, prerequisites and scope', result: 'Eligible R0-R2 task', next: 'PLAN' });
         persist(role, { taskId: node.id, phase: 'IMPLEMENTING', writeOwner: 'CODEX', antigravityMode: 'READ_ONLY_AUDITOR' });
-        const result = await runTask(contract, root);
+        const result = await runTask(contract, root, true);
         if (result.status === 'HUMAN_GATE') { update('HUMAN_GATE', 'Task runner requested approval or authentication'); return { status: 'HUMAN_GATE', taskId: node.id }; }
         if (result.status !== 'COMPLETE') { update('BLOCKED', `Task runner: ${result.status}`); return { status: 'BLOCKED', taskId: node.id }; }
         if (git(result.worktree!.path, 'branch', '--show-current') !== contract.repository.taskBranch) throw Error('TASK_BRANCH_CHANGED');
@@ -118,6 +150,11 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
         if (git(root, 'branch', '--show-current') !== branch) throw Error('COORDINATOR_BRANCH_CHANGED');
         git(root, 'merge', '--ff-only', contract.repository.taskBranch);
         git(root, 'push', 'origin', branch);
+        checkpointStage(root, { taskId: node.id, stage: 'DELIVERY', owner: 'COORDINATOR',
+          objective: node.objective, evidence: { featureBranch: branch, featureCommit: git(root, 'rev-parse', 'HEAD'),
+            taskBranch: contract.repository.taskBranch }, method: 'git push origin feature branch',
+          result: 'Verified commit pushed to feature integration branch', next: 'Next DAG node',
+          receipts: [git(root, 'rev-parse', 'HEAD')] });
         update('COMPLETED');
         return { status: 'COMPLETED', taskId: node.id };
       } catch (error) {

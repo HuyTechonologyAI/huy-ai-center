@@ -15,36 +15,11 @@
   },
   "tasks": [
     {
-      "id": "bridge-b-core",
-      "title": "AI-DEV-BRIDGE-B autonomous backlog runner",
-      "phase": "AI-DEV-BRIDGE-B",
-      "risk": "R2",
-      "depends_on": [],
-      "status": "READY",
-      "objective": "Implement serial DAG backlog execution, exclusive worktree/path leases, Antigravity planner/auditor ownership, Codex implementation ownership, guarded feature push and human-gated main merge.",
-      "allowed_paths": [
-        "automation/agent-bridge/",
-        "config/autonomy/",
-        "schemas/",
-        "tests/automation/",
-        "docs/automation/",
-        "package.json",
-        "PROJECT_STATE.md"
-      ],
-      "verification": [
-        "npm run typecheck",
-        "npm run test:bridge"
-      ],
-      "human_gate": false
-    },
-    {
       "id": "06k-c-readiness",
       "title": "06K-C production migration readiness package",
       "phase": "06K-C0",
       "risk": "R1",
-      "depends_on": [
-        "bridge-b-core"
-      ],
+      "depends_on": [],
       "status": "BLOCKED",
       "objective": "Prepare a read-only production migration readiness packet: current production snapshot, migration checksums, exact apply sequence, rollback decision tree, pre/post queries, and explicit R4 approval request. No production mutation.",
       "allowed_paths": [

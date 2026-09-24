@@ -25,6 +25,8 @@ import {
 import { createWorktree } from "./worktree-manager.js";
 import {
   collectDiffStat,
+  collectReviewDiff,
+  enforceEditBudget,
   collectChangedFiles,
   runVerificationCommands,
   summarizeVerification,
@@ -32,6 +34,7 @@ import {
   allVerificationsPassed,
 } from "./result-auditor.js";
 import { safeJsonStringify } from "./log-redactor.js";
+import { checkpointStage } from './checkpoints.js';
 
 const ARTIFACTS_ROOT = ".artifacts/agent-bridge";
 const MAX_CYCLES = 3;
@@ -42,7 +45,8 @@ const MAX_CYCLES = 3;
 
 export async function runTask(
   contract: TaskContract,
-  repositoryRoot: string
+  repositoryRoot: string,
+  checkpoint = false
 ): Promise<BridgeTaskState> {
   const state: BridgeTaskState = {
     contract,
@@ -132,6 +136,27 @@ export async function runTask(
     state.status = "BLOCKED";
     writeArtifact(artifactDir, "audit.json", { finalStatus: "ANTIGRAVITY_UNAVAILABLE" });
     return state;
+  }
+
+  if (checkpoint) {
+    if (!plan.steps.length) throw Error('PLAN_WITHOUT_STEPS');
+    for (const step of plan.steps) {
+      if (step.targetFiles?.some(file => !contract.scope.allowedPaths.some(path => file === path || file.startsWith(path)))) {
+        throw Error('PLAN_SCOPE_INVALID');
+      }
+    }
+    checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'PLAN', owner: 'ANTIGRAVITY',
+      objective: contract.objective, evidence: plan, method: 'validated planner steps', result: 'Plan contains steps', next: 'DECOMPOSITION' });
+    const subtasks = plan.steps.map((step, index) => ({ subtask_id: `${contract.taskId}-${index + 1}`,
+      task_id: contract.taskId, owner_agent: 'CODEX', objective: step.description,
+      input: contract.objective, output: step.targetFiles ?? contract.scope.allowedPaths,
+      depends_on: index ? [`${contract.taskId}-${index}`] : [],
+      allowed_paths: contract.scope.allowedPaths, acceptance: contract.verification.commands,
+      test_commands: contract.verification.commands, cross_review_agent: 'ANTIGRAVITY',
+      source_checkpoint: 'PLAN_VERIFIED' }));
+    checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'DECOMPOSITION', owner: 'COORDINATOR',
+      objective: contract.objective, evidence: { contract, subtasks }, method: 'contract scope and plan steps',
+      result: 'Subtasks assigned to Codex within allowed paths', next: 'IMPLEMENTATION' });
   }
 
   // ── 4. Worktree isolation (taskBranch authoritative) ───────────
@@ -280,11 +305,14 @@ export async function runTask(
     const diffStat = collectDiffStat(worktree.path);
     const changedFiles = collectChangedFiles(worktree.path);
     previousDiffSummary = diffStat;
+    const reviewDiff = collectReviewDiff(worktree.path);
+    if (checkpoint) enforceEditBudget(reviewDiff);
 
     const auditDecision = await auditResult({
       taskId: contract.taskId,
       objective: contract.objective,
       diffStat,
+      reviewDiff,
       verificationSummary: verSummary,
       repositoryRoot,
     });
@@ -327,6 +355,15 @@ export async function runTask(
     lastStatus = result.status;
 
     if (result.status === "PASS") {
+      if (checkpoint) {
+        if (!verifications.length || !verPass) throw Error('VERIFICATION_EVIDENCE_REQUIRED');
+        checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'IMPLEMENTATION', owner: 'CODEX',
+          objective: contract.objective, evidence: { changedFiles, reviewDiff, verifications },
+          method: 'guarded verification', result: 'All required commands passed', next: 'CROSS_REVIEW' });
+        checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'CROSS_REVIEW', owner: 'ANTIGRAVITY',
+          objective: contract.objective, evidence: { reviewDiff, auditDecision, verifications },
+          method: 'independent patch audit', result: 'PASS', next: 'DELIVERY' });
+      }
       // ── 9. Safe Scoped Staging & Commit ────────────────────────
       state.status = "COMMITTING";
 
