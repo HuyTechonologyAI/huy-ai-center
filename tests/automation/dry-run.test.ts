@@ -11,7 +11,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { resolve, join } from "node:path";
-import { writeFileSync, unlinkSync, existsSync } from "node:fs";
+import { writeFileSync, unlinkSync, existsSync, rmSync, mkdirSync, readFileSync } from "node:fs";
+import { randomUUID } from 'node:crypto';
 import {
   validateContract,
   classifyTask,
@@ -50,6 +51,32 @@ const dryRunContract: TaskContract = {
   },
   createdAt: new Date().toISOString(),
 };
+
+/** Remove only a unique test-owned worktree after preserving its PASS receipt. */
+function cleanPassedFixture(contract: TaskContract, status: string): void {
+  if (status !== 'COMPLETE' || !/^bridge-(dry-run|e2e-live)-[a-f0-9-]{36}$/.test(contract.taskId)) return;
+  const path = join(process.cwd(), '.agent-worktrees', contract.taskId);
+  if (!existsSync(path)) return;
+  const changes = spawnSync('git', ['status', '--porcelain'], { cwd: path, encoding: 'utf8' });
+  assert.equal(changes.status, 0);
+  assert.ok(changes.stdout.split('\n').filter(Boolean).every(line => line.slice(3).startsWith('tests/fixtures/agent-bridge-dry-run/')),
+    'Unexpected changes in fixture worktree; preserving it for inspection');
+  const receiptDir = join(process.cwd(), '.artifacts/agent-bridge/acceptance');
+  mkdirSync(receiptDir, { recursive: true });
+  const auditPath = join(process.cwd(), '.artifacts/agent-bridge', contract.taskId, 'audit.json');
+  assert.ok(existsSync(auditPath), 'Missing audit evidence; preserving fixture for inspection');
+  const audit = JSON.parse(readFileSync(auditPath, 'utf8'));
+  assert.equal(audit.finalStatus, 'PASS');
+  const commit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: process.cwd(), encoding: 'utf8' });
+  assert.equal(commit.status, 0);
+  writeFileSync(join(receiptDir, `${contract.taskId}.json`), JSON.stringify({ taskId: contract.taskId,
+    status, featureCommit: commit.stdout.trim(), verifiedAt: new Date().toISOString(), audit }));
+  const removed = spawnSync('git', ['worktree', 'remove', '--force', path], { cwd: process.cwd(), encoding: 'utf8' });
+  assert.equal(removed.status, 0, removed.stderr);
+  const deleted = spawnSync('git', ['branch', '-D', contract.repository.taskBranch], { cwd: process.cwd(), encoding: 'utf8' });
+  assert.equal(deleted.status, 0, deleted.stderr);
+  rmSync(join(process.cwd(), '.artifacts/agent-bridge', contract.taskId), { recursive: true, force: true });
+}
 
 describe("A. SAFE_DEGRADATION_TEST", () => {
   it("Dry-run task contract is strictly valid", () => {
@@ -106,16 +133,15 @@ describe("A. SAFE_DEGRADATION_TEST", () => {
     );
   });
 
-  it("Safe execution degradation: runTask does not crash when CLI is unavailable", async () => {
-    const state = await runTask(dryRunContract, process.cwd());
-    assert.ok(state);
-    assert.ok(
-      state.status === "BLOCKED" ||
-      state.status === "COMPLETE" ||
-      state.status === "HUMAN_GATE" ||
-      state.status === "FAILED",
-      `Unexpected task state status: ${state.status}`
-    );
+  it("Elevated-risk task stops at the gate before invoking either AI", async () => {
+    const taskId = `bridge-dry-run-${randomUUID()}`;
+    const contract = { ...dryRunContract, taskId,
+      risk: { level: 'R3' as const, reason: 'Verify the human gate' },
+      repository: { ...dryRunContract.repository, taskBranch: `agent-task/${taskId}` } };
+    const state = await runTask(contract, process.cwd());
+    assert.equal(state.status, 'HUMAN_GATE');
+    assert.equal(state.cycles, 0);
+    assert.equal(state.worktree, undefined);
   });
 });
 
@@ -124,26 +150,24 @@ describe("B. REAL_E2E_BRIDGE_TEST", () => {
     const codex = checkCodex();
     const agy = checkAntigravity();
 
-    // Check if both CLIs are installed AND authenticated
-    const codexReady = codex.installed && codex.status === "AUTH_READY";
-    const agyReady = agy.installed && agy.status === "AUTH_READY";
-
-    if (!codexReady || !agyReady) {
+    if (process.env.BRIDGE_REAL_E2E !== '1') {
       console.log(
         "    ℹ [REAL_E2E_BRIDGE_TEST] REAL_E2E: NOT_EXECUTED_CI_ENVIRONMENT (Requires authenticated Codex & Antigravity on trusted local machine)."
       );
       return;
     }
+    assert.ok(codex.installed && agy.installed, 'Real acceptance requires installed Codex and Antigravity CLIs');
 
     // Both CLIs installed and authenticated: execute fixture contract and require real PASS
+    const liveTaskId = `bridge-e2e-live-${randomUUID()}`;
     const realContract: TaskContract = {
       ...dryRunContract,
-      taskId: "bridge-e2e-live-001",
-      repository: {
-        ...dryRunContract.repository,
-        taskBranch: "agent-task/bridge-e2e-live-001",
-      },
+      taskId: liveTaskId,
+      objective: `Append acceptance run ID ${liveTaskId} to tests/fixtures/agent-bridge-dry-run/README.md and explain the bridge dry-run.`,
+      repository: { ...dryRunContract.repository },
+      verification: { commands: ['npm run typecheck'] },
     };
+    realContract.repository.taskBranch = `agent-task/${realContract.taskId}`;
 
     const state = await runTask(realContract, process.cwd());
     assert.ok(state);
@@ -152,6 +176,7 @@ describe("B. REAL_E2E_BRIDGE_TEST", () => {
       "COMPLETE",
       `Real authenticated E2E test must complete with PASS, got: ${state.status}`
     );
+    cleanPassedFixture(realContract, state.status);
   });
 });
 
@@ -162,7 +187,7 @@ describe("C. ORCHESTRATOR_CLI_INVOCATION_TEST", () => {
     const res = spawnSync("npx", ["tsx", cliPath, "--preflight"], {
       cwd: process.cwd(),
       encoding: "utf-8",
-      shell: true,
+      shell: false,
       timeout: 15000,
     });
     assert.equal(res.status, 0, `cli.ts --preflight failed: ${res.stderr || res.stdout}`);
@@ -177,7 +202,7 @@ describe("C. ORCHESTRATOR_CLI_INVOCATION_TEST", () => {
       const res = spawnSync("npx", ["tsx", cliPath, tempFile], {
         cwd: process.cwd(),
         encoding: "utf-8",
-        shell: true,
+        shell: false,
         timeout: 10000,
       });
       assert.equal(res.status, 2, "Invalid contract must return exit code 2");
@@ -196,7 +221,7 @@ describe("C. ORCHESTRATOR_CLI_INVOCATION_TEST", () => {
       const res = spawnSync("npx", ["tsx", cliPath, tempFile], {
         cwd: process.cwd(),
         encoding: "utf-8",
-        shell: true,
+        shell: false,
         timeout: 10000,
       });
       assert.equal(res.status, 2, "Contract missing fields must return exit code 2");

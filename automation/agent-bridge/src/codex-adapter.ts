@@ -8,6 +8,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { redact } from "./log-redactor.js";
 import type { CliCheckResult, CliStatus } from "./types.js";
 
@@ -16,10 +17,8 @@ import type { CliCheckResult, CliStatus } from "./types.js";
 // ─────────────────────────────────────────────────
 
 export function checkCodex(): CliCheckResult {
-  const result = spawnSync("codex", ["--version"], {
-    encoding: "utf-8",
-    timeout: 5000,
-    shell: true,
+  const result = runCodex(["--version"], {
+    timeoutMs: 5000,
   });
 
   if (result.error || result.status === null || result.status !== 0) {
@@ -96,12 +95,9 @@ export async function execCodexTask(
     req.prompt,
   ];
 
-  const result = spawnSync("codex", args, {
-    encoding: "utf-8",
+  const result = runCodex(args, {
     cwd: req.worktreePath,
-    timeout: (req.timeoutSeconds ?? 1800) * 1000,
-    env: { ...process.env },
-    shell: true,
+    timeoutMs: (req.timeoutSeconds ?? 1800) * 1000,
   });
 
   const stdout = redact(result.stdout ?? "");
@@ -120,8 +116,13 @@ export async function execCodexTask(
     };
   }
 
-  // Check for authentication error
-  if (isCodexAuthError(combined)) {
+  const isSuccess = (result.status ?? 1) === 0;
+
+  // Only classify authentication failures when the CLI itself failed.
+  // Successful Codex stdout may legitimately contain phrases such as
+  // "login required" while discussing optional tooling, which must not
+  // create a false HUMAN_GATE.
+  if (!isSuccess && isCodexAuthError(`${stderr}\n${stdout}`)) {
     return {
       success: false,
       stdout,
@@ -132,31 +133,59 @@ export async function execCodexTask(
     };
   }
 
-  // Check for sandbox denial
-  if (combined.includes("sandbox") && (combined.includes("denied") || combined.includes("violation") || combined.includes("blocked"))) {
+  // Only classify sandbox / permission failures when Codex itself exits non-zero.
+  // Successful model output may mention words such as "sandbox", "blocked",
+  // "violation", or "permission denied" while explaining the task; those are
+  // not execution failures.
+  const failureText = `${stderr}\n${stdout}`.toLowerCase();
+
+  if (
+    !isSuccess &&
+    failureText.includes("sandbox") &&
+    (
+      failureText.includes("denied") ||
+      failureText.includes("violation") ||
+      failureText.includes("blocked")
+    )
+  ) {
     return {
       success: false,
       stdout,
-      stderr: "SANDBOX_VIOLATION: Operation denied by workspace-write sandbox",
+      stderr: [
+        "SANDBOX_VIOLATION: Operation denied by workspace-write sandbox",
+        "Original stderr (redacted):",
+        stderr.slice(-4000),
+        "Original stdout tail (redacted):",
+        stdout.slice(-2000),
+      ].join("\n"),
       exitCode: result.status,
       blocked: true,
       blockReason: "SANDBOX_VIOLATION",
     };
   }
 
-  // Check for permission failure
-  if (combined.includes("permission denied") || combined.includes("eacces")) {
+  if (
+    !isSuccess &&
+    (
+      failureText.includes("permission denied") ||
+      failureText.includes("eacces")
+    )
+  ) {
     return {
       success: false,
       stdout,
-      stderr: "PERMISSION_DENIED: File or process permission denied",
+      stderr: [
+        "PERMISSION_DENIED: File or process permission denied",
+        "Original stderr (redacted):",
+        stderr.slice(-4000),
+        "Original stdout tail (redacted):",
+        stdout.slice(-2000),
+      ].join("\n"),
       exitCode: result.status,
       blocked: true,
       blockReason: "PERMISSION_DENIED",
     };
   }
-
-  const isSuccess = (result.status ?? 1) === 0;
 
   return {
     success: isSuccess,
@@ -179,6 +208,42 @@ function isCodexAuthError(text: string): boolean {
     text.includes("authentication failed") ||
     text.includes("auth error")
   );
+}
+
+
+interface CodexRunOptions {
+  cwd?: string;
+  timeoutMs: number;
+}
+
+/**
+ * Execute the npm-installed Codex CLI without cmd.exe argument rewriting.
+ * This mirrors the Antigravity adapter and prevents large multiline prompts
+ * from being corrupted on Windows.
+ */
+function runCodex(args: string[], options: CodexRunOptions) {
+  const common = {
+    encoding: "utf-8" as const,
+    cwd: options.cwd,
+    timeout: options.timeoutMs,
+    env: { ...process.env },
+  };
+
+  if (process.platform === "win32") {
+    const npmBin = process.env.APPDATA
+      ? `${process.env.APPDATA}\\npm\\codex.ps1`
+      : "";
+
+    if (npmBin && existsSync(npmBin)) {
+      return spawnSync(
+        "powershell.exe",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", npmBin, ...args],
+        { ...common, shell: false }
+      );
+    }
+  }
+
+  return spawnSync("codex", args, { ...common, shell: process.platform === "win32" });
 }
 
 // ─────────────────────────────────────────────────
