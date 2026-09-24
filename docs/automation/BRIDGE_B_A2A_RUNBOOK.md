@@ -45,4 +45,6 @@ A successful invocation completes at most one task, pushes its task branch, fast
 
 After the live acceptance and a supervised first task succeed, `npm run bridge:backlog:run-all` processes eligible tasks serially until a human gate, blocked task, or empty queue. It never merges into `main`.
 
+For a single gated activation on WSL2, use `npm run bridge:activate`. It builds, typechecks, runs bridge tests, requires live authenticated acceptance, then processes eligible tasks in order. Any failed check stops the chain before backlog execution; R3/R4 stop it at the human gate.
+
 Keep scheduled execution disabled until typecheck, the required live acceptance, and one supervised eligible task pass on that machine.
