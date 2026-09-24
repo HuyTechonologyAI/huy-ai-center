@@ -104,6 +104,7 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
 export interface AgyAuditRequest {
   taskId: string;
   objective: string;
+  planSummary?: string;
   diffStat: string;
   reviewDiff?: string;
   verificationSummary: string;
@@ -130,6 +131,9 @@ You are auditing a completed automation task.
 Task ID: ${req.taskId}
 Objective: ${req.objective}
 
+Approved plan steps:
+${redact(req.planSummary ?? '')}
+
 Git diff stat:
 ${redact(req.diffStat)}
 
@@ -145,6 +149,9 @@ CORRECTION_REQUIRED
 HUMAN_DECISION_REQUIRED
 
 PASS = the implementation meets the objective and all verifications pass.
+Check requirement against plan, plan against patch, changed code against tests,
+caller against provider, schema against types and data, and docs against behavior.
+If any relevant comparison cannot be verified from the supplied evidence, return CORRECTION_REQUIRED.
 CORRECTION_REQUIRED = the implementation has issues that can be fixed automatically.
 HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a human must resolve.
 `.trim();

@@ -311,6 +311,7 @@ export async function runTask(
     const auditDecision = await auditResult({
       taskId: contract.taskId,
       objective: contract.objective,
+      planSummary: plan.steps.map(step => step.description).join('\n'),
       diffStat,
       reviewDiff,
       verificationSummary: verSummary,
