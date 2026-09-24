@@ -164,9 +164,11 @@ describe("B. REAL_E2E_BRIDGE_TEST", () => {
     assert.ok(codex.installed && agy.installed, 'Real acceptance requires installed Codex and Antigravity CLIs');
 
     // Both CLIs installed and authenticated: execute fixture contract and require real PASS
+    const liveTaskId = `bridge-e2e-live-${randomUUID()}`;
     const realContract: TaskContract = {
       ...dryRunContract,
-      taskId: `bridge-e2e-live-${randomUUID()}`,
+      taskId: liveTaskId,
+      objective: `Append acceptance run ID ${liveTaskId} to tests/fixtures/agent-bridge-dry-run/README.md and explain the bridge dry-run.`,
       repository: { ...dryRunContract.repository },
       verification: { commands: ['npm run typecheck'] },
     };
