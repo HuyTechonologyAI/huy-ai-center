@@ -110,6 +110,13 @@ of a backup filename alone does not prove recoverability.
 
 ## Acceptance and handoff
 
+Run `npm run bridge:readiness` on the feature checkout to inspect the live
+acceptance receipt, checkpoint pointer and five pinned migration checksums.
+`PARTIAL` means the gates are still blocked; `READY_FOR_REVIEW` means a
+DELIVERY checkpoint exists, but the production snapshot and restore evidence
+still require independent review. This command reads local files only and
+never authorizes or executes a production database action.
+
 G1 can become VERIFIED only with the fresh snapshot provenance, checksum
 comparison, measured backup restore, explicit pre/post assertion results,
 independent audit, passing `npm run typecheck` and `npm run test:core`, and
