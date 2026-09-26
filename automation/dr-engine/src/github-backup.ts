@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { assertSafeRefPush } from './path-guard.js';
 
 export function validateDRRepoVisibility(repo: { name: string; isPrivate: boolean }): void {
@@ -60,4 +62,23 @@ export function pushSafeBackupRef(options: {
   }
 
   return { success: true, ref: backupRefName };
+}
+
+
+export function verifyDownloadedRemoteArtifact(localPath: string, downloadedRemotePath: string): void {
+  if (!existsSync(localPath)) {
+    throw new Error(`LOCAL_ARTIFACT_MISSING: ${localPath}`);
+  }
+  if (!existsSync(downloadedRemotePath)) {
+    throw new Error(`REMOTE_DOWNLOAD_MISSING: ${downloadedRemotePath}`);
+  }
+
+  const localHash = createHash('sha256').update(readFileSync(localPath)).digest('hex');
+  const remoteHash = createHash('sha256').update(readFileSync(downloadedRemotePath)).digest('hex');
+
+  if (localHash !== remoteHash) {
+    throw new Error(
+      `SECURITY_VIOLATION: REMOTE_HASH_MISMATCH local=${localHash} downloaded=${remoteHash}`
+    );
+  }
 }
