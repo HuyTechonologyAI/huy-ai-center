@@ -368,3 +368,24 @@ When present:
 - do not access owner secrets, `/mnt/data2`, or non-workspace system state;
 - network commands are limited to GitHub/DR repository operations and required package/test tooling;
 - production Node01 migration remains forbidden.
+
+## 14. Exact network-command contract for V1.2 resume
+
+The Human Owner has approved only the following unsandboxed network command prefixes for this phase:
+- `git fetch`
+- `git clone`
+- `git ls-remote`
+- `git push` (feature/DR refs only; never force-push or main merge)
+- `gh auth status`
+- `gh repo view`
+- exact creation command `gh repo create HuyTechonologyAI/HUY-AI-DISASTER-RECOVERY-V2 --private`
+
+The V2 repository already exists and has been verified private. Do not rediscover repositories or inspect commit history with broader GitHub CLI/API commands.
+
+Explicitly forbidden/unapproved for this phase:
+- `gh api ...`
+- `gh repo list ...`
+- any `command(*)` or `unsandboxed(*)` wildcard
+- alternate wrappers or scripts intended to reach the same denied target
+
+For remote existence/ref verification, use `git ls-remote` or `gh repo view` only. If another network command appears useful, do not request or attempt it; choose an allowed equivalent or stop fail-closed.
