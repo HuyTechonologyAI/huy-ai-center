@@ -74,8 +74,12 @@ function restoreUntrackedEntry(
 
 function verifyRestoredUntracked(restoreDir: string, entry: UntrackedEntry): void {
   const p = join(restoreDir, safeRel(entry.path));
-  if (!existsSync(p)) throw new Error(`RESTORED_UNTRACKED_MISSING: ${entry.path}`);
-  const st = lstatSync(p);
+  let st;
+  try {
+    st = lstatSync(p);
+  } catch {
+    throw new Error(`RESTORED_UNTRACKED_MISSING: ${entry.path}`);
+  }
 
   if (entry.type === 'symlink') {
     if (!st.isSymbolicLink()) throw new Error(`RESTORED_UNTRACKED_TYPE_MISMATCH: ${entry.path}`);
@@ -165,6 +169,8 @@ export function performRestoreTest(options: {
 
     for (const entry of entries) {
       restoreUntrackedEntry(restoreDir, dirtyStatePayloadDir!, entry);
+    }
+    for (const entry of entries) {
       verifyRestoredUntracked(restoreDir, entry);
     }
 
