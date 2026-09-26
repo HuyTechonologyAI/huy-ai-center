@@ -9,7 +9,9 @@ import {
   markProviderSuccess,
   selectProvider,
   providerCommandSpec,
-  detectProviderSemanticFailure
+  detectProviderSemanticFailure,
+  parseCodexAuthStatus,
+  parseClaudeAuthStatus
 } from '../../automation/agent-bridge/src/provider-mesh.js';
 
 import {
@@ -138,4 +140,13 @@ test('provider semantic failure detector converts zero-exit sandbox failures int
     detectProviderSemanticFailure('codex', '1. inspect file\n2. edit fixture\n3. verify', ''),
     null
   );
+});
+
+
+test('explicit CLI auth parsing fails closed for free or logged-out providers', () => {
+  assert.equal(parseCodexAuthStatus(0, 'Logged in using ChatGPT'), true);
+  assert.equal(parseCodexAuthStatus(1, 'Not logged in'), false);
+  assert.equal(parseClaudeAuthStatus(0, '{"loggedIn":true,"authMethod":"claude.ai"}'), true);
+  assert.equal(parseClaudeAuthStatus(1, '{"loggedIn":false,"authMethod":"none"}'), false);
+  assert.equal(parseClaudeAuthStatus(0, 'not-json'), false);
 });
