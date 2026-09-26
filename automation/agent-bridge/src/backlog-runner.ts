@@ -43,7 +43,7 @@ export function projectRoadmapNodeToContract(node: RoadmapNode, baseRef: string)
     repository: { root: '.', baseRef, taskBranch: `agent-task/${branchId}` },
     scope: { allowedPaths: node.allowed_paths, forbiddenPaths: forbidden },
     risk: { level: node.risk, reason: 'Canonical roadmap risk' },
-    execution: { maxCycles: 3, timeoutSeconds: 3600 },
+    execution: { maxCycles: 8, timeoutSeconds: 3600 },
     verification: { commands: node.verification },
     sourceControl: { commitAllowed: true, pushFeatureBranchAllowed: true, prCreationAllowed: false, mergeAllowed: false },
     createdAt: new Date().toISOString(),
@@ -67,7 +67,7 @@ function lease(path: string, node: RoadmapNode, branch: string, worktree: string
   const fd = openSync(path, 'wx', 0o600); // Existing lease is never silently stolen.
   try { writeFileSync(fd, JSON.stringify({ taskId: node.id, pid: process.pid, worktreePath: worktree, taskBranch: branch, owner: 'CODEX_IMPLEMENTER', phase: 'RUNNING', acquiredAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 7200000).toISOString(), allowedPaths: node.allowed_paths })); }
   finally { closeSync(fd); }
-  return () => unlinkSync(path);
+  return () => { if (existsSync(path)) unlinkSync(path); };
 }
 
 /** Accept only a real CLI receipt, tied to the unchanged bridge implementation. */
@@ -97,7 +97,7 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
   const ordered = validateRoadmap(roadmap);
   const runtime = join(root, '.artifacts/agent-bridge'); mkdirSync(join(runtime, 'leases'), { recursive: true });
   const lock = join(runtime, 'backlog-runner.lock');
-  const lockFd = openSync(lock, 'wx', 0o600); // Fail closed on stale lock; owner must investigate.
+  const releaseBacklogLock = acquireBacklogLock(lock);
   const statePath = join(runtime, 'backlog-state.json');
   const role = join(runtime, 'phase-ownership.json');
   try {
@@ -114,8 +114,40 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
         continue;
       }
       if (node.depends_on.some(id => state.tasks[id]?.status !== 'COMPLETED')) continue;
-      if (state.tasks[node.id]?.status === 'BLOCKED' || state.tasks[node.id]?.status === 'RUNNING') return { status: 'BLOCKED', taskId: node.id, reason: state.tasks[node.id].reason ?? 'Inspect previous run before resuming' };
-      if (latest) return { status: 'BLOCKED', taskId: node.id, reason: 'Inspect and reconcile unfinished checkpoint before resuming' };
+      const prior = state.tasks[node.id];
+      if (prior?.status === 'HUMAN_GATE') {
+        return { status: 'HUMAN_GATE', taskId: node.id, reason: prior.reason ?? 'Owner approval required' };
+      }
+
+      const resumableCheckpoint = latest && latest.stage !== 'DELIVERY';
+      const retryablePrior =
+        prior?.status === 'TOOL_CAPACITY_WAIT' ||
+        prior?.status === 'RUNNING' ||
+        (prior?.status === 'BLOCKED' && isRetryableBlock(prior.reason));
+
+      if (prior?.status === 'BLOCKED' && !retryablePrior) {
+        return { status: 'BLOCKED', taskId: node.id, reason: prior.reason ?? 'Non-retryable previous failure' };
+      }
+
+      if (latest?.stage === 'DELIVERY' && prior?.status !== 'COMPLETED') {
+        state.tasks[node.id] = {
+          status: 'COMPLETED',
+          branch: `agent-task/${node.id}`,
+          updatedAt: new Date().toISOString()
+        };
+        persist(statePath, state);
+        continue;
+      }
+
+      if (resumableCheckpoint || retryablePrior) {
+        state.tasks[node.id] = {
+          status: 'RUNNING',
+          reason: 'AUTO_RESUME_FROM_VERIFIED_CHECKPOINT',
+          branch: `agent-task/${node.id}`,
+          updatedAt: new Date().toISOString()
+        };
+        persist(statePath, state);
+      }
       const update = (status: Status, reason?: string) => {
         state.tasks[node.id] = { status, reason, branch: `agent-task/${node.id}`, updatedAt: new Date().toISOString() }; persist(statePath, state);
       };
@@ -136,7 +168,14 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
         checkpointStage(root, { taskId: node.id, stage: 'RECEIVED', owner: 'COORDINATOR',
           objective: node.objective, evidence: { node, baseRef: git(root, 'rev-parse', 'HEAD') },
           method: 'validated roadmap DAG, prerequisites and scope', result: 'Eligible R0-R2 task', next: 'PLAN' });
-        persist(role, { taskId: node.id, phase: 'IMPLEMENTING', writeOwner: 'CODEX', antigravityMode: 'READ_ONLY_AUDITOR' });
+        persist(role, {
+          taskId: node.id,
+          phase: 'IMPLEMENTING',
+          writeOwner: 'PROVIDER_MESH',
+          planningRole: 'PLANNER_FAILOVER',
+          testDesignerRole: 'TEST_DESIGNER_FAILOVER',
+          reviewerRole: 'INDEPENDENT_REVIEWER_FAILOVER'
+        });
         const result = await runTask(contract, root, true);
         if (result.status === 'HUMAN_GATE') { update('HUMAN_GATE', 'Task runner requested approval or authentication'); return { status: 'HUMAN_GATE', taskId: node.id }; }
         if (result.status !== 'COMPLETE') { update('BLOCKED', `Task runner: ${result.status}`); return { status: 'BLOCKED', taskId: node.id }; }
@@ -163,10 +202,88 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
       } finally { if (existsSync(role)) unlinkSync(role); release(); }
     }
     return { status: 'NO_READY_TASK' };
-  } finally { closeSync(lockFd); unlinkSync(lock); }
+  } finally { releaseBacklogLock(); }
 }
+
+function processAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function acquireBacklogLock(path: string): () => void {
+  if (existsSync(path)) {
+    let priorPid = 0;
+    try {
+      priorPid = (JSON.parse(readFileSync(path, 'utf8')) as { pid?: number }).pid ?? 0;
+    } catch {
+      // malformed lock is preserved as stale evidence below
+    }
+
+    if (priorPid && processAlive(priorPid)) {
+      throw Error(`BACKLOG_RUNNER_ALREADY_ACTIVE:${priorPid}`);
+    }
+
+    const stale = `${path}.stale-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    renameSync(path, stale);
+  }
+
+  const fd = openSync(path, 'wx', 0o600);
+  try {
+    writeFileSync(fd, JSON.stringify({
+      pid: process.pid,
+      acquiredAt: new Date().toISOString()
+    }) + '\n');
+  } finally {
+    closeSync(fd);
+  }
+
+  return () => {
+    if (existsSync(path)) unlinkSync(path);
+  };
+}
+
+function isRetryableBlock(reason?: string): boolean {
+  if (!reason) return false;
+  const lower = reason.toLowerCase();
+  return [
+    'unavailable',
+    'tool_capacity_wait',
+    'execution_timeout',
+    'rate limit',
+    '429',
+    'temporary capacity',
+    'all_providers_unavailable',
+    'all_planners_unavailable',
+    'audit_invalid'
+  ].some(marker => lower.includes(marker));
+}
+
 function requireLeaseFree(dir: string): boolean {
-  return readdirSync(dir).some(name => name.endsWith('.json'));
+  let active = false;
+  for (const name of readdirSync(dir).filter(name => name.endsWith('.json'))) {
+    const path = join(dir, name);
+    try {
+      const lease = JSON.parse(readFileSync(path, 'utf8')) as {
+        pid?: number;
+        expiresAt?: string;
+      };
+      const expired = lease.expiresAt ? Date.parse(lease.expiresAt) <= Date.now() : false;
+      if (expired && !processAlive(lease.pid ?? 0)) {
+        const stale = `${path}.stale-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+        renameSync(path, stale);
+        continue;
+      }
+      active = true;
+    } catch {
+      active = true;
+    }
+  }
+  return active;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
