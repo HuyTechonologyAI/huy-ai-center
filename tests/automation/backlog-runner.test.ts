@@ -17,11 +17,11 @@ const graph = (tasks: RoadmapNode[]): Roadmap => ({ mode: 'SERIAL_FAIL_CLOSED', 
 
 test('canonical roadmap is serial and orders dependencies', () => {
   const nodes = validateRoadmap(source);
-  assert.equal(nodes[0].id, '06k-c-readiness');
+  assert.equal(nodes[0].id, 'ai-hr-bootstrap');
   for (const item of nodes) for (const dep of item.depends_on) assert.ok(nodes.indexOf(nodes.find(n => n.id === dep)!) < nodes.indexOf(item));
   const contract = projectRoadmapNodeToContract(nodes[0], 'feature/ai-dev-bridge-b-autonomous-backlog');
   assert.equal(contract.taskId, nodes[0].id);
-  assert.equal(contract.repository.taskBranch, 'agent-task/06k-c-readiness');
+  assert.equal(contract.repository.taskBranch, 'agent-task/ai-hr-bootstrap');
   assert.ok(contract.scope.allowedPaths.includes('PROJECT_STATE.md'));
   assert.equal(contract.sourceControl.mergeAllowed, false);
 });
@@ -84,4 +84,75 @@ test('live acceptance requires a passing CLI receipt bound to an unchanged bridg
     git('add', '.'); git('commit', '-m', 'bridge changed');
     assert.throws(() => assertLiveAcceptance(dir), /LIVE_E2E_ACCEPTANCE_REQUIRED/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+
+test('worktree safe-directory registration is exact and never wildcard', async () => {
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { spawnSync } = await import('node:child_process');
+  const { ensureGitSafeDirectory } = await import('../../automation/agent-bridge/src/worktree-manager.js');
+
+  const root = mkdtempSync(join(tmpdir(), 'huy-safe-dir-'));
+  const config = join(root, 'gitconfig');
+  writeFileSync(config, '');
+
+  const prior = process.env.GIT_CONFIG_GLOBAL;
+  process.env.GIT_CONFIG_GLOBAL = config;
+  try {
+    const target = join(root, 'repo', '.agent-worktrees', 'task-1');
+    ensureGitSafeDirectory(target);
+
+    const result = spawnSync('git', ['config', '--global', '--get-all', 'safe.directory'], {
+      encoding: 'utf8',
+      env: { ...process.env, GIT_CONFIG_GLOBAL: config }
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const values = (result.stdout || '').split('\n').filter(Boolean);
+    assert.deepEqual(values, [target]);
+    assert.equal(values.some(v => v.includes('*')), false);
+  } finally {
+    if (prior === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+    else process.env.GIT_CONFIG_GLOBAL = prior;
+  }
+});
+
+
+test('canonical roadmap prioritizes AI HR bootstrap after provider connectivity', async () => {
+  const { readFileSync } = await import('node:fs');
+  const roadmap = JSON.parse(
+    readFileSync('config/autonomy/system-roadmap.json', 'utf8')
+  ) as {
+    invariants?: Record<string, unknown>;
+    tasks: Array<{ id: string; risk: string; human_gate: boolean; allowed_paths: string[] }>;
+  };
+
+  assert.equal(roadmap.tasks[0]?.id, 'ai-hr-bootstrap');
+  assert.equal(roadmap.tasks[0]?.risk, 'R2');
+  assert.equal(roadmap.tasks[0]?.human_gate, false);
+  assert.ok(roadmap.tasks[0]?.allowed_paths.includes('config/organization/'));
+  assert.equal(roadmap.invariants?.antigravity_role, 'PRIMARY_IMPLEMENTER_AND_PLANNER');
+});
+
+
+test('AI HR charter is fail-closed and cannot self-grant production authority', async () => {
+  const { readFileSync } = await import('node:fs');
+  const agent = JSON.parse(
+    readFileSync('config/organization/ai-hr-agent.json', 'utf8')
+  ) as {
+    id: string;
+    role: string;
+    authority: { max_auto_risk: string; production_mutation: string; self_grant_permissions: boolean };
+    responsibilities: string[];
+  };
+
+  assert.equal(agent.id, 'ai-hr-001');
+  assert.equal(agent.role, 'AI_HR_DIRECTOR');
+  assert.equal(agent.authority.max_auto_risk, 'R2');
+  assert.equal(agent.authority.production_mutation, 'DENY');
+  assert.equal(agent.authority.self_grant_permissions, false);
+  assert.ok(agent.responsibilities.includes('WORKFORCE_PLANNING'));
+  assert.ok(agent.responsibilities.includes('AGENT_RECRUITMENT'));
+  assert.ok(agent.responsibilities.includes('CAPABILITY_VERIFICATION'));
 });

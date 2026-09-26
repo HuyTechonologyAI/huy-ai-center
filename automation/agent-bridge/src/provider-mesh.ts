@@ -55,7 +55,7 @@ export interface ProviderCommandSpec {
 export const DEFAULT_ROLE_PRIORITY: Record<AgentRole, ProviderId[]> = {
   PLANNER: ['antigravity', 'gemini', 'claude', 'chatgpt', 'codex'],
   TEST_DESIGNER: ['gemini', 'claude', 'codex', 'chatgpt', 'antigravity'],
-  IMPLEMENTER: ['codex', 'claude', 'gemini'],
+  IMPLEMENTER: ['antigravity', 'codex', 'gemini', 'claude'],
   REVIEWER: ['gemini', 'claude', 'chatgpt', 'antigravity', 'codex']
 };
 
@@ -184,9 +184,10 @@ export function providerCommandSpec(
           '-p',
           request.prompt,
           '--mode',
-          'plan',
+          request.mode === 'READ_ONLY' ? 'plan' : 'accept-edits',
           '--output-format',
-          'stream-json'
+          'stream-json',
+          ...(request.mode === 'WORKSPACE_WRITE' ? ['--sandbox'] : [])
         ]
       };
 
@@ -218,6 +219,47 @@ function checkAuthText(text: string): boolean {
   return AUTH_PATTERNS.some(pattern => lower.includes(pattern));
 }
 
+
+export function detectProviderSemanticFailure(
+  provider: ProviderId,
+  output: string,
+  error: string
+): { reason: string; retryable: boolean } | null {
+  const combined = `${output}\n${error}`.toLowerCase();
+
+  const sandboxMarkers = [
+    'failed rtm_newaddr',
+    'sandbox configuration error',
+    'shell execution failed',
+    'could not find bubblewrap',
+    'bwrap:'
+  ];
+
+  if (sandboxMarkers.some(marker => combined.includes(marker))) {
+    return {
+      reason: `SANDBOX_EXECUTION_FAILED:${provider}`,
+      retryable: true
+    };
+  }
+
+  const capacityMarkers = [
+    'rate limit',
+    'too many requests',
+    '429',
+    'temporarily unavailable',
+    'capacity'
+  ];
+
+  if (capacityMarkers.some(marker => combined.includes(marker))) {
+    return {
+      reason: `PROVIDER_CAPACITY_WAIT:${provider}`,
+      retryable: true
+    };
+  }
+
+  return null;
+}
+
 function runVersion(command: string): { installed: boolean; version?: string } {
   const r = spawnSync(command, ['--version'], {
     encoding: 'utf8',
@@ -229,6 +271,58 @@ function runVersion(command: string): { installed: boolean; version?: string } {
     installed: true,
     version: (r.stdout || r.stderr || '').trim().split('\n')[0]
   };
+}
+
+
+export function parseCodexAuthStatus(status: number | null, output: string): boolean {
+  return status === 0 && /logged in/i.test(output) && !/not logged in/i.test(output);
+}
+
+export function parseClaudeAuthStatus(status: number | null, output: string): boolean {
+  if (status !== 0) return false;
+  try {
+    const parsed = JSON.parse(output) as { loggedIn?: boolean };
+    return parsed.loggedIn === true;
+  } catch {
+    return false;
+  }
+}
+
+function probeInstalledAuth(id: ProviderId): boolean {
+  if (id === 'codex') {
+    const r = spawnSync('codex', ['login', 'status'], {
+      encoding: 'utf8',
+      timeout: 5_000,
+      shell: false
+    });
+    return parseCodexAuthStatus(r.status, `${r.stdout ?? ''}\n${r.stderr ?? ''}`);
+  }
+
+  if (id === 'claude') {
+    const r = spawnSync('claude', ['auth', 'status'], {
+      encoding: 'utf8',
+      timeout: 5_000,
+      shell: false
+    });
+    return parseClaudeAuthStatus(r.status, r.stdout ?? '');
+  }
+
+  if (id === 'gemini') {
+    const hasEnv = Boolean(
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_GENAI_USE_VERTEXAI ||
+      process.env.GOOGLE_GENAI_USE_GCA
+    );
+    return hasEnv;
+  }
+
+  // Antigravity currently has no cheap non-network auth-status command.
+  // Only a previously successful real invocation is accepted as proof.
+  if (id === 'antigravity') {
+    return false;
+  }
+
+  return false;
 }
 
 export function probeProviders(
@@ -245,15 +339,14 @@ export function probeProviders(
     h.version = version.version;
     h.lastProbeAt = now;
 
-    // Version checks cannot prove auth. Existing successful execution can.
     if (!version.installed) {
       h.authenticated = false;
     } else if (h.lastSuccessAt) {
       h.authenticated = true;
     } else {
-      // Installed providers are considered routable; invocation converts auth
-      // errors into HUMAN_AUTH_REQUIRED without silently claiming success.
-      h.authenticated = true;
+      // Fail closed: installed != authenticated.
+      // Free/logged-out providers remain unavailable until explicit auth proof.
+      h.authenticated = probeInstalledAuth(id);
     }
   }
 
@@ -412,14 +505,15 @@ export async function runProviderPrompt(req: ProviderRunRequest): Promise<Provid
   const error = redact(r.stderr ?? '');
   const combined = `${error}\n${output}`;
   const authRequired = r.status !== 0 && checkAuthText(combined);
+  const semanticFailure = detectProviderSemanticFailure(req.provider, output, error);
 
   return {
     provider: req.provider,
-    success: r.status === 0,
+    success: r.status === 0 && !semanticFailure,
     output,
-    error,
+    error: semanticFailure ? `${semanticFailure.reason}\n${error}`.trim() : error,
     exitCode: r.status,
     authRequired,
-    retryable: !authRequired
+    retryable: semanticFailure ? semanticFailure.retryable : !authRequired
   };
 }

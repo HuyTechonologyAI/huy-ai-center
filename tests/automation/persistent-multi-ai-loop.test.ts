@@ -8,7 +8,11 @@ import {
   markProviderFailure,
   markProviderSuccess,
   selectProvider,
-  providerCommandSpec
+  providerCommandSpec,
+  detectProviderSemanticFailure,
+  parseCodexAuthStatus,
+  parseClaudeAuthStatus,
+  antigravityTokenEvidence
 } from '../../automation/agent-bridge/src/provider-mesh.js';
 
 import {
@@ -32,19 +36,19 @@ test('role routing prefers specialized agents and fails over without human invol
     health[id].authenticated = true;
   }
 
-  assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'codex');
+  assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'antigravity');
   assert.equal(selectProvider('PLANNER', health, { now })?.id, 'antigravity');
 
-  markProviderFailure(health.codex, 'temporary capacity', now, {
+  markProviderFailure(health.antigravity, 'temporary capacity', now, {
     failureThreshold: 1,
     cooldownMs: 60_000
   });
 
-  assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'claude');
-  assert.equal(selectProvider('REVIEWER', health, { now, exclude: ['claude'] })?.id, 'gemini');
+  assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'codex');
+  assert.equal(selectProvider('REVIEWER', health, { now, exclude: ['codex'] })?.id, 'gemini');
 
-  markProviderSuccess(health.codex, now + 61_000);
-  assert.equal(selectProvider('IMPLEMENTER', health, { now: now + 61_000 })?.id, 'codex');
+  markProviderSuccess(health.antigravity, now + 61_000);
+  assert.equal(selectProvider('IMPLEMENTER', health, { now: now + 61_000 })?.id, 'antigravity');
 });
 
 test('circuit breaker opens after repeated provider failures and recovers after cooldown', () => {
@@ -116,9 +120,68 @@ test('role priority contains independent planner, implementer, test designer and
   assert.deepEqual(DEFAULT_ROLE_PRIORITY.PLANNER.slice(0, 4), [
     'antigravity', 'gemini', 'claude', 'chatgpt'
   ]);
-  assert.deepEqual(DEFAULT_ROLE_PRIORITY.IMPLEMENTER.slice(0, 3), [
-    'codex', 'claude', 'gemini'
+  assert.deepEqual(DEFAULT_ROLE_PRIORITY.IMPLEMENTER.slice(0, 4), [
+    'antigravity', 'codex', 'gemini', 'claude'
   ]);
   assert.ok(DEFAULT_ROLE_PRIORITY.TEST_DESIGNER.includes('gemini'));
   assert.ok(DEFAULT_ROLE_PRIORITY.REVIEWER.includes('chatgpt'));
+});
+
+
+test('provider semantic failure detector converts zero-exit sandbox failures into retryable failover', () => {
+  const failure = detectProviderSemanticFailure(
+    'codex',
+    'TEST_PLAN_ONLY\nShell execution failed with bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted',
+    ''
+  );
+  assert.equal(failure?.retryable, true);
+  assert.match(failure?.reason ?? '', /SANDBOX_EXECUTION_FAILED/);
+
+  assert.equal(
+    detectProviderSemanticFailure('codex', '1. inspect file\n2. edit fixture\n3. verify', ''),
+    null
+  );
+});
+
+
+test('explicit CLI auth parsing fails closed for free or logged-out providers', () => {
+  assert.equal(parseCodexAuthStatus(0, 'Logged in using ChatGPT'), true);
+  assert.equal(parseCodexAuthStatus(1, 'Not logged in'), false);
+  assert.equal(parseClaudeAuthStatus(0, '{"loggedIn":true,"authMethod":"claude.ai"}'), true);
+  assert.equal(parseClaudeAuthStatus(1, '{"loggedIn":false,"authMethod":"none"}'), false);
+  assert.equal(parseClaudeAuthStatus(0, 'not-json'), false);
+});
+
+
+test('Antigravity uses plan mode for read-only and accept-edits for implementation', () => {
+  const readOnly = providerCommandSpec('antigravity', {
+    prompt: 'plan',
+    cwd: '/tmp/worktree',
+    mode: 'READ_ONLY'
+  });
+  const writable = providerCommandSpec('antigravity', {
+    prompt: 'implement',
+    cwd: '/tmp/worktree',
+    mode: 'WORKSPACE_WRITE'
+  });
+
+  assert.deepEqual(readOnly.args.slice(0, 4), ['-p', 'plan', '--mode', 'plan']);
+  assert.ok(writable.args.includes('accept-edits'));
+  assert.ok(writable.args.includes('--sandbox'));
+  assert.equal(writable.args.includes('--dangerously-skip-permissions'), false);
+});
+
+
+test('Antigravity auth evidence requires the exact OAuth token file and never reads its contents', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+
+  const home = mkdtempSync(join(tmpdir(), 'agy-auth-'));
+  assert.equal(antigravityTokenEvidence(home), false);
+
+  const dir = join(home, '.gemini', 'antigravity-cli');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'antigravity-oauth-token'), 'opaque-secret-never-read');
+  assert.equal(antigravityTokenEvidence(home), true);
 });
