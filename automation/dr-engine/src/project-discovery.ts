@@ -241,3 +241,49 @@ export function discoverProjects(options: {
 
   return projects;
 }
+
+
+function normalizeRepoName(value: string | null | undefined): string | null {
+  if (!value) return null;
+  let v = value.trim();
+  v = v.replace(/^git@github\.com:/i, '');
+  v = v.replace(/^https?:\/\/github\.com\//i, '');
+  v = v.replace(/\.git$/i, '');
+  return v || null;
+}
+
+export function reconcileRequiredRepositories(
+  discoveredProjects: DiscoveredProject[],
+  knownRepos: string[]
+): {
+  required: Array<{ repo: string; mode: 'LOCAL' | 'REMOTE_ONLY'; localProjectId?: string }>;
+  localOnly: DiscoveredProject[];
+  allCovered: boolean;
+} {
+  const byRepo = new Map<string, DiscoveredProject>();
+
+  for (const project of discoveredProjects) {
+    const normalized = normalizeRepoName(project.github_repo || project.git_remote);
+    if (normalized) byRepo.set(normalized.toLowerCase(), project);
+  }
+
+  const required = knownRepos.map(repo => {
+    const local = byRepo.get(normalizeRepoName(repo)!.toLowerCase());
+    return local
+      ? { repo, mode: 'LOCAL' as const, localProjectId: local.project_id }
+      : { repo, mode: 'REMOTE_ONLY' as const };
+  });
+
+  const knownSet = new Set(knownRepos.map(r => normalizeRepoName(r)!.toLowerCase()));
+  const localOnly = discoveredProjects.filter(project => {
+    if (!project.migration_required) return false;
+    const normalized = normalizeRepoName(project.github_repo || project.git_remote);
+    return !normalized || !knownSet.has(normalized.toLowerCase());
+  });
+
+  return {
+    required,
+    localOnly,
+    allCovered: required.length === knownRepos.length
+  };
+}
