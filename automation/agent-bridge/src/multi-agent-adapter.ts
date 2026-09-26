@@ -76,7 +76,7 @@ function parseNumberedPlan(taskId: string, provider: ProviderId, output: string)
   };
 }
 
-function planningPrompt(req: {
+export function buildPlanningPrompt(req: {
   taskId: string;
   title: string;
   objective: string;
@@ -97,9 +97,15 @@ function planningPrompt(req: {
     '- No secrets.',
     '- Tests must be designed before production-code edits.',
     '- Remain strictly inside allowed paths.',
+    '- Do not make tool calls; tool calls are strictly forbidden.',
+    '- Do not execute shell commands or terminal commands; shell execution is strictly forbidden.',
+    '- Do not inspect files or the repository; file and repository inspection are strictly forbidden.',
+    '- Generate a parseable numbered plan from prompt context only.',
     '- Return numbered steps only.'
   ].join('\n');
 }
+
+export const planningPrompt = buildPlanningPrompt;
 
 export async function generatePlanMulti(req: {
   taskId: string;

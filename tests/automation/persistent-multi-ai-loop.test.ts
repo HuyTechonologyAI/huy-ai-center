@@ -20,6 +20,11 @@ import {
   type BacklogCycleResult
 } from '../../automation/agent-bridge/src/persistent-supervisor.js';
 
+import {
+  buildPlanningPrompt,
+  planningPrompt
+} from '../../automation/agent-bridge/src/multi-agent-adapter.js';
+
 test('provider mesh registers all five autonomous AI providers', () => {
   assert.deepEqual(
     [...ALL_PROVIDER_IDS].sort(),
@@ -137,8 +142,45 @@ test('provider semantic failure detector converts zero-exit sandbox failures int
   assert.equal(failure?.retryable, true);
   assert.match(failure?.reason ?? '', /SANDBOX_EXECUTION_FAILED/);
 
+  const antigravityJetskiFailure = detectProviderSemanticFailure(
+    'antigravity',
+    'no output produced — a tool required the command permission',
+    ''
+  );
+  assert.equal(antigravityJetskiFailure?.retryable, true);
+  assert.match(antigravityJetskiFailure?.reason ?? '', /HEADLESS_PERMISSION_DENIED/);
+
+  const antigravityStderrJetskiFailure = detectProviderSemanticFailure(
+    'antigravity',
+    '',
+    'no output produced — a tool required the command permission'
+  );
+  assert.equal(antigravityStderrJetskiFailure?.retryable, true);
+  assert.match(antigravityStderrJetskiFailure?.reason ?? '', /HEADLESS_PERMISSION_DENIED/);
+
+  const antigravityPayloadFailure = detectProviderSemanticFailure(
+    'antigravity',
+    JSON.stringify({
+      denied_actions: [
+        { action: 'command', detail: 'action=command: user denied permission to run command' }
+      ]
+    }),
+    ''
+  );
+  assert.equal(antigravityPayloadFailure?.retryable, true);
+  assert.match(antigravityPayloadFailure?.reason ?? '', /HEADLESS_PERMISSION_DENIED/);
+
   assert.equal(
     detectProviderSemanticFailure('codex', '1. inspect file\n2. edit fixture\n3. verify', ''),
+    null
+  );
+
+  assert.equal(
+    detectProviderSemanticFailure(
+      'codex',
+      'TEST_PLAN_ONLY',
+      'Codex could not find bubblewrap on PATH\nCodex will use the bundled bubblewrap in the meantime'
+    ),
     null
   );
 });
@@ -175,4 +217,23 @@ test('Antigravity uses plan mode for read-only and accept-edits for implementati
   assert.deepEqual(writable.args.slice(-1), ['--sandbox']);
   assert.equal(writable.args.includes('--output-format') && writable.args.includes('stream-json'), true);
   assert.equal(writable.args.includes('--dangerously-skip-permissions'), false);
+});
+
+test('planning prompt explicitly forbids tool calls, shell commands, and repository inspection', () => {
+  assert.equal(typeof buildPlanningPrompt, 'function');
+  assert.equal(typeof planningPrompt, 'function');
+
+  const prompt = buildPlanningPrompt({
+    taskId: 'task-plan-headless',
+    title: 'Headless planning verification',
+    objective: 'Generate plan from prompt context only without tool execution',
+    allowedPaths: ['automation/agent-bridge/src'],
+    forbiddenPaths: ['/mnt/data2']
+  });
+
+  assert.match(prompt, /(?:no|forbid|do not).*tool call/i);
+  assert.match(prompt, /(?:no|forbid|do not).*(?:shell|terminal)/i);
+  assert.match(prompt, /(?:no|forbid|do not).*(?:repository|file) inspection/i);
+  assert.match(prompt, /prompt context only/i);
+  assert.match(prompt, /numbered steps only|parseable numbered plan/i);
 });

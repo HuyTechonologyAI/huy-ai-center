@@ -227,15 +227,39 @@ export function detectProviderSemanticFailure(
 ): { reason: string; retryable: boolean } | null {
   const combined = `${output}\n${error}`.toLowerCase();
 
-  const sandboxMarkers = [
+  if (provider === 'antigravity') {
+    const hasJetskiPermissionDenial =
+      combined.includes('no output produced') && combined.includes('command permission');
+    const hasCommandActionDenial =
+      (combined.includes('denied_actions') || combined.includes('action=command')) &&
+      combined.includes('user denied permission to run command');
+
+    if (hasJetskiPermissionDenial || hasCommandActionDenial) {
+      return {
+        reason: 'HEADLESS_PERMISSION_DENIED:antigravity',
+        retryable: true
+      };
+    }
+  }
+
+  const actualSandboxMarkers = [
     'failed rtm_newaddr',
     'sandbox configuration error',
     'shell execution failed',
-    'could not find bubblewrap',
-    'bwrap:'
+    'bwrap:',
+    'bwrap error'
   ];
 
-  if (sandboxMarkers.some(marker => combined.includes(marker))) {
+  const hasActualSandboxFailure = actualSandboxMarkers.some(marker => combined.includes(marker));
+
+  const hasBundledBubblewrapFallback =
+    combined.includes('bundled bubblewrap') &&
+    (combined.includes('will use') || combined.includes('in the meantime') || combined.includes('using'));
+
+  const hasMissingBubblewrapWithoutFallback =
+    combined.includes('could not find bubblewrap') && !hasBundledBubblewrapFallback;
+
+  if (hasActualSandboxFailure || hasMissingBubblewrapWithoutFallback) {
     return {
       reason: `SANDBOX_EXECUTION_FAILED:${provider}`,
       retryable: true
