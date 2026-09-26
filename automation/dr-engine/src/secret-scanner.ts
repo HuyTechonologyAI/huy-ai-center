@@ -10,6 +10,7 @@ const SECRET_PATTERNS: Array<{ type: string; regex: RegExp }> = [
   { type: 'JWT_BEARER', regex: /Bearer\s+ey[a-zA-Z0-9_-]+\.ey[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g },
   { type: 'DB_CONNECTION_URI', regex: /(?:postgres|postgresql|mysql|mongodb\+srv):\/\/[^:\s]+:[^@\s]+@[^\s/]+/gi },
   { type: 'PRIVATE_KEY_BLOCK', regex: /-----BEGIN\s+(?:RSA|OPENSSH|EC|DSA|ENCRYPTED)?\s*PRIVATE\s+KEY-----/g },
+  { type: 'AGE_SECRET_KEY', regex: /AGE-SECRET-KEY-[A-Z0-9-]+/g },
   { type: 'SUPABASE_SERVICE_ROLE', regex: /ey[a-zA-Z0-9_-]{20,}\.ey[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}/g }
 ];
 
@@ -43,6 +44,9 @@ export function scanAndClassifyFile(filePath: string, content?: string): FileCla
   // 1. PROHIBITED (Owner Gate Private Key, Raw SSH Private Keys, Decrypted recovery keys)
   if (
     norm.includes('owner_gate_ed25519') ||
+    norm.includes('dr-recovery') ||
+    norm.includes('age-identity') ||
+    norm.endsWith('.agekey') ||
     norm.includes('.ssh/id_') ||
     norm.endsWith('.kdbx') ||
     norm.includes('ntuser.dat') ||
@@ -161,4 +165,34 @@ export function scanProjectFiles(dirPath: string): { hasPlaintextSecret: boolean
 
   walk(dirPath);
   return { hasPlaintextSecret, findings };
+}
+
+
+export function assertUploadSetSafe(filePaths: string[]): void {
+  const blocked: Array<{ file: string; reason: string }> = [];
+
+  for (const filePath of filePaths) {
+    let content: string | undefined;
+    try {
+      content = readFileSync(filePath, 'utf8');
+    } catch {
+      content = undefined;
+    }
+
+    const classification = scanAndClassifyFile(filePath, content);
+    const secretScan = content ? detectSecretsInContent(content) : { hasSecret: false, findings: [] };
+
+    if (
+      classification.category === FileClassification.PROHIBITED ||
+      classification.prohibitedForPlaintextGit ||
+      secretScan.hasSecret
+    ) {
+      blocked.push({ file: filePath, reason: classification.reason });
+    }
+  }
+
+  if (blocked.length > 0) {
+    const names = blocked.map(x => x.file).join(', ');
+    throw new Error(`UPLOAD_SET_BLOCKED: prohibited or plaintext-sensitive material detected: ${names}`);
+  }
 }
