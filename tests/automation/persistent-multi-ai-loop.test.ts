@@ -169,7 +169,10 @@ test('Antigravity uses plan mode for read-only and accept-edits for implementati
   });
 
   assert.deepEqual(readOnly.args.slice(0, 4), ['-p', 'plan', '--mode', 'plan']);
+  assert.deepEqual(readOnly.args.slice(-2), ['--output-format', 'text']);
   assert.ok(writable.args.includes('accept-edits'));
   assert.ok(writable.args.includes('--sandbox'));
+  assert.deepEqual(writable.args.slice(-1), ['--sandbox']);
+  assert.equal(writable.args.includes('--output-format') && writable.args.includes('stream-json'), true);
   assert.equal(writable.args.includes('--dangerously-skip-permissions'), false);
 });

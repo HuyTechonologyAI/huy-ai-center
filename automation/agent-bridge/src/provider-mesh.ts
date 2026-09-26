@@ -186,7 +186,7 @@ export function providerCommandSpec(
           '--mode',
           request.mode === 'READ_ONLY' ? 'plan' : 'accept-edits',
           '--output-format',
-          'stream-json',
+          request.mode === 'READ_ONLY' ? 'text' : 'stream-json',
           ...(request.mode === 'WORKSPACE_WRITE' ? ['--sandbox'] : [])
         ]
       };
