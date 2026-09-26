@@ -44,11 +44,15 @@ printf '%s\n' "head=$(git -C "$WT" rev-parse HEAD)" >> "$ARTIFACT_DIR/launcher-s
 
 PROMPT="$(cat "$WT/$DIRECTIVE")"
 
+cd "$WT"
+echo "ANTIGRAVITY_CWD=$(pwd)"
 echo "ANTIGRAVITY_EXECUTION=START"
-AGY_ARGS=( -p "$PROMPT" --add-dir "$WT" --mode accept-edits --sandbox --print-timeout 60m --output-format stream-json )
+AGY_ARGS=( -p "$PROMPT" --mode accept-edits --sandbox --print-timeout 60m --output-format stream-json )
 if [ -n "${AGY_PROJECT_ID:-}" ]; then
   AGY_ARGS+=( --project="$AGY_PROJECT_ID" )
   echo "ANTIGRAVITY_PROJECT_ID=$AGY_PROJECT_ID"
+else
+  AGY_ARGS+=( --add-dir "$WT" )
 fi
 set +e
 "$AGY" "${AGY_ARGS[@]}" \
