@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
-export type Stage = 'RECEIVED' | 'PLAN' | 'DECOMPOSITION' | 'IMPLEMENTATION' | 'CROSS_REVIEW' | 'DELIVERY';
-const stages: Stage[] = ['RECEIVED', 'PLAN', 'DECOMPOSITION', 'IMPLEMENTATION', 'CROSS_REVIEW', 'DELIVERY'];
+export type Stage = 'RECEIVED' | 'PLAN' | 'DECOMPOSITION' | 'TEST_DESIGN' | 'IMPLEMENTATION' | 'CROSS_REVIEW' | 'DELIVERY';
+const stages: Stage[] = ['RECEIVED', 'PLAN', 'DECOMPOSITION', 'TEST_DESIGN', 'IMPLEMENTATION', 'CROSS_REVIEW', 'DELIVERY'];
 export interface Checkpoint {
   checkpoint_id: string;
   task_id: string;
