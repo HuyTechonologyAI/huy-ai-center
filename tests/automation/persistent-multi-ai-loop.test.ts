@@ -8,7 +8,8 @@ import {
   markProviderFailure,
   markProviderSuccess,
   selectProvider,
-  providerCommandSpec
+  providerCommandSpec,
+  detectProviderSemanticFailure
 } from '../../automation/agent-bridge/src/provider-mesh.js';
 
 import {
@@ -121,4 +122,20 @@ test('role priority contains independent planner, implementer, test designer and
   ]);
   assert.ok(DEFAULT_ROLE_PRIORITY.TEST_DESIGNER.includes('gemini'));
   assert.ok(DEFAULT_ROLE_PRIORITY.REVIEWER.includes('chatgpt'));
+});
+
+
+test('provider semantic failure detector converts zero-exit sandbox failures into retryable failover', () => {
+  const failure = detectProviderSemanticFailure(
+    'codex',
+    'TEST_PLAN_ONLY\nShell execution failed with bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted',
+    ''
+  );
+  assert.equal(failure?.retryable, true);
+  assert.match(failure?.reason ?? '', /SANDBOX_EXECUTION_FAILED/);
+
+  assert.equal(
+    detectProviderSemanticFailure('codex', '1. inspect file\n2. edit fixture\n3. verify', ''),
+    null
+  );
 });
