@@ -35,19 +35,19 @@ test('role routing prefers specialized agents and fails over without human invol
     health[id].authenticated = true;
   }
 
-  assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'codex');
+  assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'antigravity');
   assert.equal(selectProvider('PLANNER', health, { now })?.id, 'antigravity');
 
-  markProviderFailure(health.codex, 'temporary capacity', now, {
+  markProviderFailure(health.antigravity, 'temporary capacity', now, {
     failureThreshold: 1,
     cooldownMs: 60_000
   });
 
-  assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'claude');
-  assert.equal(selectProvider('REVIEWER', health, { now, exclude: ['claude'] })?.id, 'gemini');
+  assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'codex');
+  assert.equal(selectProvider('REVIEWER', health, { now, exclude: ['codex'] })?.id, 'gemini');
 
-  markProviderSuccess(health.codex, now + 61_000);
-  assert.equal(selectProvider('IMPLEMENTER', health, { now: now + 61_000 })?.id, 'codex');
+  markProviderSuccess(health.antigravity, now + 61_000);
+  assert.equal(selectProvider('IMPLEMENTER', health, { now: now + 61_000 })?.id, 'antigravity');
 });
 
 test('circuit breaker opens after repeated provider failures and recovers after cooldown', () => {
@@ -119,8 +119,8 @@ test('role priority contains independent planner, implementer, test designer and
   assert.deepEqual(DEFAULT_ROLE_PRIORITY.PLANNER.slice(0, 4), [
     'antigravity', 'gemini', 'claude', 'chatgpt'
   ]);
-  assert.deepEqual(DEFAULT_ROLE_PRIORITY.IMPLEMENTER.slice(0, 3), [
-    'codex', 'claude', 'gemini'
+  assert.deepEqual(DEFAULT_ROLE_PRIORITY.IMPLEMENTER.slice(0, 4), [
+    'antigravity', 'codex', 'gemini', 'claude'
   ]);
   assert.ok(DEFAULT_ROLE_PRIORITY.TEST_DESIGNER.includes('gemini'));
   assert.ok(DEFAULT_ROLE_PRIORITY.REVIEWER.includes('chatgpt'));
@@ -149,4 +149,23 @@ test('explicit CLI auth parsing fails closed for free or logged-out providers', 
   assert.equal(parseClaudeAuthStatus(0, '{"loggedIn":true,"authMethod":"claude.ai"}'), true);
   assert.equal(parseClaudeAuthStatus(1, '{"loggedIn":false,"authMethod":"none"}'), false);
   assert.equal(parseClaudeAuthStatus(0, 'not-json'), false);
+});
+
+
+test('Antigravity uses plan mode for read-only and accept-edits for implementation', () => {
+  const readOnly = providerCommandSpec('antigravity', {
+    prompt: 'plan',
+    cwd: '/tmp/worktree',
+    mode: 'READ_ONLY'
+  });
+  const writable = providerCommandSpec('antigravity', {
+    prompt: 'implement',
+    cwd: '/tmp/worktree',
+    mode: 'WORKSPACE_WRITE'
+  });
+
+  assert.deepEqual(readOnly.args.slice(0, 4), ['-p', 'plan', '--mode', 'plan']);
+  assert.ok(writable.args.includes('accept-edits'));
+  assert.ok(writable.args.includes('--sandbox'));
+  assert.equal(writable.args.includes('--dangerously-skip-permissions'), false);
 });
