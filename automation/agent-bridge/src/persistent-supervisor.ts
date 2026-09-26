@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { runBacklog } from './backlog-runner.js';
 import {
   ALL_PROVIDER_IDS,
@@ -225,6 +226,43 @@ function hasImplementationProvider(health: Record<ProviderId, ProviderHealth>): 
   );
 }
 
+
+function runNpm(root: string, args: string[]): { ok: boolean; output: string } {
+  const command = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const result = spawnSync(command, args, {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30 * 60_000,
+    shell: false,
+    env: { ...process.env }
+  });
+  return {
+    ok: result.status === 0,
+    output: `${result.stdout ?? ''}\n${result.stderr ?? ''}`.slice(-12000)
+  };
+}
+
+function repairLiveAcceptance(root: string): { repaired: boolean; reason: string } {
+  const sequence: string[][] = [
+    ['run', 'build:shared'],
+    ['run', 'typecheck'],
+    ['run', 'test:bridge'],
+    ['run', 'bridge:acceptance:live']
+  ];
+
+  for (const args of sequence) {
+    const result = runNpm(root, args);
+    if (!result.ok) {
+      return {
+        repaired: false,
+        reason: `SELF_REPAIR_FAILED:npm ${args.join(' ')}:${result.output.slice(-3000)}`
+      };
+    }
+  }
+
+  return { repaired: true, reason: 'LIVE_ACCEPTANCE_REGENERATED' };
+}
+
 function writeHumanGateNotice(
   stateDir: string,
   result: BacklogCycleResult
@@ -299,10 +337,25 @@ export async function runPersistentSupervisor(
       try {
         result = await runBacklog(root, true);
       } catch (error) {
-        result = {
-          status: 'BLOCKED',
-          reason: error instanceof Error ? error.message : String(error)
-        };
+        const reason = error instanceof Error ? error.message : String(error);
+
+        if (reason.includes('LIVE_E2E_ACCEPTANCE_REQUIRED')) {
+          const repair = repairLiveAcceptance(root);
+          if (repair.repaired) {
+            try {
+              result = await runBacklog(root, true);
+            } catch (retryError) {
+              result = {
+                status: 'BLOCKED',
+                reason: retryError instanceof Error ? retryError.message : String(retryError)
+              };
+            }
+          } else {
+            result = { status: 'BLOCKED', reason: repair.reason };
+          }
+        } else {
+          result = { status: 'BLOCKED', reason };
+        }
       }
 
       const decision = decideSupervisorNextAction(result, { idleMs, blockedMs });
