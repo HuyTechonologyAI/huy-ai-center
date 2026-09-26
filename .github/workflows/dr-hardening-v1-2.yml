@@ -1,0 +1,43 @@
+name: DR Hardening V1.2
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'automation/dr-engine/**'
+      - 'tests/automation/dr-hardening-v1-2.test.ts'
+      - 'package.json'
+      - '.github/workflows/dr-hardening-v1-2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dr-v1-2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install age
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y age
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: DR V1.2 regression suite
+        run: npm run test:dr-v1-2
+
+      - name: Typecheck
+        run: npm run typecheck
