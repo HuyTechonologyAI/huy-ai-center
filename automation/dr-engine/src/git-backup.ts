@@ -1,8 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import {
+  readFileSync, writeFileSync, mkdirSync, existsSync, rmSync,
+  lstatSync, readlinkSync, symlinkSync, copyFileSync, chmodSync
+} from 'node:fs';
+import { join, dirname, isAbsolute, normalize, resolve, relative, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import type { GitBackupResult, GitDirtyState } from './types.js';
+import type { GitBackupResult, GitDirtyState, UntrackedEntry } from './types.js';
 
 export function verifyGitBundle(bundlePath: string): boolean {
   if (!existsSync(bundlePath)) return false;
@@ -15,16 +18,114 @@ export function verifyGitFsck(repoDir: string): boolean {
   return res.status === 0;
 }
 
-export function captureDirtyState(repoDir: string): GitDirtyState {
+function sha256Bytes(bytes: Buffer | string): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+function assertSafeRelativePath(p: string): string {
+  if (!p || p.includes('\0') || isAbsolute(p)) {
+    throw new Error(`UNSAFE_UNTRACKED_PATH: ${p}`);
+  }
+  const n = normalize(p).replace(/\\/g, '/');
+  if (n === '..' || n.startsWith('../') || n.includes('/../')) {
+    throw new Error(`UNSAFE_UNTRACKED_PATH: ${p}`);
+  }
+  return n;
+}
+
+function isWithin(root: string, candidate: string): boolean {
+  const rel = relative(resolve(root), resolve(candidate));
+  return rel === '' || (!rel.startsWith('..' + sep) && rel !== '..' && !isAbsolute(rel));
+}
+
+function captureUntrackedEntries(repoDir: string, payloadDir?: string): { files: string[]; entries: UntrackedEntry[] } {
+  const r = spawnSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], {
+    cwd: repoDir,
+    encoding: 'buffer'
+  });
+  if (r.status !== 0) {
+    throw new Error(`UNTRACKED_DISCOVERY_FAILED: ${String(r.stderr || '')}`);
+  }
+
+  const raw = Buffer.from(r.stdout || Buffer.alloc(0)).toString('utf8');
+  const files = raw.split('\0').filter(Boolean).map(assertSafeRelativePath);
+  const entries: UntrackedEntry[] = [];
+
+  if (payloadDir) {
+    rmSync(payloadDir, { recursive: true, force: true });
+    mkdirSync(payloadDir, { recursive: true });
+  }
+
+  for (const rel of files) {
+    const src = join(repoDir, rel);
+    const st = lstatSync(src);
+    const mode = st.mode & 0o777;
+
+    if (st.isSymbolicLink()) {
+      const target = readlinkSync(src);
+      if (isAbsolute(target)) {
+        throw new Error(`UNSAFE_SYMLINK_TARGET: ${rel} -> ${target}`);
+      }
+      const resolvedTarget = resolve(dirname(src), target);
+      if (!isWithin(repoDir, resolvedTarget)) {
+        throw new Error(`UNSAFE_SYMLINK_TARGET: ${rel} -> ${target}`);
+      }
+
+      const entry: UntrackedEntry = {
+        path: rel,
+        type: 'symlink',
+        size: Buffer.byteLength(target),
+        sha256: sha256Bytes(target),
+        mode,
+        linkTarget: target
+      };
+
+      if (payloadDir) {
+        const dst = join(payloadDir, rel);
+        mkdirSync(dirname(dst), { recursive: true });
+        symlinkSync(target, dst);
+        entry.payloadRelativePath = rel;
+      }
+      entries.push(entry);
+      continue;
+    }
+
+    if (!st.isFile()) {
+      throw new Error(`UNSUPPORTED_UNTRACKED_ENTRY_TYPE: ${rel}`);
+    }
+
+    const bytes = readFileSync(src);
+    const entry: UntrackedEntry = {
+      path: rel,
+      type: 'file',
+      size: bytes.length,
+      sha256: sha256Bytes(bytes),
+      mode
+    };
+
+    if (payloadDir) {
+      const dst = join(payloadDir, rel);
+      mkdirSync(dirname(dst), { recursive: true });
+      copyFileSync(src, dst);
+      chmodSync(dst, mode);
+      entry.payloadRelativePath = rel;
+    }
+    entries.push(entry);
+  }
+
+  return { files, entries };
+}
+
+export function captureDirtyState(repoDir: string, payloadDir?: string): GitDirtyState {
   const unstagedRes = spawnSync('git', ['diff', '--binary'], { cwd: repoDir, encoding: 'utf8' });
   const stagedRes = spawnSync('git', ['diff', '--cached', '--binary'], { cwd: repoDir, encoding: 'utf8' });
-  const statusRes = spawnSync('git', ['status', '--porcelain'], { cwd: repoDir, encoding: 'utf8' });
   const wtRes = spawnSync('git', ['worktree', 'list', '--porcelain'], { cwd: repoDir, encoding: 'utf8' });
 
-  const statusLines = (statusRes.stdout || '').split('\n').filter(Boolean);
-  const untrackedFiles = statusLines
-    .filter(line => line.startsWith('??'))
-    .map(line => line.substring(3).trim());
+  if (unstagedRes.status !== 0 || stagedRes.status !== 0 || wtRes.status !== 0) {
+    throw new Error('DIRTY_STATE_CAPTURE_FAILED');
+  }
+
+  const { files: untrackedFiles, entries: untrackedEntries } = captureUntrackedEntries(repoDir, payloadDir);
 
   const worktrees: Array<{ path: string; branch: string; head: string }> = [];
   const wtBlocks = (wtRes.stdout || '').split('\n\n').filter(Boolean);
@@ -51,6 +152,7 @@ export function captureDirtyState(repoDir: string): GitDirtyState {
     hasStagedChanges: stagedDiff.length > 0,
     stagedDiff,
     untrackedFiles,
+    untrackedEntries,
     worktrees
   };
 }
@@ -61,9 +163,7 @@ export function createGitBackup(options: {
   projectId: string;
 }): GitBackupResult {
   const { repoDir, outputDir, projectId } = options;
-  if (!existsSync(outputDir)) {
-    mkdirSync(outputDir, { recursive: true });
-  }
+  if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true });
 
   const bundlePath = join(outputDir, `${projectId}.bundle`);
   const bundleRes = spawnSync('git', ['bundle', 'create', bundlePath, '--all'], {
@@ -75,25 +175,21 @@ export function createGitBackup(options: {
     throw new Error(`GIT_BUNDLE_CREATION_FAILED for ${projectId}: ${bundleRes.stderr}`);
   }
 
-  // Calculate bundle SHA256
   const bundleBytes = readFileSync(bundlePath);
-  const sha256 = createHash('sha256').update(bundleBytes).digest('hex');
+  const sha256 = sha256Bytes(bundleBytes);
 
-  // Verify bundle
   if (!verifyGitBundle(bundlePath)) {
     throw new Error(`GIT_BUNDLE_VERIFICATION_FAILED for ${bundlePath}`);
   }
 
-  // Get refs
   const refsRes = spawnSync('git', ['show-ref'], { cwd: repoDir, encoding: 'utf8' });
   const refLines = (refsRes.stdout || '').split('\n').filter(Boolean);
   const heads = refLines.filter(l => l.includes('refs/heads/')).map(l => l.split(' ')[1]);
   const tags = refLines.filter(l => l.includes('refs/tags/')).map(l => l.split(' ')[1]);
 
-  // Capture dirty state
-  const dirtyState = captureDirtyState(repoDir);
+  const dirtyStatePayloadDir = join(outputDir, `${projectId}-untracked`);
+  const dirtyState = captureDirtyState(repoDir, dirtyStatePayloadDir);
 
-  // Write diff artifacts alongside bundle
   if (dirtyState.hasUnstagedChanges) {
     writeFileSync(join(outputDir, `${projectId}-unstaged.patch`), dirtyState.unstagedDiff);
   }
@@ -107,6 +203,7 @@ export function createGitBackup(options: {
     bundlePath,
     sha256,
     refs: { heads, tags },
-    dirtyState
+    dirtyState,
+    dirtyStatePayloadDir
   };
 }
