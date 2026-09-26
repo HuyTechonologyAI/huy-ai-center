@@ -5,10 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/mnt/data1/Projects/HUY-AI-Center
-Environment=NODE_ENV=production
-Environment=HUY_AI_SUPERVISOR_STATE_DIR=/mnt/data1/HUY-AI/state/supervisors
-ExecStart=/usr/bin/env npm run autonomy:daemon
+EnvironmentFile=-%h/.config/huy-ai/autonomy.env
+EnvironmentFile=-%h/.config/huy-ai/provider-secrets.env
+ExecStart=/usr/bin/env bash -lc 'cd "$HUY_AI_REPO" && exec npm run autonomy:daemon'
 Restart=always
 RestartSec=15
 TimeoutStopSec=30
