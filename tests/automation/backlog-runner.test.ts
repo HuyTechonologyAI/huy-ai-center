@@ -134,3 +134,25 @@ test('canonical roadmap prioritizes AI HR bootstrap after provider connectivity'
   assert.ok(roadmap.tasks[0]?.allowed_paths.includes('config/organization/'));
   assert.equal(roadmap.invariants?.antigravity_role, 'PRIMARY_IMPLEMENTER_AND_PLANNER');
 });
+
+
+test('AI HR charter is fail-closed and cannot self-grant production authority', async () => {
+  const { readFileSync } = await import('node:fs');
+  const agent = JSON.parse(
+    readFileSync('config/organization/ai-hr-agent.json', 'utf8')
+  ) as {
+    id: string;
+    role: string;
+    authority: { max_auto_risk: string; production_mutation: string; self_grant_permissions: boolean };
+    responsibilities: string[];
+  };
+
+  assert.equal(agent.id, 'ai-hr-001');
+  assert.equal(agent.role, 'AI_HR_DIRECTOR');
+  assert.equal(agent.authority.max_auto_risk, 'R2');
+  assert.equal(agent.authority.production_mutation, 'DENY');
+  assert.equal(agent.authority.self_grant_permissions, false);
+  assert.ok(agent.responsibilities.includes('WORKFORCE_PLANNING'));
+  assert.ok(agent.responsibilities.includes('AGENT_RECRUITMENT'));
+  assert.ok(agent.responsibilities.includes('CAPABILITY_VERIFICATION'));
+});
