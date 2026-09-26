@@ -338,3 +338,17 @@ If any marker is not proven, final result must be:
 - exact list of Human Gates encountered.
 
 Do not claim PASS from plans, mocked placeholders, synthetic files, local-only hash comparisons, or hard-coded status strings.
+
+
+## 12. Antigravity headless terminal protocol
+
+The execution environment is headless and uses fine-grained permissions. To remain compatible with scoped grants:
+
+- invoke terminal tools directly (examples: `git status`, `npm run test:...`, `npx tsx ...`, `python3 ...`);
+- do NOT wrap ordinary commands in `bash -lc`, `sh -c`, command substitution, backticks, process substitution, or generated shell snippets;
+- prefer simple literal command prefixes over complex shell composition;
+- do NOT request `command(*)`, Turbo, or `--dangerously-skip-permissions`;
+- if a command is denied, report the exact command target needed and stop fail-closed rather than claiming completion;
+- file edits inside the isolated worktree should use normal workspace file operations;
+- any command needing network/host access must remain within the pre-authorized scoped prefixes;
+- the final receipt is authoritative; a CLI exit code of 0 alone is never proof of V1.2 completion.
