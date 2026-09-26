@@ -7,6 +7,8 @@ UNIT_DIR="$HOME/.config/systemd/user"
 UNIT="$UNIT_DIR/huy-ai-persistent-multi-ai.service"
 SOURCE_UNIT="$REPO/deploy/node01/huy-ai-persistent-multi-ai.service"
 BACKUP="$UNIT.pre-persistent-loop"
+CONFIG_DIR="$HOME/.config/huy-ai"
+RUNTIME_ENV="$CONFIG_DIR/autonomy.env"
 
 echo "=============================================================="
 echo "HUY AI CENTER - PERSISTENT MULTI-AI LOOP ACTIVATION"
@@ -38,8 +40,11 @@ if [ -n "$(git -C "$REPO" status --porcelain)" ]; then
   exit 28
 fi
 
-mkdir -p "$STATE" "$UNIT_DIR"
-chmod 700 "$STATE"
+mkdir -p "$STATE" "$UNIT_DIR" "$CONFIG_DIR"
+chmod 700 "$STATE" "$CONFIG_DIR"
+printf 'HUY_AI_REPO=%s\nHUY_AI_SUPERVISOR_STATE_DIR=%s\n' "$REPO" "$STATE" > "$RUNTIME_ENV"
+chmod 600 "$RUNTIME_ENV"
+echo "RUNTIME_ENV=PASS"
 
 echo "PREACTIVATION_VERIFY=START"
 npm --prefix "$REPO" ci
