@@ -352,3 +352,19 @@ The execution environment is headless and uses fine-grained permissions. To rema
 - file edits inside the isolated worktree should use normal workspace file operations;
 - any command needing network/host access must remain within the pre-authorized scoped prefixes;
 - the final receipt is authoritative; a CLI exit code of 0 alone is never proof of V1.2 completion.
+
+
+## 13. Policy hook execution contract
+
+The DR worktree may install a temporary workspace-level `PreToolUse` safety hook for `run_command`.
+
+When present:
+- obey the hook decisions;
+- use direct commands only;
+- keep command working directories inside the isolated DR worktree or `/tmp`;
+- do not attempt to bypass a denied command with shell wrappers or alternate interpreters;
+- if a command is denied by policy, choose an equivalent allowed command or stop fail-closed;
+- do not modify or disable the hook;
+- do not access owner secrets, `/mnt/data2`, or non-workspace system state;
+- network commands are limited to GitHub/DR repository operations and required package/test tooling;
+- production Node01 migration remains forbidden.
