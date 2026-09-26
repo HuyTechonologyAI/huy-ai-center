@@ -11,7 +11,8 @@ import {
   providerCommandSpec,
   detectProviderSemanticFailure,
   parseCodexAuthStatus,
-  parseClaudeAuthStatus
+  parseClaudeAuthStatus,
+  antigravityTokenEvidence
 } from '../../automation/agent-bridge/src/provider-mesh.js';
 
 import {
@@ -168,4 +169,19 @@ test('Antigravity uses plan mode for read-only and accept-edits for implementati
   assert.ok(writable.args.includes('accept-edits'));
   assert.ok(writable.args.includes('--sandbox'));
   assert.equal(writable.args.includes('--dangerously-skip-permissions'), false);
+});
+
+
+test('Antigravity auth evidence requires the exact OAuth token file and never reads its contents', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+
+  const home = mkdtempSync(join(tmpdir(), 'agy-auth-'));
+  assert.equal(antigravityTokenEvidence(home), false);
+
+  const dir = join(home, '.gemini', 'antigravity-cli');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'antigravity-oauth-token'), 'opaque-secret-never-read');
+  assert.equal(antigravityTokenEvidence(home), true);
 });
