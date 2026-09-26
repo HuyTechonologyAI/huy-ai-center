@@ -10,10 +10,33 @@
     "cooldown_seconds": 120
   },
   "roles": {
-    "PLANNER": ["antigravity", "gemini", "claude", "chatgpt", "codex"],
-    "TEST_DESIGNER": ["gemini", "claude", "codex", "chatgpt", "antigravity"],
-    "IMPLEMENTER": ["codex", "claude", "gemini"],
-    "REVIEWER": ["gemini", "claude", "chatgpt", "antigravity", "codex"]
+    "PLANNER": [
+      "antigravity",
+      "gemini",
+      "claude",
+      "chatgpt",
+      "codex"
+    ],
+    "TEST_DESIGNER": [
+      "gemini",
+      "claude",
+      "codex",
+      "chatgpt",
+      "antigravity"
+    ],
+    "IMPLEMENTER": [
+      "antigravity",
+      "codex",
+      "gemini",
+      "claude"
+    ],
+    "REVIEWER": [
+      "gemini",
+      "claude",
+      "chatgpt",
+      "antigravity",
+      "codex"
+    ]
   },
   "invariants": {
     "tests_before_implementation": true,
@@ -29,7 +52,17 @@
   },
   "chatgpt": {
     "mode": "OPENAI_RESPONSES_API_OR_EXTERNAL_COMMAND",
-    "required_env_when_api": ["OPENAI_API_KEY", "OPENAI_AUTONOMY_MODEL"],
+    "required_env_when_api": [
+      "OPENAI_API_KEY",
+      "OPENAI_AUTONOMY_MODEL"
+    ],
     "external_command_env": "CHATGPT_AUTONOMY_COMMAND"
+  },
+  "antigravity": {
+    "implementation_priority": "PRIMARY",
+    "write_mode": "accept-edits",
+    "sandbox_required": true,
+    "ide_role": "PRIMARY_INTERACTIVE_CODING_WORKBENCH",
+    "cli_role": "PRIMARY_HEADLESS_IMPLEMENTER"
   }
 }
