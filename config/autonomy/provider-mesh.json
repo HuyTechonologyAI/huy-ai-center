@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "mode": "PERSISTENT_MULTI_AI_FAIL_CLOSED",
+  "max_concurrency": 1,
+  "provider_probe_seconds": 60,
+  "idle_poll_seconds": 30,
+  "blocked_retry_seconds": 60,
+  "circuit_breaker": {
+    "failure_threshold": 3,
+    "cooldown_seconds": 120
+  },
+  "roles": {
+    "PLANNER": ["antigravity", "gemini", "claude", "chatgpt", "codex"],
+    "TEST_DESIGNER": ["gemini", "claude", "codex", "chatgpt", "antigravity"],
+    "IMPLEMENTER": ["codex", "claude", "gemini"],
+    "REVIEWER": ["gemini", "claude", "chatgpt", "antigravity", "codex"]
+  },
+  "invariants": {
+    "tests_before_implementation": true,
+    "independent_reviewer_preferred": true,
+    "provider_failover_without_human": true,
+    "r0_r2_auto_continue": true,
+    "r3_r4_human_gate": true,
+    "force_push": "DENY",
+    "production_write": "DENY_UNLESS_HUMAN_GATE",
+    "data2_access": "DENY",
+    "dangerous_permission_bypass": "DENY",
+    "node01_authoritative_data_migration": "BLOCKED_PENDING_DR_V1_2"
+  },
+  "chatgpt": {
+    "mode": "OPENAI_RESPONSES_API_OR_EXTERNAL_COMMAND",
+    "required_env_when_api": ["OPENAI_API_KEY", "OPENAI_AUTONOMY_MODEL"],
+    "external_command_env": "CHATGPT_AUTONOMY_COMMAND"
+  }
+}

@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
-export type Stage = 'RECEIVED' | 'PLAN' | 'DECOMPOSITION' | 'IMPLEMENTATION' | 'CROSS_REVIEW' | 'DELIVERY';
-const stages: Stage[] = ['RECEIVED', 'PLAN', 'DECOMPOSITION', 'IMPLEMENTATION', 'CROSS_REVIEW', 'DELIVERY'];
+export type Stage = 'RECEIVED' | 'PLAN' | 'DECOMPOSITION' | 'TEST_DESIGN' | 'IMPLEMENTATION' | 'CROSS_REVIEW' | 'DELIVERY';
+const stages: Stage[] = ['RECEIVED', 'PLAN', 'DECOMPOSITION', 'TEST_DESIGN', 'IMPLEMENTATION', 'CROSS_REVIEW', 'DELIVERY'];
 export interface Checkpoint {
   checkpoint_id: string;
   task_id: string;
@@ -71,6 +71,23 @@ export function checkpointStage(root: string, params: {
   evidence: unknown; method: string; result: string; next: string;
   dependencies?: Record<string, string>; receipts?: string[];
 }): Checkpoint {
+  const existing = readLatestCheckpoint(root, params.taskId);
+  if (existing) {
+    const existingIndex = stages.indexOf(existing.stage);
+    const requestedIndex = stages.indexOf(params.stage);
+    if (requestedIndex < 0) throw Error('CHECKPOINT_STAGE_UNKNOWN');
+    if (requestedIndex <= existingIndex) {
+      // Restart/resume is idempotent: never rewrite or fork already-verified history.
+      if (existing.task_id !== params.taskId || existing.objective !== params.objective) {
+        throw Error('CHECKPOINT_RESUME_IDENTITY_MISMATCH');
+      }
+      return existing;
+    }
+    if (requestedIndex !== existingIndex + 1) {
+      throw Error('CHECKPOINT_STAGE_GAP');
+    }
+  }
+
   const dir = join(root, '.artifacts/agent-bridge/checkpoints', params.taskId);
   mkdirSync(dir, { recursive: true });
   const body = JSON.stringify(params.evidence, null, 2) + '\n';

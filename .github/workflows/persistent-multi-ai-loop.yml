@@ -1,0 +1,44 @@
+name: Persistent Multi-AI Loop
+
+on:
+  push:
+    branches:
+      - agent-task/persistent-multi-ai-loop
+    paths:
+      - 'automation/agent-bridge/**'
+      - 'config/autonomy/**'
+      - 'deploy/node01/**'
+      - 'scripts/node01/**'
+      - 'tests/automation/**'
+      - 'package.json'
+      - '.github/workflows/persistent-multi-ai-loop.yml'
+  pull_request:
+    branches:
+      - main
+      - agent-task/dr-hardening-v1-2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Build shared packages
+        run: npm run build:shared
+      - name: Persistent loop contract tests
+        run: npm run test:autonomy-loop
+      - name: Full bridge regression
+        run: npm run test:bridge
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
