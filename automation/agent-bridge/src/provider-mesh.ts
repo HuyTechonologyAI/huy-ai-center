@@ -288,6 +288,10 @@ export function parseClaudeAuthStatus(status: number | null, output: string): bo
   }
 }
 
+export function parseAntigravityAuthStatus(status: number | null, output: string): boolean {
+  return status === 0 && output.trim().length > 0 && !checkAuthText(output);
+}
+
 function probeInstalledAuth(id: ProviderId): boolean {
   if (id === 'codex') {
     const r = spawnSync('codex', ['login', 'status'], {
@@ -316,10 +320,16 @@ function probeInstalledAuth(id: ProviderId): boolean {
     return hasEnv;
   }
 
-  // Antigravity currently has no cheap non-network auth-status command.
-  // Only a previously successful real invocation is accepted as proof.
   if (id === 'antigravity') {
-    return false;
+    const r = spawnSync('agy', ['models'], {
+      encoding: 'utf8',
+      timeout: 12_000,
+      shell: false
+    });
+    return parseAntigravityAuthStatus(
+      r.status,
+      `${r.stdout ?? ''}\n${r.stderr ?? ''}`
+    );
   }
 
   return false;

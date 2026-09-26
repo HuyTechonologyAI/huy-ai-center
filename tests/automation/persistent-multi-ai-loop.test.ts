@@ -11,7 +11,8 @@ import {
   providerCommandSpec,
   detectProviderSemanticFailure,
   parseCodexAuthStatus,
-  parseClaudeAuthStatus
+  parseClaudeAuthStatus,
+  parseAntigravityAuthStatus
 } from '../../automation/agent-bridge/src/provider-mesh.js';
 
 import {
@@ -149,6 +150,9 @@ test('explicit CLI auth parsing fails closed for free or logged-out providers', 
   assert.equal(parseClaudeAuthStatus(0, '{"loggedIn":true,"authMethod":"claude.ai"}'), true);
   assert.equal(parseClaudeAuthStatus(1, '{"loggedIn":false,"authMethod":"none"}'), false);
   assert.equal(parseClaudeAuthStatus(0, 'not-json'), false);
+  assert.equal(parseAntigravityAuthStatus(0, 'gemini-3.8-flash-high\tGemini 3.8 Flash (High)'), true);
+  assert.equal(parseAntigravityAuthStatus(1, 'authentication required'), false);
+  assert.equal(parseAntigravityAuthStatus(0, ''), false);
 });
 
 
