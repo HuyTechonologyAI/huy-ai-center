@@ -117,3 +117,20 @@ test('worktree safe-directory registration is exact and never wildcard', async (
     else process.env.GIT_CONFIG_GLOBAL = prior;
   }
 });
+
+
+test('canonical roadmap prioritizes AI HR bootstrap after provider connectivity', async () => {
+  const { readFileSync } = await import('node:fs');
+  const roadmap = JSON.parse(
+    readFileSync('config/autonomy/system-roadmap.json', 'utf8')
+  ) as {
+    invariants?: Record<string, unknown>;
+    tasks: Array<{ id: string; risk: string; human_gate: boolean; allowed_paths: string[] }>;
+  };
+
+  assert.equal(roadmap.tasks[0]?.id, 'ai-hr-bootstrap');
+  assert.equal(roadmap.tasks[0]?.risk, 'R2');
+  assert.equal(roadmap.tasks[0]?.human_gate, false);
+  assert.ok(roadmap.tasks[0]?.allowed_paths.includes('config/organization/'));
+  assert.equal(roadmap.invariants?.antigravity_role, 'PRIMARY_IMPLEMENTER_AND_PLANNER');
+});
