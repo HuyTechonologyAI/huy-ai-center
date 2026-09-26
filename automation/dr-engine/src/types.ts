@@ -49,12 +49,23 @@ export interface DiscoveredProject {
   isAuthoritativeSource?: boolean;
 }
 
+export interface UntrackedEntry {
+  path: string;
+  type: 'file' | 'symlink';
+  size: number;
+  sha256: string;
+  mode: number;
+  payloadRelativePath?: string;
+  linkTarget?: string;
+}
+
 export interface GitDirtyState {
   hasUnstagedChanges: boolean;
   unstagedDiff: string;
   hasStagedChanges: boolean;
   stagedDiff: string;
   untrackedFiles: string[];
+  untrackedEntries?: UntrackedEntry[];
   worktrees: Array<{ path: string; branch: string; head: string }>;
 }
 
@@ -67,6 +78,7 @@ export interface GitBackupResult {
     tags: string[];
   };
   dirtyState: GitDirtyState;
+  dirtyStatePayloadDir?: string;
 }
 
 export interface CheckpointRecord {
@@ -75,6 +87,10 @@ export interface CheckpointRecord {
   status: 'PENDING' | 'RUNNING' | 'PASS' | 'COMPLETED' | 'FAILED';
   started_at?: string;
   completed_at?: string;
+  directive_version?: string;
+  source_fingerprint?: string;
+  previous_checkpoint_sha256?: string;
+  record_sha256?: string;
   source_manifest_sha256?: string;
   artifact_manifest_sha256?: string;
   github_receipt?: Record<string, any>;
@@ -85,6 +101,15 @@ export interface CheckpointRecord {
 }
 
 export interface FinalReceipt {
+  DR_V1_1_SECURITY_STATUS: 'QUARANTINED';
+  DR_V1_2_CRYPTO: 'PASS' | 'FAIL';
+  DR_RECOVERY_KEY_CUSTODY: 'PASS' | 'FAIL' | 'PENDING';
+  ALL_PROJECTS_COVERED: 'PASS' | 'FAIL';
+  SECRET_SCAN: 'PASS' | 'FAIL';
+  PROHIBITED_DATA_EXCLUDED: 'PASS' | 'FAIL';
+  REMOTE_BYTES_VERIFIED: 'PASS' | 'FAIL';
+  REAL_DIRTY_STATE_RESTORE: 'PASS' | 'FAIL';
+  FALSE_PASS_FALLBACKS: 'ZERO' | 'PRESENT';
   GITHUB_DR: 'PASS' | 'FAIL';
   RESTORE_TEST: 'PASS' | 'FAIL';
   NODE01_MIGRATION_TOOLKIT: 'READY' | 'NOT_READY';
