@@ -17,11 +17,11 @@ const graph = (tasks: RoadmapNode[]): Roadmap => ({ mode: 'SERIAL_FAIL_CLOSED', 
 
 test('canonical roadmap is serial and orders dependencies', () => {
   const nodes = validateRoadmap(source);
-  assert.equal(nodes[0].id, '06k-c-readiness');
+  assert.equal(nodes[0].id, 'ai-hr-bootstrap');
   for (const item of nodes) for (const dep of item.depends_on) assert.ok(nodes.indexOf(nodes.find(n => n.id === dep)!) < nodes.indexOf(item));
   const contract = projectRoadmapNodeToContract(nodes[0], 'feature/ai-dev-bridge-b-autonomous-backlog');
   assert.equal(contract.taskId, nodes[0].id);
-  assert.equal(contract.repository.taskBranch, 'agent-task/06k-c-readiness');
+  assert.equal(contract.repository.taskBranch, 'agent-task/ai-hr-bootstrap');
   assert.ok(contract.scope.allowedPaths.includes('PROJECT_STATE.md'));
   assert.equal(contract.sourceControl.mergeAllowed, false);
 });
