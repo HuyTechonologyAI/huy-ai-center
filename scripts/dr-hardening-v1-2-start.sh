@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="/home/huyai007/workspace/huy-ai-center"
 BRANCH="agent-task/dr-hardening-v1-2"
-WT="$ROOT/.agent-worktrees/dr-hardening-v1-2"
+WT="${AGY_EXEC_ROOT:-$ROOT/.agent-worktrees/dr-hardening-v1-2}"
 AGY="/home/huyai007/.local/bin/agy"
 DIRECTIVE="docs/automation/DR_HARDENING_V1_2_EXECUTION_DIRECTIVE.md"
 ARTIFACT_DIR="$WT/.artifacts/dr-hardening-v1-2"
@@ -22,17 +22,30 @@ test -d "$ROOT/.git" || { echo "ROOT_REPO_NOT_FOUND=$ROOT"; exit 22; }
 
 git -C "$ROOT" fetch origin "$BRANCH"
 
-if [ ! -d "$WT" ]; then
-  mkdir -p "$(dirname "$WT")"
-  git -C "$ROOT" worktree add -B "$BRANCH" "$WT" "origin/$BRANCH"
-else
-  test -e "$WT/.git" || { echo "WORKTREE_PATH_EXISTS_BUT_IS_NOT_GIT_WORKTREE=$WT"; exit 23; }
+if [ -n "${AGY_EXEC_ROOT:-}" ]; then
+  test -d "$WT/.git" || { echo "STANDALONE_EXEC_ROOT_NOT_GIT_REPO=$WT"; exit 23; }
   if [ -z "$(git -C "$WT" status --porcelain)" ]; then
     git -C "$WT" fetch origin "$BRANCH"
+    git -C "$WT" checkout "$BRANCH" >/dev/null 2>&1 || true
     git -C "$WT" reset --hard "origin/$BRANCH"
   else
-    echo "EXISTING_WORKTREE_DIRTY=PRESERVED"
+    echo "STANDALONE_EXEC_ROOT_DIRTY=PRESERVED"
   fi
+  echo "EXECUTION_REPO_MODE=STANDALONE_CLONE"
+else
+  if [ ! -d "$WT" ]; then
+    mkdir -p "$(dirname "$WT")"
+    git -C "$ROOT" worktree add -B "$BRANCH" "$WT" "origin/$BRANCH"
+  else
+    test -e "$WT/.git" || { echo "WORKTREE_PATH_EXISTS_BUT_IS_NOT_GIT_WORKTREE=$WT"; exit 23; }
+    if [ -z "$(git -C "$WT" status --porcelain)" ]; then
+      git -C "$WT" fetch origin "$BRANCH"
+      git -C "$WT" reset --hard "origin/$BRANCH"
+    else
+      echo "EXISTING_WORKTREE_DIRTY=PRESERVED"
+    fi
+  fi
+  echo "EXECUTION_REPO_MODE=LINKED_WORKTREE"
 fi
 
 test -f "$WT/$DIRECTIVE" || { echo "DIRECTIVE_NOT_FOUND=$WT/$DIRECTIVE"; exit 24; }
@@ -111,7 +124,7 @@ printf '%s\n' "head_after=$(git -C "$WT" rev-parse HEAD)" >> "$ARTIFACT_DIR/laun
 if [ "$rc" -ne 0 ]; then
   echo "ANTIGRAVITY_EXECUTION=STOPPED"
   echo "AGY_EXIT_CODE=$rc"
-  echo "WORKTREE_PRESERVED=$WT"
+  echo "EXECUTION_REPO_PRESERVED=$WT"
   echo "LOG=$LOG"
   echo "SAFE_TO_START_NODE01_MIGRATION=NO"
   exit "$rc"
@@ -121,14 +134,14 @@ fi
 receipt="$(find "$WT" -type f -name 'DR_HARDENING_V1_2_FINAL_RECEIPT.json' -print -quit 2>/dev/null || true)"
 if [ -z "$receipt" ]; then
   echo "ANTIGRAVITY_ZERO_EXIT_WITHOUT_FINAL_RECEIPT=FAIL"
-  echo "WORKTREE_PRESERVED=$WT"
+  echo "EXECUTION_REPO_PRESERVED=$WT"
   echo "LOG=$LOG"
   echo "SAFE_TO_START_NODE01_MIGRATION=NO"
   exit 87
 fi
 
 echo "ANTIGRAVITY_EXECUTION=COMPLETE"
-echo "WORKTREE=$WT"
+echo "EXECUTION_REPO=$WT"
 echo "LOG=$LOG"
 echo "FINAL_RECEIPT=$receipt"
 echo "NEXT_AUTHORITY=DR_HARDENING_V1_2_FINAL_RECEIPT"
