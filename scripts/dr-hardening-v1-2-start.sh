@@ -45,7 +45,7 @@ printf '%s\n' "head=$(git -C "$WT" rev-parse HEAD)" >> "$ARTIFACT_DIR/launcher-s
 PROMPT="$(cat "$WT/$DIRECTIVE")"
 
 echo "ANTIGRAVITY_EXECUTION=START"
-AGY_ARGS=( -p "$PROMPT" --add-dir "$WT" --mode accept-edits --sandbox --print-timeout 60m )
+AGY_ARGS=( -p "$PROMPT" --add-dir "$WT" --mode accept-edits --sandbox --print-timeout 60m --output-format stream-json )
 if [ -n "${AGY_PROJECT_ID:-}" ]; then
   AGY_ARGS+=( --project="$AGY_PROJECT_ID" )
   echo "ANTIGRAVITY_PROJECT_ID=$AGY_PROJECT_ID"
@@ -59,6 +59,34 @@ set -e
 # Antigravity headless can soft-deny a tool and still exit 0. Treat that as FAIL.
 if grep -Eqi 'no output produced|auto-denied|required the "command" permission|permission that headless mode cannot prompt for' "$LOG"; then
   echo "ANTIGRAVITY_PERMISSION_SOFT_DENIAL=DETECTED"
+  python3 - "$LOG" <<'PY' || true
+import json, sys
+p = sys.argv[1]
+last = None
+try:
+    with open(p, "r", encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            raw = raw.strip()
+            if not raw.startswith("{"):
+                continue
+            try:
+                obj = json.loads(raw)
+            except Exception:
+                continue
+            su = obj.get("step_update") or {}
+            if su.get("step_type") == "tool" and su.get("tool_name") == "run_command":
+                info = su.get("tool_info") or {}
+                params = info.get("parameters") or {}
+                cmd = params.get("CommandLine") or params.get("command") or params.get("cmd")
+                if cmd:
+                    last = cmd
+except Exception:
+    pass
+if last:
+    print("LAST_STREAMED_RUN_COMMAND=" + str(last).replace("\n"," "))
+else:
+    print("LAST_STREAMED_RUN_COMMAND=UNAVAILABLE")
+PY
   rc=86
 fi
 
