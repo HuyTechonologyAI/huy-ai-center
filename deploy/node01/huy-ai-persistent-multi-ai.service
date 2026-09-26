@@ -1,0 +1,21 @@
+[Unit]
+Description=HUY AI Center Persistent Multi-AI Autonomous Supervisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/mnt/data1/Projects/HUY-AI-Center
+Environment=NODE_ENV=production
+Environment=HUY_AI_SUPERVISOR_STATE_DIR=/mnt/data1/HUY-AI/state/supervisors
+ExecStart=/usr/bin/env npm run autonomy:daemon
+Restart=always
+RestartSec=15
+TimeoutStopSec=30
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
