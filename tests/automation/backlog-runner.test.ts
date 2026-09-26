@@ -85,3 +85,35 @@ test('live acceptance requires a passing CLI receipt bound to an unchanged bridg
     assert.throws(() => assertLiveAcceptance(dir), /LIVE_E2E_ACCEPTANCE_REQUIRED/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+
+test('worktree safe-directory registration is exact and never wildcard', async () => {
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { spawnSync } = await import('node:child_process');
+  const { ensureGitSafeDirectory } = await import('../../automation/agent-bridge/src/worktree-manager.js');
+
+  const root = mkdtempSync(join(tmpdir(), 'huy-safe-dir-'));
+  const config = join(root, 'gitconfig');
+  writeFileSync(config, '');
+
+  const prior = process.env.GIT_CONFIG_GLOBAL;
+  process.env.GIT_CONFIG_GLOBAL = config;
+  try {
+    const target = join(root, 'repo', '.agent-worktrees', 'task-1');
+    ensureGitSafeDirectory(target);
+
+    const result = spawnSync('git', ['config', '--global', '--get-all', 'safe.directory'], {
+      encoding: 'utf8',
+      env: { ...process.env, GIT_CONFIG_GLOBAL: config }
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const values = (result.stdout || '').split('\n').filter(Boolean);
+    assert.deepEqual(values, [target]);
+    assert.equal(values.some(v => v.includes('*')), false);
+  } finally {
+    if (prior === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+    else process.env.GIT_CONFIG_GLOBAL = prior;
+  }
+});
