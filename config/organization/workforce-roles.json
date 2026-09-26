@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "status": "PLANNING",
+  "owner": "ai-hr-001",
+  "priority_roles": [
+    {
+      "id": "chief-architect",
+      "title": "AI Chief Architect / Planner",
+      "priority": 1
+    },
+    {
+      "id": "primary-coder",
+      "title": "Antigravity Primary Coding Engineer",
+      "priority": 1
+    },
+    {
+      "id": "qa",
+      "title": "AI Test & QA Engineer",
+      "priority": 1
+    },
+    {
+      "id": "security",
+      "title": "AI Security Auditor",
+      "priority": 1
+    },
+    {
+      "id": "devops",
+      "title": "AI DevOps / SRE",
+      "priority": 1
+    },
+    {
+      "id": "data",
+      "title": "AI Data & Database Engineer",
+      "priority": 2
+    },
+    {
+      "id": "research",
+      "title": "AI Research & GitHub Radar",
+      "priority": 2
+    },
+    {
+      "id": "education",
+      "title": "AI Education Product Agent",
+      "priority": 2
+    },
+    {
+      "id": "tax-legal",
+      "title": "AI Tax & Legal Knowledge Agent",
+      "priority": 2
+    },
+    {
+      "id": "content",
+      "title": "AI Content & Media Agent",
+      "priority": 3
+    },
+    {
+      "id": "ops",
+      "title": "AI Customer & Operations Agent",
+      "priority": 3
+    }
+  ],
+  "note": "Final hiring order and provider assignment must be produced by AI HR from live roadmap and capability evidence."
+}
