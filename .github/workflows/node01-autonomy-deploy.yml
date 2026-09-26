@@ -42,7 +42,7 @@ jobs:
       - name: Fail-closed deploy to dedicated control clone
         shell: bash
         env:
-          AUTONOMY_REF: agent-task/dr-hardening-v1-2
+          AUTONOMY_REF: feature/persistent-multi-ai-runtime
           CONTROL_REPO: /mnt/data1/HUY-AI/runtime/autonomy-control
         run: |
           set -euo pipefail
