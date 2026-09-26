@@ -12,6 +12,10 @@ on:
       - 'tests/automation/**'
       - 'package.json'
       - '.github/workflows/persistent-multi-ai-loop.yml'
+  pull_request:
+    branches:
+      - main
+      - agent-task/dr-hardening-v1-2
   workflow_dispatch:
 
 permissions:
