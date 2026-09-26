@@ -16,12 +16,15 @@ import type {
 } from "./types.js";
 import { classifyTask, maxRisk, requiresHuman } from "./risk-classifier.js";
 import { evaluateGate, buildApprovalRequest } from "./approval-gate.js";
-import { generatePlan, auditResultDetailed } from "./antigravity-adapter.js";
+import { buildImplementationPrompt } from "./codex-adapter.js";
 import {
-  checkCodex,
-  execCodexTask,
-  buildImplementationPrompt,
-} from "./codex-adapter.js";
+  auditResultMulti,
+  buildTestDesignPrompt,
+  executeImplementationMulti,
+  executeTestDesignMulti,
+  generatePlanMulti
+} from "./multi-agent-adapter.js";
+import type { ProviderId } from "./provider-mesh.js";
 import { createWorktree } from "./worktree-manager.js";
 import {
   collectDiffStat,
@@ -37,7 +40,7 @@ import { safeJsonStringify } from "./log-redactor.js";
 import { checkpointStage } from './checkpoints.js';
 
 const ARTIFACTS_ROOT = ".artifacts/agent-bridge";
-const MAX_CYCLES = 3;
+const MAX_CYCLES = 8;
 
 // ─────────────────────────────────────────────────
 // Entry point
@@ -100,7 +103,7 @@ export async function runTask(
 
   const coordinatorBeforePlan = gitPorcelain(repositoryRoot);
 
-  const plan = await generatePlan({
+  const plan = await generatePlanMulti({
     taskId: contract.taskId,
     title: contract.title,
     objective: contract.objective,
@@ -118,23 +121,17 @@ export async function runTask(
     state.status = "HUMAN_GATE";
     writeArtifact(artifactDir, "audit.json", {
       finalStatus: "HUMAN_AUTH_REQUIRED",
-      reason: "Antigravity CLI requires human authentication",
+      reason: "All available planning providers require human authentication",
     });
     return state;
   }
 
-  if (plan.rawOutput === "AGENT_PLAN_INVALID") {
-    state.status = "FAILED";
-    writeArtifact(artifactDir, "audit.json", {
-      finalStatus: "AGENT_PLAN_INVALID",
-      reason: "Antigravity generated an invalid plan after retry",
-    });
-    return state;
-  }
-
-  if (plan.rawOutput === "ANTIGRAVITY_UNAVAILABLE") {
+  if (plan.rawOutput === "AGENT_PLAN_INVALID" || plan.rawOutput === "ALL_PLANNERS_UNAVAILABLE") {
     state.status = "BLOCKED";
-    writeArtifact(artifactDir, "audit.json", { finalStatus: "ANTIGRAVITY_UNAVAILABLE" });
+    writeArtifact(artifactDir, "audit.json", {
+      finalStatus: plan.rawOutput,
+      reason: "No planning provider produced a valid executable plan",
+    });
     return state;
   }
 
@@ -145,18 +142,18 @@ export async function runTask(
         throw Error('PLAN_SCOPE_INVALID');
       }
     }
-    checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'PLAN', owner: 'ANTIGRAVITY',
+    checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'PLAN', owner: plan.model.toUpperCase(),
       objective: contract.objective, evidence: plan, method: 'validated planner steps', result: 'Plan contains steps', next: 'DECOMPOSITION' });
     const subtasks = plan.steps.map((step, index) => ({ subtask_id: `${contract.taskId}-${index + 1}`,
-      task_id: contract.taskId, owner_agent: 'CODEX', objective: step.description,
+      task_id: contract.taskId, owner_agent: 'MULTI_AI_IMPLEMENTER', objective: step.description,
       input: contract.objective, output: step.targetFiles ?? contract.scope.allowedPaths,
       depends_on: index ? [`${contract.taskId}-${index}`] : [],
       allowed_paths: contract.scope.allowedPaths, acceptance: contract.verification.commands,
-      test_commands: contract.verification.commands, cross_review_agent: 'ANTIGRAVITY',
+      test_commands: contract.verification.commands, cross_review_agent: 'INDEPENDENT_PROVIDER',
       source_checkpoint: 'PLAN_VERIFIED' }));
     checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'DECOMPOSITION', owner: 'COORDINATOR',
       objective: contract.objective, evidence: { contract, subtasks }, method: 'contract scope and plan steps',
-      result: 'Subtasks assigned to Codex within allowed paths', next: 'IMPLEMENTATION' });
+      result: 'Subtasks assigned to provider mesh within allowed paths', next: 'TEST_DESIGN' });
   }
 
   // ── 4. Worktree isolation (taskBranch authoritative) ───────────
@@ -178,7 +175,77 @@ export async function runTask(
   }
   state.worktree = worktree;
 
-  // ── 5. Self-correction implementation loop ─────────────────────
+  // ── 5. Test-first design stage (mandatory before production-code edits) ──
+  const testDesignPrompt = buildTestDesignPrompt({
+    taskId: contract.taskId,
+    objective: contract.objective,
+    planSteps: plan.steps,
+    allowedPaths: contract.scope.allowedPaths,
+    forbiddenPaths: contract.scope.forbiddenPaths,
+    verification: contract.verification.commands,
+  });
+
+  const testDesign = await executeTestDesignMulti({
+    taskId: contract.taskId,
+    prompt: testDesignPrompt,
+    worktreePath: worktree.path,
+    timeoutSeconds: Math.min(contract.execution.timeoutSeconds, 900),
+  });
+
+  writeArtifact(artifactDir, "test-design.json", {
+    provider: testDesign.provider,
+    success: testDesign.success,
+    stdoutTail: testDesign.stdout.slice(-6000),
+    stderrTail: testDesign.stderr.slice(-4000),
+    exitCode: testDesign.exitCode,
+    blockReason: testDesign.blockReason,
+  });
+
+  if (!testDesign.success) {
+    if (testDesign.blockReason === "HUMAN_AUTH_REQUIRED") {
+      state.status = "HUMAN_GATE";
+      writeArtifact(artifactDir, "audit.json", {
+        finalStatus: "HUMAN_AUTH_REQUIRED",
+        source: "TEST_DESIGNER",
+      });
+      return state;
+    }
+    state.status = "BLOCKED";
+    writeArtifact(artifactDir, "audit.json", {
+      finalStatus: "TEST_DESIGN_BLOCKED",
+      reason: testDesign.stderr || testDesign.blockReason,
+    });
+    return state;
+  }
+
+  const preImplementationVerification = runVerificationCommands({
+    commands: contract.verification.commands,
+    cwd: worktree.path,
+  });
+  writeArtifact(artifactDir, "tdd-pre-implementation.json", {
+    provider: testDesign.provider,
+    stage: "TESTS_BEFORE_IMPLEMENTATION",
+    verificationResults: preImplementationVerification,
+    expectedRedAllowed: true,
+  });
+
+  if (checkpoint) {
+    checkpointStage(repositoryRoot, {
+      taskId: contract.taskId,
+      stage: 'TEST_DESIGN',
+      owner: (testDesign.provider ?? 'PROVIDER_MESH').toUpperCase(),
+      objective: contract.objective,
+      evidence: {
+        provider: testDesign.provider,
+        verificationResults: preImplementationVerification,
+      },
+      method: 'tests designed before implementation and executed once',
+      result: 'Test-first baseline captured',
+      next: 'IMPLEMENTATION',
+    });
+  }
+
+  // ── 6. Self-correction implementation loop ─────────────────────
   let lastStatus: AgentResultStatus = "PENDING" as AgentResultStatus;
   let previousDiffSummary = "";
   let failedVerifications = "";
@@ -190,25 +257,6 @@ export async function runTask(
     state.status = "IMPLEMENTING";
 
     console.log(`[task-runner] Task ${contract.taskId} → cycle ${cycle}/${MAX_CYCLES}`);
-
-    // Check Codex availability
-    const codexCheck = checkCodex();
-
-    if (codexCheck.status === "UNAVAILABLE") {
-      console.warn(`[task-runner] Codex unavailable (${codexCheck.status}) — skipping impl step`);
-      lastStatus = "CODEX_UNAVAILABLE";
-      break;
-    }
-
-    if (codexCheck.status === "HUMAN_AUTH_REQUIRED") {
-      state.status = "HUMAN_GATE";
-      lastStatus = "HUMAN_AUTH_REQUIRED";
-      writeArtifact(artifactDir, "audit.json", {
-        finalStatus: "HUMAN_AUTH_REQUIRED",
-        reason: "Codex CLI requires human authentication",
-      });
-      return state;
-    }
 
     // Build prompt with real self-correction context
     const prompt = buildImplementationPrompt({
@@ -225,7 +273,7 @@ export async function runTask(
       scopeViolation: cycle > 1 ? scopeViolationNotes : undefined,
     });
 
-    const codexResult = await execCodexTask({
+    const implementationResult = await executeImplementationMulti({
       taskId: contract.taskId,
       prompt,
       worktreePath: worktree.path,
@@ -234,29 +282,34 @@ export async function runTask(
       timeoutSeconds: contract.execution.timeoutSeconds,
     });
 
-    if (codexResult.blocked) {
-      lastStatus = (codexResult.blockReason as AgentResultStatus) ?? "FAIL";
-      writeArtifact(artifactDir, `codex-cycle-${cycle}-blocked.json`, {
-        blockReason: codexResult.blockReason,
-        exitCode: codexResult.exitCode,
-        stdoutTail: codexResult.stdout.slice(-4000),
-        stderrTail: codexResult.stderr.slice(-4000),
+    const implementerProvider = implementationResult.provider as ProviderId | undefined;
+
+    if (implementationResult.blocked) {
+      lastStatus = implementationResult.blockReason === "HUMAN_AUTH_REQUIRED"
+        ? "HUMAN_AUTH_REQUIRED"
+        : "AUTOMATION_BLOCKED";
+      writeArtifact(artifactDir, `implementer-cycle-${cycle}-blocked.json`, {
+        provider: implementerProvider,
+        blockReason: implementationResult.blockReason,
+        exitCode: implementationResult.exitCode,
+        stdoutTail: implementationResult.stdout.slice(-4000),
+        stderrTail: implementationResult.stderr.slice(-4000),
       });
       if (lastStatus === "HUMAN_AUTH_REQUIRED") {
         state.status = "HUMAN_GATE";
         writeArtifact(artifactDir, "audit.json", {
           finalStatus: "HUMAN_AUTH_REQUIRED",
-          source: "CODEX",
+          source: implementerProvider ?? "PROVIDER_MESH",
           cycle,
-          exitCode: codexResult.exitCode,
-          stderr: codexResult.stderr,
+          exitCode: implementationResult.exitCode,
+          stderr: implementationResult.stderr,
         });
         return state;
       }
       break;
     }
 
-    // ── 6. Mechanical Scope Enforcement ─────────────────────────
+    // ── 7. Mechanical Scope Enforcement ─────────────────────────
     const scopeCheck = verifyPathScope({
       worktreePath: worktree.path,
       allowedPaths: contract.scope.allowedPaths,
@@ -284,7 +337,7 @@ export async function runTask(
       continue; // Retry in next cycle with scope correction feedback
     }
 
-    // ── 7. Guarded Verification ─────────────────────────────────
+    // ── 8. Guarded Verification ─────────────────────────────────
     state.status = "VERIFYING";
 
     const verifications = runVerificationCommands({
@@ -299,7 +352,7 @@ export async function runTask(
       failedVerifications = verSummary;
     }
 
-    // ── 8. Antigravity Audit ─────────────────────────────────────
+    // ── 9. Independent cross-provider audit ──────────────────────
     state.status = "AUDITING";
 
     const diffStat = collectDiffStat(worktree.path);
@@ -308,7 +361,7 @@ export async function runTask(
     const reviewDiff = collectReviewDiff(worktree.path);
     if (checkpoint) enforceEditBudget(reviewDiff);
 
-    const audit = await auditResultDetailed({
+    const audit = await auditResultMulti({
       taskId: contract.taskId,
       objective: contract.objective,
       planSummary: plan.steps.map(step => step.description).join('\n'),
@@ -316,6 +369,7 @@ export async function runTask(
       reviewDiff,
       verificationSummary: verSummary,
       repositoryRoot,
+      excludeProviders: implementerProvider ? [implementerProvider] : [],
     });
     const auditDecision = audit.decision;
     writeArtifact(artifactDir, `auditor-cycle-${cycle}.json`, audit);
@@ -326,7 +380,7 @@ export async function runTask(
       lastStatus = "HUMAN_AUTH_REQUIRED";
       writeArtifact(artifactDir, "audit.json", {
         finalStatus: "HUMAN_AUTH_REQUIRED",
-        source: "ANTIGRAVITY_AUDIT",
+        source: audit.provider ?? "PROVIDER_MESH_AUDIT",
         cycle,
       });
       return state;
@@ -337,8 +391,8 @@ export async function runTask(
     const effectiveStatus: AgentResultStatus =
       auditDecision === "PASS" && verPass
         ? "PASS"
-        : auditDecision === "ANTIGRAVITY_UNAVAILABLE"
-        ? "ANTIGRAVITY_UNAVAILABLE"
+        : auditDecision === "AUDIT_INVALID"
+        ? "AUDIT_INVALID"
         : (auditDecision as AgentResultStatus);
 
     const result = buildAgentResult({
@@ -360,10 +414,10 @@ export async function runTask(
     if (result.status === "PASS") {
       if (checkpoint) {
         if (!verifications.length || !verPass) throw Error('VERIFICATION_EVIDENCE_REQUIRED');
-        checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'IMPLEMENTATION', owner: 'CODEX',
+        checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'IMPLEMENTATION', owner: (implementerProvider ?? 'PROVIDER_MESH').toUpperCase(),
           objective: contract.objective, evidence: { changedFiles, reviewDiff, verifications },
           method: 'guarded verification', result: 'All required commands passed', next: 'CROSS_REVIEW' });
-        checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'CROSS_REVIEW', owner: 'ANTIGRAVITY',
+        checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'CROSS_REVIEW', owner: (audit.provider ?? 'PROVIDER_MESH').toUpperCase(),
           objective: contract.objective, evidence: { reviewDiff, auditDecision, verifications },
           method: 'independent patch audit', result: 'PASS', next: 'DELIVERY' });
       }
@@ -390,7 +444,7 @@ export async function runTask(
       break;
     }
 
-    if (result.status === 'AUDIT_INVALID' || result.status === 'ANTIGRAVITY_UNAVAILABLE') {
+    if (result.status === 'AUDIT_INVALID') {
       break;
     }
 
