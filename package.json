@@ -28,7 +28,8 @@
     "bridge:acceptance:live": "BRIDGE_REAL_E2E=1 npx tsx --test tests/automation/dry-run.test.ts",
     "bridge:backlog:run": "npx tsx automation/agent-bridge/src/backlog-runner.ts --execute",
     "bridge:backlog:run-all": "npx tsx automation/agent-bridge/src/backlog-runner.ts --execute --all",
-    "bridge:activate": "npm run build:shared && npm run typecheck && npm run test:bridge && npm run bridge:acceptance:live && npm run bridge:backlog:run-all"
+    "bridge:activate": "npm run build:shared && npm run typecheck && npm run test:bridge && npm run bridge:acceptance:live && npm run bridge:backlog:run-all",
+    "test:dr-v1-2": "npx tsx --test tests/automation/dr-hardening-v1-2.test.ts"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
