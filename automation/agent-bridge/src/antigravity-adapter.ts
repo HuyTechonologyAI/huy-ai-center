@@ -7,6 +7,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { redact } from "./log-redactor.js";
 import type { AgentPlan, CliCheckResult } from "./types.js";
 
@@ -15,10 +16,8 @@ import type { AgentPlan, CliCheckResult } from "./types.js";
 // ─────────────────────────────────────────────────
 
 export function checkAntigravity(): CliCheckResult {
-  const result = spawnSync("agy", ["--version"], {
-    encoding: "utf-8",
-    timeout: 5000,
-    shell: true,
+  const result = runAgy(["--version"], {
+    timeoutMs: 5000,
   });
 
   if (result.error || result.status === null || result.status !== 0) {
@@ -65,19 +64,20 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
   const prompt = buildPlanningPrompt(req);
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const result = spawnSync("agy", ["-p", prompt, "--output-format", "text"], {
-      encoding: "utf-8",
-      cwd: req.repositoryRoot,
-      timeout: (req.timeoutSeconds ?? 120) * 1000,
-      env: { ...process.env },
-      shell: true,
-    });
+    const result = runAgy(
+      ["--input-format", "text", "--output-format", "text"],
+      {
+        cwd: req.repositoryRoot,
+        timeoutMs: (req.timeoutSeconds ?? 120) * 1000,
+        input: prompt,
+      }
+    );
 
     const stdout = redact(result.stdout ?? "");
     const stderr = redact(result.stderr ?? "");
     const output = stdout || stderr;
 
-    if (isAgyAuthError(output)) {
+    if (result.status !== 0 && isAgyAuthError(`${stderr}\n${stdout}`)) {
       return buildUnavailablePlan(req.taskId, "HUMAN_AUTH_REQUIRED");
     }
 
@@ -88,7 +88,10 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
       }
     }
 
-    console.warn(`[antigravity-adapter] Plan attempt ${attempt} invalid or empty. Retrying...`);
+    console.warn(
+      `[antigravity-adapter] Plan attempt ${attempt} invalid or empty. ` +
+      `exit=${String(result.status)} stderr=${redact(result.stderr ?? "").slice(0, 300)} Retrying...`
+    );
   }
 
   return buildUnavailablePlan(req.taskId, "AGENT_PLAN_INVALID");
@@ -101,10 +104,52 @@ export async function generatePlan(req: AgyPlanRequest): Promise<AgentPlan> {
 export interface AgyAuditRequest {
   taskId: string;
   objective: string;
+  planSummary?: string;
   diffStat: string;
+  reviewDiff?: string;
   verificationSummary: string;
   repositoryRoot: string;
   timeoutSeconds?: number;
+}
+
+export type AuditDecision = "PASS" | "CORRECTION_REQUIRED" | "HUMAN_DECISION_REQUIRED"
+  | "ANTIGRAVITY_UNAVAILABLE" | "HUMAN_AUTH_REQUIRED" | "AUDIT_INVALID";
+
+export async function auditResultDetailed(req: AgyAuditRequest): Promise<{ decision: AuditDecision; reason: string }> {
+  const check = checkAntigravity();
+  if (!check.installed) return { decision: 'ANTIGRAVITY_UNAVAILABLE', reason: 'Antigravity CLI unavailable' };
+
+  const prompt = `You are an independent reviewer of an automation task.
+Task ID: ${req.taskId}
+Objective: ${req.objective}
+Plan: ${redact(req.planSummary ?? '')}
+Diff stat: ${redact(req.diffStat)}
+Complete patch: ${redact(req.reviewDiff ?? '')}
+Verification results: ${redact(req.verificationSummary)}
+Verify the objective against the actual patch and applicable checks. For a documentation-only
+change, verify requested content in the patch, scope, and verification results. Check API,
+schema, and code tests when relevant; do not require unrelated checks.
+Respond with exactly two lines:
+PASS | CORRECTION_REQUIRED | HUMAN_DECISION_REQUIRED
+REASON: one specific, brief reason backed by the patch or verification output.
+Use CORRECTION_REQUIRED for a fixable defect and HUMAN_DECISION_REQUIRED for ambiguity.`;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const result = runAgy(['--input-format', 'text', '--output-format', 'text'], {
+      cwd: req.repositoryRoot, timeoutMs: (req.timeoutSeconds ?? 90) * 1000, input: prompt,
+    });
+    const stdout = redact(result.stdout ?? '').trim();
+    const stderr = redact(result.stderr ?? '').trim();
+    if (result.status !== 0 && isAgyAuthError(`${stderr}\n${stdout}`)) {
+      return { decision: 'HUMAN_AUTH_REQUIRED', reason: 'Antigravity authentication required' };
+    }
+    if (result.status === 0) {
+      const match = /^(PASS|CORRECTION_REQUIRED|HUMAN_DECISION_REQUIRED)\s*\r?\nREASON:\s*(.+)$/i.exec(stdout);
+      if (match) return { decision: match[1].toUpperCase() as AuditDecision, reason: match[2].slice(0, 500) };
+    }
+    console.warn(`[antigravity-adapter] Audit attempt ${attempt} invalid: exit=${String(result.status)} error=${String(result.error ?? '')} stderr=${stderr.slice(0, 300)} stdout=${stdout.slice(0, 100)}`);
+  }
+  return { decision: 'AUDIT_INVALID', reason: 'Antigravity failed or returned an invalid audit response twice' };
 }
 
 export async function auditResult(
@@ -117,54 +162,7 @@ export async function auditResult(
   | "HUMAN_AUTH_REQUIRED"
   | "AUDIT_INVALID"
 > {
-  const check = checkAntigravity();
-  if (!check.installed) return "ANTIGRAVITY_UNAVAILABLE";
-
-  const prompt = `
-You are auditing a completed automation task.
-
-Task ID: ${req.taskId}
-Objective: ${req.objective}
-
-Git diff stat:
-${redact(req.diffStat)}
-
-Verification results:
-${req.verificationSummary}
-
-Based on the above, respond with ONE of the following (nothing else):
-PASS
-CORRECTION_REQUIRED
-HUMAN_DECISION_REQUIRED
-
-PASS = the implementation meets the objective and all verifications pass.
-CORRECTION_REQUIRED = the implementation has issues that can be fixed automatically.
-HUMAN_DECISION_REQUIRED = there is an architectural or security ambiguity a human must resolve.
-`.trim();
-
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const result = spawnSync("agy", ["-p", prompt, "--output-format", "text"], {
-      encoding: "utf-8",
-      cwd: req.repositoryRoot,
-      timeout: (req.timeoutSeconds ?? 90) * 1000,
-      shell: true,
-    });
-
-    const output = redact(result.stdout ?? "").trim().toUpperCase();
-
-    if (isAgyAuthError(output)) {
-      return "HUMAN_AUTH_REQUIRED";
-    }
-
-    if (output.includes("CORRECTION_REQUIRED")) return "CORRECTION_REQUIRED";
-    if (output.includes("HUMAN_DECISION_REQUIRED")) return "HUMAN_DECISION_REQUIRED";
-    if (output.includes("PASS")) return "PASS";
-
-    console.warn(`[antigravity-adapter] Audit attempt ${attempt} returned unrecognized response: ${output.slice(0, 100)}`);
-  }
-
-  // Do not silently convert malformed agent output to PASS
-  return "AUDIT_INVALID";
+  return (await auditResultDetailed(req)).decision;
 }
 
 function isAgyAuthError(text: string): boolean {
@@ -184,6 +182,44 @@ function isAgyAuthError(text: string): boolean {
 // ─────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────
+
+interface AgyRunOptions {
+  cwd?: string;
+  timeoutMs: number;
+  input?: string;
+}
+
+/**
+ * Execute the npm-installed Antigravity CLI without routing the prompt through
+ * cmd.exe. On Windows the npm PowerShell shim is invoked explicitly so
+ * multiline prompts are passed as a single argv value.
+ */
+function runAgy(args: string[], options: AgyRunOptions) {
+  const common = {
+    encoding: "utf-8" as const,
+    cwd: options.cwd,
+    timeout: options.timeoutMs,
+    env: { ...process.env },
+    input: options.input,
+  };
+
+  if (process.platform === "win32") {
+    const npmBin = process.env.APPDATA
+      ? `${process.env.APPDATA}\\npm\\agy.ps1`
+      : "";
+
+    if (npmBin && existsSync(npmBin)) {
+      return spawnSync(
+        "powershell.exe",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", npmBin, ...args],
+        { ...common, shell: false }
+      );
+    }
+  }
+
+  return spawnSync("agy", args, { ...common, shell: process.platform === "win32" });
+}
+
 
 function buildPlanningPrompt(req: AgyPlanRequest): string {
   return `

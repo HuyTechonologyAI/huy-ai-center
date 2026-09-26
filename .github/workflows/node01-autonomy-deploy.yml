@@ -1,0 +1,90 @@
+name: Node01 Persistent Autonomy Deploy
+
+on:
+  push:
+    branches:
+      - agent-task/dr-hardening-v1-2
+    paths:
+      - 'automation/agent-bridge/**'
+      - 'config/autonomy/**'
+      - 'deploy/node01/**'
+      - 'scripts/node01/activate-persistent-multi-ai-loop.sh'
+      - 'package.json'
+      - '.github/workflows/node01-autonomy-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Activate persistent loop on huy-ai-node-01
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 30
+    concurrency:
+      group: node01-persistent-autonomy
+      cancel-in-progress: true
+    steps:
+      - name: Verify this is Node01
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d /mnt/data1/HUY-AI
+          case "$(hostname -s)" in
+            huy-ai-node-01|huy-ai-node01|node01|Node01) ;;
+            *)
+              echo "NODE01_IDENTITY=FAIL:$(hostname -s)"
+              exit 40
+              ;;
+          esac
+          echo "NODE01_IDENTITY=PASS"
+
+      - name: Fail-closed deploy to dedicated control clone
+        shell: bash
+        env:
+          AUTONOMY_REF: feature/persistent-multi-ai-runtime
+          CONTROL_REPO: /mnt/data1/HUY-AI/runtime/autonomy-control
+        run: |
+          set -euo pipefail
+          case "$CONTROL_REPO" in
+            /mnt/data2|/mnt/data2/*) echo "DATA2_ACCESS=DENY"; exit 41 ;;
+          esac
+
+          mkdir -p "$(dirname "$CONTROL_REPO")"
+
+          if [ ! -d "$CONTROL_REPO/.git" ]; then
+            git clone --branch "$AUTONOMY_REF" --single-branch               https://github.com/HuyTechonologyAI/huy-ai-center.git               "$CONTROL_REPO"
+          else
+            if [ -n "$(git -C "$CONTROL_REPO" status --porcelain)" ]; then
+              echo "CONTROL_REPO_DIRTY=DENY"
+              exit 42
+            fi
+            git -C "$CONTROL_REPO" fetch origin "$AUTONOMY_REF"
+            git -C "$CONTROL_REPO" checkout "$AUTONOMY_REF"
+            git -C "$CONTROL_REPO" reset --hard "origin/$AUTONOMY_REF"
+          fi
+
+          test -d "$CONTROL_REPO/.git"
+          test "$(git -C "$CONTROL_REPO" branch --show-current)" = "$AUTONOMY_REF"
+
+          HUY_AI_REPO="$CONTROL_REPO"           HUY_AI_SUPERVISOR_STATE_DIR=/mnt/data1/HUY-AI/state/supervisors             bash "$CONTROL_REPO/scripts/node01/activate-persistent-multi-ai-loop.sh"
+
+      - name: Verify fresh heartbeat
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATE=/mnt/data1/HUY-AI/state/supervisors
+          test -s "$STATE/persistent-multi-ai-heartbeat.json"
+          node - "$STATE/persistent-multi-ai-heartbeat.json" <<'NODE'
+          const fs = require('fs');
+          const p = process.argv[2];
+          const h = JSON.parse(fs.readFileSync(p, 'utf8'));
+          const age = Date.now() - Date.parse(h.timestamp);
+          if (!Number.isFinite(age) || age > 90000) throw new Error('STALE_HEARTBEAT');
+          if (!['RUNNING','IDLE','WAITING_PROVIDER','WAITING_HUMAN','DEGRADED'].includes(h.state)) {
+            throw new Error('INVALID_SUPERVISOR_STATE:' + h.state);
+          }
+          console.log('NODE01_PERSISTENT_MULTI_AI_LOOP=ACTIVE');
+          console.log('SUPERVISOR_STATE=' + h.state);
+          console.log('SAFE_TO_START_NODE01_MIGRATION=NO');
+          NODE
