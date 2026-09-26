@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HUY AI Center Storage Policy & Node Topology",
+  "version": "2.0",
+  "effectiveDate": "2026-09-26",
+  "authorizedBy": "Human Owner (Root of Trust)",
+  "architecture": "DECOUPLED_REMOTE_CONTROL_AND_AUTHORITATIVE_STORAGE",
+  "nodes": {
+    "lenovoControlPlane": {
+      "name": "Lenovo Laptop Control Plane",
+      "role": "REMOTE_CONTROL_PLANE_ONLY",
+      "authoritativeStorage": false,
+      "allowPermanentDataStorage": false,
+      "allowPermanentCheckpointStorage": false,
+      "description": "Lenovo is strictly a remote orchestration control station; it does not retain authoritative working data or permanent checkpoints."
+    },
+    "node01": {
+      "name": "Node-01 (huy-node01)",
+      "tailscaleIp": "100.79.240.108",
+      "role": "AUTHORITATIVE_STORAGE_ANCHOR",
+      "authoritativeStorage": true,
+      "canonicalTarget": "/mnt/data1/Projects/HUY-AI-Center",
+      "operationalRoot": "/mnt/data1/HUY-AI",
+      "storageDirectories": {
+        "checkpoints": "/mnt/data1/HUY-AI/checkpoints",
+        "state": "/mnt/data1/HUY-AI/state",
+        "data": "/mnt/data1/HUY-AI/data",
+        "artifacts": "/mnt/data1/HUY-AI/artifacts",
+        "backups": "/mnt/data1/HUY-AI/backups",
+        "staging": "/mnt/data1/HUY-AI/staging"
+      },
+      "protectedPaths": [
+        "/mnt/data2",
+        "/mnt/data2/**"
+      ],
+      "protectionLevel": "R4_PROTECTED_NO_WRITE_NO_FALLBACK"
+    }
+  },
+  "synchronization": {
+    "transport": "tailscale_taildrop",
+    "targetPeer": "huy-node01",
+    "autoSyncCheckpoints": true,
+    "syncFrequency": "ON_CHECKPOINT_CREATION"
+  },
+  "rules": [
+    "RULE_1: All working data and newly created checkpoints must be transmitted to and stored on Node-01.",
+    "RULE_2: Lenovo machine operates as an ephemeral remote control plane only.",
+    "RULE_3: /mnt/data2 on Node-01 is R4 Protected - zero write, zero delete, zero fallback.",
+    "RULE_4: All candidate promote actions occur under /mnt/data1 on Node-01."
+  ]
+}

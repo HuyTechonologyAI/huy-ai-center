@@ -1,6 +1,7 @@
 import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CheckpointRecord, FinalReceipt } from './types.js';
+import { syncFileToNode01 } from './node01-sync.js';
 
 const PHASE_ORDER = [
   'CP00_PATH_VALIDATION',
@@ -50,6 +51,14 @@ export function writeCheckpoint(options: {
   // Also update latest project state
   const stateFile = join(stateDir, 'PROJECT_STATE.json');
   writeFileSync(stateFile, JSON.stringify(record, null, 2));
+
+  // Authoritative Storage: Auto-sync checkpoint to Node-01
+  try {
+    syncFileToNode01(checkpointFile);
+    syncFileToNode01(stateFile);
+  } catch {
+    // Non-blocking fallback if transport temporarily offline
+  }
 
   return record;
 }
