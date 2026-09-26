@@ -8,7 +8,9 @@ const PHASE_ORDER = [
   'CP10_PROJECT_DISCOVERY',
   'CP20_CLASSIFICATION',
   'CP30_GIT_STATE',
+  'CP30_DR_SNAPSHOT',
   'CP40_DR_SNAPSHOT',
+  'CP40_GITHUB_DESTINATION',
   'CP50_GITHUB_DESTINATION',
   'CP50_GITHUB_UPLOAD',
   'CP60_RESTORE_TEST',
@@ -198,21 +200,21 @@ export function validateFinalReceipt(receipt: Partial<FinalReceipt>): void {
 
     if (wanted === '__NONEMPTY__') {
       if (typeof actual !== 'string' || actual.trim() === '') {
-        throw new Error(`RECEIPT_VALIDATION_ERROR: marker '${key}' must be non-empty`);
+        throw new Error(`RECEIPT_VALIDATION_ERROR: INCOMPLETE_RECEIPT_CANNOT_PASS - marker '${key}' must be non-empty`);
       }
       continue;
     }
 
     if (wanted === '__OBJECT__') {
       if (!actual || typeof actual !== 'object' || Array.isArray(actual)) {
-        throw new Error(`RECEIPT_VALIDATION_ERROR: marker '${key}' must be an object`);
+        throw new Error(`RECEIPT_VALIDATION_ERROR: INCOMPLETE_RECEIPT_CANNOT_PASS - marker '${key}' must be an object`);
       }
       continue;
     }
 
     if (actual !== wanted) {
       throw new Error(
-        `RECEIPT_VALIDATION_ERROR: marker '${key}' expected '${String(wanted)}' but got '${String(actual)}'`
+        `RECEIPT_VALIDATION_ERROR: INCOMPLETE_RECEIPT_CANNOT_PASS - marker '${key}' expected '${String(wanted)}' but got '${String(actual)}'`
       );
     }
   }

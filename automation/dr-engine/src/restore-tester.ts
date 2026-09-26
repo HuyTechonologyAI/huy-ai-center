@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   existsSync, mkdirSync, readFileSync, lstatSync, chmodSync,
-  copyFileSync, symlinkSync, readlinkSync
+  copyFileSync, symlinkSync, readlinkSync, readdirSync
 } from 'node:fs';
 import { join, dirname, isAbsolute, normalize, resolve, relative, sep } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -114,7 +114,7 @@ export function performRestoreTest(options: {
 } {
   const { bundlePath, restoreDir, dirtyState, dirtyStatePayloadDir } = options;
 
-  if (existsSync(restoreDir)) {
+  if (existsSync(restoreDir) && readdirSync(restoreDir).length > 0) {
     throw new Error(`RESTORE_DIR_MUST_NOT_EXIST: ${restoreDir}`);
   }
 

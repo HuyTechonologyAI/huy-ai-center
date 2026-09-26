@@ -303,7 +303,8 @@ describe('GitHub DR & Node01 Migration Test Suite (T01 - T36)', () => {
       const restoreRes = performRestoreTest({
         bundlePath: backup.bundlePath,
         restoreDir,
-        dirtyState: dirty
+        dirtyState: backup.dirtyState,
+        dirtyStatePayloadDir: backup.dirtyStatePayloadDir
       });
       assert.equal(restoreRes.dirtyStateReconstructed, true);
       assert.ok(existsSync(join(restoreDir, 'unstaged.txt')));
