@@ -39,5 +39,8 @@ jobs:
       - name: DR V1.2 regression suite
         run: npm run test:dr-v1-2
 
+      - name: Build shared workspaces
+        run: npm run build:shared
+
       - name: Typecheck
         run: npm run typecheck
