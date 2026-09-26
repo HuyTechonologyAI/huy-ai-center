@@ -184,7 +184,7 @@ export function assertUploadSetSafe(filePaths: string[]): void {
 
     if (
       classification.category === FileClassification.PROHIBITED ||
-      classification.prohibitedForPlaintextGit ||
+      classification.category === FileClassification.DR_ENCRYPTED ||
       secretScan.hasSecret
     ) {
       blocked.push({ file: filePath, reason: classification.reason });
