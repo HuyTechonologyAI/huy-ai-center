@@ -4,8 +4,8 @@
   "mode": "SERIAL_FAIL_CLOSED",
   "max_concurrency": 1,
   "invariants": {
-    "antigravity_role": "PLANNER_AUDITOR_ONLY",
-    "codex_role": "IMPLEMENTER_ONLY",
+    "antigravity_role": "PRIMARY_IMPLEMENTER_AND_PLANNER",
+    "codex_role": "SECONDARY_IMPLEMENTER_AND_REVIEWER",
     "primary_worktree_edits_forbidden": true,
     "task_worktree_required": true,
     "parallel_tasks_require_disjoint_allowed_paths": true,
@@ -14,6 +14,94 @@
     "merge_to_main_default": "HUMAN_REQUIRED"
   },
   "tasks": [
+    {
+      "id": "ai-hr-bootstrap",
+      "title": "Recruit and activate AI HR Director",
+      "phase": "ORG-HR-01",
+      "risk": "R2",
+      "depends_on": [],
+      "status": "READY",
+      "objective": "Activate the AI HR Director charter and workforce-control policy, verify fail-closed authority boundaries, and prepare the first evidence-based staffing plan for HUY AI Center.",
+      "allowed_paths": [
+        "config/organization/",
+        "docs/organization/",
+        "tests/automation/",
+        "PROJECT_STATE.md"
+      ],
+      "verification": [
+        "npm run typecheck",
+        "npm run test:bridge"
+      ],
+      "human_gate": false
+    },
+    {
+      "id": "ai-workforce-plan",
+      "title": "Build complete AI workforce plan",
+      "phase": "ORG-HR-02",
+      "risk": "R2",
+      "depends_on": [
+        "ai-hr-bootstrap"
+      ],
+      "status": "BLOCKED",
+      "objective": "Analyze the canonical roadmap, architecture and provider capabilities; produce prioritized role cards, competency matrix, permission ceilings, tool assignments, probation tasks and hiring order for the full AI organization.",
+      "allowed_paths": [
+        "config/organization/",
+        "docs/organization/",
+        "tests/automation/",
+        "PROJECT_STATE.md"
+      ],
+      "verification": [
+        "npm run typecheck",
+        "npm run test:bridge"
+      ],
+      "human_gate": false
+    },
+    {
+      "id": "ai-core-team-recruitment",
+      "title": "Recruit and verify core AI operating team",
+      "phase": "ORG-HR-03",
+      "risk": "R2",
+      "depends_on": [
+        "ai-workforce-plan"
+      ],
+      "status": "BLOCKED",
+      "objective": "Recruit, configure and verify the first core AI workforce using isolated probation tasks and capability receipts: architecture/planning, Antigravity primary coding, QA, security, DevOps/SRE and data engineering.",
+      "allowed_paths": [
+        "config/organization/",
+        "config/autonomy/",
+        "docs/organization/",
+        "tests/automation/",
+        "PROJECT_STATE.md"
+      ],
+      "verification": [
+        "npm run typecheck",
+        "npm run test:bridge"
+      ],
+      "human_gate": false
+    },
+    {
+      "id": "ai-org-readiness",
+      "title": "Verify AI organization readiness",
+      "phase": "ORG-HR-04",
+      "risk": "R2",
+      "depends_on": [
+        "ai-core-team-recruitment"
+      ],
+      "status": "BLOCKED",
+      "objective": "Verify workforce coverage, least-privilege permissions, provider failover, probation receipts and ownership for all roadmap work before returning execution priority to the technical roadmap.",
+      "allowed_paths": [
+        "config/organization/",
+        "config/autonomy/",
+        "docs/organization/",
+        "tests/automation/",
+        "PROJECT_STATE.md"
+      ],
+      "verification": [
+        "npm run typecheck",
+        "npm run test:bridge"
+      ],
+      "human_gate": false
+    },
     {
       "id": "06k-c-readiness",
       "title": "06K-C production migration readiness package",
