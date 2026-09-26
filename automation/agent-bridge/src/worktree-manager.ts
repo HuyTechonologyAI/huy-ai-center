@@ -21,6 +21,33 @@ function sanitizeTaskId(taskId: string): string {
   return taskId.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
+
+/**
+ * Trust only the exact task worktree path for the current user.
+ * This is required on Node01 because /mnt/data1 is mounted with root ownership
+ * while the autonomy service runs as huyadmin. Wildcard trust is forbidden.
+ */
+export function ensureGitSafeDirectory(path: string): void {
+  const current = spawnSync("git", ["config", "--global", "--get-all", "safe.directory"], {
+    encoding: "utf-8",
+  });
+
+  if (current.status !== 0 && current.status !== 1) {
+    throw new Error(`SAFE_DIRECTORY_READ_FAILED: ${current.stderr || current.stdout}`);
+  }
+
+  const configured = (current.stdout ?? "").split("\n").filter(Boolean);
+  if (configured.includes(path)) return;
+
+  const add = spawnSync("git", ["config", "--global", "--add", "safe.directory", path], {
+    encoding: "utf-8",
+  });
+
+  if (add.status !== 0) {
+    throw new Error(`SAFE_DIRECTORY_WRITE_FAILED: ${add.stderr || add.stdout}`);
+  }
+}
+
 /**
  * Create an isolated worktree for the given task.
  * Creates a new branch from baseBranch.
@@ -52,6 +79,8 @@ export function createWorktree(params: {
   if (!existsSync(join(repositoryRoot, WORKTREES_ROOT))) {
     mkdirSync(join(repositoryRoot, WORKTREES_ROOT), { recursive: true });
   }
+
+  ensureGitSafeDirectory(path);
 
   if (existsSync(path)) {
     const existing = spawnSync("git", ["branch", "--show-current"], { cwd: path, encoding: "utf-8" });
