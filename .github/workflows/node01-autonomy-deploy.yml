@@ -19,12 +19,26 @@ permissions:
 jobs:
   deploy:
     name: Activate persistent loop on huy-ai-node-01
-    runs-on: [self-hosted, linux, x64, huy-ai-node-01]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 30
     concurrency:
       group: node01-persistent-autonomy
       cancel-in-progress: false
     steps:
+      - name: Verify this is Node01
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d /mnt/data1/HUY-AI
+          case "$(hostname -s)" in
+            huy-ai-node-01|huy-ai-node01|node01|Node01) ;;
+            *)
+              echo "NODE01_IDENTITY=FAIL:$(hostname -s)"
+              exit 40
+              ;;
+          esac
+          echo "NODE01_IDENTITY=PASS"
+
       - name: Fail-closed deploy to dedicated control clone
         shell: bash
         env:
