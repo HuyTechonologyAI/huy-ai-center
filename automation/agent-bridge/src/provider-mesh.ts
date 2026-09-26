@@ -272,6 +272,58 @@ function runVersion(command: string): { installed: boolean; version?: string } {
   };
 }
 
+
+export function parseCodexAuthStatus(status: number | null, output: string): boolean {
+  return status === 0 && /logged in/i.test(output) && !/not logged in/i.test(output);
+}
+
+export function parseClaudeAuthStatus(status: number | null, output: string): boolean {
+  if (status !== 0) return false;
+  try {
+    const parsed = JSON.parse(output) as { loggedIn?: boolean };
+    return parsed.loggedIn === true;
+  } catch {
+    return false;
+  }
+}
+
+function probeInstalledAuth(id: ProviderId): boolean {
+  if (id === 'codex') {
+    const r = spawnSync('codex', ['login', 'status'], {
+      encoding: 'utf8',
+      timeout: 5_000,
+      shell: false
+    });
+    return parseCodexAuthStatus(r.status, `${r.stdout ?? ''}\n${r.stderr ?? ''}`);
+  }
+
+  if (id === 'claude') {
+    const r = spawnSync('claude', ['auth', 'status'], {
+      encoding: 'utf8',
+      timeout: 5_000,
+      shell: false
+    });
+    return parseClaudeAuthStatus(r.status, r.stdout ?? '');
+  }
+
+  if (id === 'gemini') {
+    const hasEnv = Boolean(
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_GENAI_USE_VERTEXAI ||
+      process.env.GOOGLE_GENAI_USE_GCA
+    );
+    return hasEnv;
+  }
+
+  // Antigravity currently has no cheap non-network auth-status command.
+  // Only a previously successful real invocation is accepted as proof.
+  if (id === 'antigravity') {
+    return false;
+  }
+
+  return false;
+}
+
 export function probeProviders(
   previous?: Record<ProviderId, ProviderHealth>,
   now = Date.now()
@@ -286,15 +338,14 @@ export function probeProviders(
     h.version = version.version;
     h.lastProbeAt = now;
 
-    // Version checks cannot prove auth. Existing successful execution can.
     if (!version.installed) {
       h.authenticated = false;
     } else if (h.lastSuccessAt) {
       h.authenticated = true;
     } else {
-      // Installed providers are considered routable; invocation converts auth
-      // errors into HUMAN_AUTH_REQUIRED without silently claiming success.
-      h.authenticated = true;
+      // Fail closed: installed != authenticated.
+      // Free/logged-out providers remain unavailable until explicit auth proof.
+      h.authenticated = probeInstalledAuth(id);
     }
   }
 
