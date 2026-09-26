@@ -218,6 +218,47 @@ function checkAuthText(text: string): boolean {
   return AUTH_PATTERNS.some(pattern => lower.includes(pattern));
 }
 
+
+export function detectProviderSemanticFailure(
+  provider: ProviderId,
+  output: string,
+  error: string
+): { reason: string; retryable: boolean } | null {
+  const combined = `${output}\n${error}`.toLowerCase();
+
+  const sandboxMarkers = [
+    'failed rtm_newaddr',
+    'sandbox configuration error',
+    'shell execution failed',
+    'could not find bubblewrap',
+    'bwrap:'
+  ];
+
+  if (sandboxMarkers.some(marker => combined.includes(marker))) {
+    return {
+      reason: `SANDBOX_EXECUTION_FAILED:${provider}`,
+      retryable: true
+    };
+  }
+
+  const capacityMarkers = [
+    'rate limit',
+    'too many requests',
+    '429',
+    'temporarily unavailable',
+    'capacity'
+  ];
+
+  if (capacityMarkers.some(marker => combined.includes(marker))) {
+    return {
+      reason: `PROVIDER_CAPACITY_WAIT:${provider}`,
+      retryable: true
+    };
+  }
+
+  return null;
+}
+
 function runVersion(command: string): { installed: boolean; version?: string } {
   const r = spawnSync(command, ['--version'], {
     encoding: 'utf8',
@@ -412,14 +453,15 @@ export async function runProviderPrompt(req: ProviderRunRequest): Promise<Provid
   const error = redact(r.stderr ?? '');
   const combined = `${error}\n${output}`;
   const authRequired = r.status !== 0 && checkAuthText(combined);
+  const semanticFailure = detectProviderSemanticFailure(req.provider, output, error);
 
   return {
     provider: req.provider,
-    success: r.status === 0,
+    success: r.status === 0 && !semanticFailure,
     output,
-    error,
+    error: semanticFailure ? `${semanticFailure.reason}\n${error}`.trim() : error,
     exitCode: r.status,
     authRequired,
-    retryable: !authRequired
+    retryable: semanticFailure ? semanticFailure.retryable : !authRequired
   };
 }
