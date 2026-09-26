@@ -10,6 +10,9 @@ import { createGitBackup } from '../../automation/dr-engine/src/git-backup.js';
 import { performRestoreTest } from '../../automation/dr-engine/src/restore-tester.js';
 import { validateFinalReceipt, writeCheckpoint, validateCheckpointChain } from '../../automation/dr-engine/src/checkpoint-manager.js';
 import { assertUploadSetSafe } from '../../automation/dr-engine/src/secret-scanner.js';
+import { reconcileRequiredRepositories } from '../../automation/dr-engine/src/project-discovery.js';
+import { verifyDownloadedRemoteArtifact } from '../../automation/dr-engine/src/github-backup.js';
+import { assertSafeStoragePath } from '../../automation/dr-engine/src/path-guard.js';
 
 function temp(prefix: string) {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -224,4 +227,83 @@ test('R28/R29: checkpoint chain detects tamper and source fingerprint change', (
   raw.details = { tampered: true };
   writeFileSync(cp, JSON.stringify(raw, null, 2));
   assert.throws(() => validateCheckpointChain(stateDir, 'm1', 'src-a'), /CHECKPOINT_HASH_MISMATCH/);
+});
+
+
+test('R23-R25: required repo reconciliation includes local, remote-only and local-only projects', () => {
+  const known = [
+    'HuyTechonologyAI/huy-ai-center',
+    'HuyTechonologyAI/ai-automation-website',
+    'HuyTechonologyAI/edtech-ai-portfolio',
+    'HuyTechonologyAI/SmartTeacherScheduleAI'
+  ];
+  const discovered: any[] = [
+    {
+      project_id: 'local-huy',
+      display_name: 'HUY',
+      source_path_windows: '',
+      source_path_wsl: '/src/huy',
+      git_root: '/src/huy',
+      git_remote: 'https://github.com/HuyTechonologyAI/huy-ai-center.git',
+      current_branch: 'feature',
+      HEAD: 'abc',
+      dirty: false,
+      staged: false,
+      untracked_count: 0,
+      worktrees: [],
+      submodules: [],
+      size_bytes: 0,
+      file_count: 0,
+      project_markers: ['.git'],
+      github_repo: 'HuyTechonologyAI/huy-ai-center',
+      classification: 'PRIMARY',
+      migration_required: true
+    },
+    {
+      project_id: 'local-only',
+      display_name: 'Local Only',
+      source_path_windows: '',
+      source_path_wsl: '/src/local-only',
+      git_root: '/src/local-only',
+      git_remote: null,
+      current_branch: 'main',
+      HEAD: 'def',
+      dirty: false,
+      staged: false,
+      untracked_count: 0,
+      worktrees: [],
+      submodules: [],
+      size_bytes: 0,
+      file_count: 0,
+      project_markers: ['.git'],
+      github_repo: null,
+      classification: 'LOCAL_ONLY',
+      migration_required: true
+    }
+  ];
+
+  const result = reconcileRequiredRepositories(discovered as any, known);
+  assert.equal(result.required.length, 4);
+  assert.equal(result.required.find(x => x.repo === known[0])?.mode, 'LOCAL');
+  assert.equal(result.required.find(x => x.repo === known[1])?.mode, 'REMOTE_ONLY');
+  assert.equal(result.localOnly.length, 1);
+  assert.equal(result.allCovered, true);
+});
+
+test('R26/R27: remote-byte verification uses actual downloaded bytes and fails mismatch', () => {
+  const dir = temp('dr-v12-remote-');
+  const local = join(dir, 'local.bin');
+  const remote = join(dir, 'remote.bin');
+  writeFileSync(local, Buffer.from([1, 2, 3, 4]));
+  writeFileSync(remote, Buffer.from([1, 2, 3, 4]));
+  assert.doesNotThrow(() => verifyDownloadedRemoteArtifact(local, remote));
+
+  writeFileSync(remote, Buffer.from([1, 2, 3, 5]));
+  assert.throws(() => verifyDownloadedRemoteArtifact(local, remote), /REMOTE_HASH_MISMATCH/);
+});
+
+test('R30: /mnt/data2 remains R4 protected', () => {
+  assert.throws(() => assertSafeStoragePath('/mnt/data2'), /R4_PROTECTED_DATA2/);
+  assert.throws(() => assertSafeStoragePath('/mnt/data2/foo'), /R4_PROTECTED_DATA2/);
+  assert.doesNotThrow(() => assertSafeStoragePath('/mnt/data1/HUY-AI'));
 });
