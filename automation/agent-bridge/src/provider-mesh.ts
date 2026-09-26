@@ -55,7 +55,7 @@ export interface ProviderCommandSpec {
 export const DEFAULT_ROLE_PRIORITY: Record<AgentRole, ProviderId[]> = {
   PLANNER: ['antigravity', 'gemini', 'claude', 'chatgpt', 'codex'],
   TEST_DESIGNER: ['gemini', 'claude', 'codex', 'chatgpt', 'antigravity'],
-  IMPLEMENTER: ['codex', 'claude', 'gemini'],
+  IMPLEMENTER: ['antigravity', 'codex', 'gemini', 'claude'],
   REVIEWER: ['gemini', 'claude', 'chatgpt', 'antigravity', 'codex']
 };
 
@@ -184,9 +184,10 @@ export function providerCommandSpec(
           '-p',
           request.prompt,
           '--mode',
-          'plan',
+          request.mode === 'READ_ONLY' ? 'plan' : 'accept-edits',
           '--output-format',
-          'stream-json'
+          'stream-json',
+          ...(request.mode === 'WORKSPACE_WRITE' ? ['--sandbox'] : [])
         ]
       };
 
