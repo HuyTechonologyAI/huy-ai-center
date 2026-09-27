@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { validateRoadmap, projectRoadmapNodeToContract, assertPushBranch, assertLiveAcceptance, shouldResumeBlockedTask, classifyRemoteSyncFailure, remotePushSpawnOptions, isLocalDeliveryComplete, type Roadmap, type RoadmapNode } from '../../automation/agent-bridge/src/backlog-runner.js';
+import { validateRoadmap, projectRoadmapNodeToContract, assertPushBranch, assertLiveAcceptance, shouldResumeBlockedTask, classifyRemoteSyncFailure, remotePushSpawnOptions, isLocalDeliveryComplete, remoteSyncBackoffMs, runRemotePushWithDeadline, processRemoteSyncQueue, type Roadmap, type RoadmapNode } from '../../automation/agent-bridge/src/backlog-runner.js';
 import { collectChangedFiles } from '../../automation/agent-bridge/src/result-auditor.js';
 import { createWorktree } from '../../automation/agent-bridge/src/worktree-manager.js';
 
@@ -189,4 +189,61 @@ test('local DELIVERY checkpoint is dependency-complete even when remote sync is 
   assert.equal(isLocalDeliveryComplete({ stage: 'DELIVERY', status: 'VERIFIED' }, 'DIVERGED_FAIL_CLOSED'), false);
   assert.equal(isLocalDeliveryComplete({ stage: 'TEST_DESIGN', status: 'VERIFIED' }, 'SYNC_PENDING'), false);
   assert.equal(isLocalDeliveryComplete(undefined, 'SYNC_PENDING'), false);
+});
+
+test('deferred remote sync is dependency-complete and backoff is bounded exponential', () => {
+  assert.equal(isLocalDeliveryComplete({ stage: 'DELIVERY', status: 'VERIFIED' }, 'REMOTE_SYNC_DEFERRED'), true);
+  assert.equal(remoteSyncBackoffMs(1), 30_000);
+  assert.equal(remoteSyncBackoffMs(2), 60_000);
+  assert.equal(remoteSyncBackoffMs(3), 120_000);
+  assert.equal(remoteSyncBackoffMs(99), 900_000);
+});
+
+test('remote push deadline terminates the whole process group', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'remote-sync-timeout-'));
+  const fakeGit = join(dir, 'fake-git.sh');
+  const pidFile = join(dir, 'child.pid');
+  writeFileSync(fakeGit, '#!/bin/sh\nsleep 30 &\necho $! > "$HUY_CHILD_PID_FILE"\nwait\n');
+  chmodSync(fakeGit, 0o755);
+  try {
+    const started = Date.now();
+    const result = await runRemotePushWithDeadline(dir, 'agent-task/test-sync', {
+      timeoutMs: 250, gitBinary: fakeGit, env: { ...process.env, HUY_CHILD_PID_FILE: pidFile }
+    });
+    assert.equal(result.timedOut, true);
+    assert.ok(Date.now() - started < 5_000);
+    const childPid = Number(readFileSync(pidFile, 'utf8').trim());
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.throws(() => process.kill(childPid, 0));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('remote sync worker migrates legacy queue records before retrying', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'remote-sync-legacy-'));
+  const runtime = join(root, '.artifacts', 'agent-bridge');
+  const fakeGit = join(root, 'git');
+  mkdirSync(runtime, { recursive: true });
+  writeFileSync(fakeGit, '#!/bin/sh\nexit 0\n');
+  chmodSync(fakeGit, 0o755);
+  const syncPath = join(runtime, 'remote-sync-legacy-task.json');
+  writeFileSync(syncPath, JSON.stringify({
+    taskId: 'legacy-task',
+    featureBranch: 'feature/persistent-multi-ai-runtime',
+    featureCommit: 'a'.repeat(40),
+    taskBranch: 'agent-task/legacy-task',
+    status: 'SYNC_PENDING',
+    updatedAt: new Date(0).toISOString()
+  }));
+  const priorPath = process.env.PATH;
+  process.env.PATH = root + ':' + priorPath;
+  try {
+    const result = await processRemoteSyncQueue(root, Date.now());
+    const state = JSON.parse(readFileSync(syncPath, 'utf8'));
+    assert.equal(result.status, 'SYNCED');
+    assert.deepEqual(state.refs, ['agent-task/legacy-task', 'feature/persistent-multi-ai-runtime']);
+    assert.equal(state.attempts.length, 2);
+  } finally {
+    process.env.PATH = priorPath;
+    rmSync(root, { recursive: true, force: true });
+  }
 });

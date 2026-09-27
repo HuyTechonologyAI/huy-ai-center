@@ -11,7 +11,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { runBacklog } from './backlog-runner.js';
+import { processRemoteSyncQueue, runBacklog } from './backlog-runner.js';
 import { redact } from './log-redactor.js';
 import {
   ALL_PROVIDER_IDS,
@@ -462,6 +462,14 @@ export async function runPersistentSupervisor(
         providers: providerSummary(health),
         safeToStartNode01Migration: false
       });
+
+      if (result.status !== 'COMPLETED') {
+        try {
+          await processRemoteSyncQueue(root);
+        } catch {
+          console.error('REMOTE_SYNC_QUEUE_FAILED');
+        }
+      }
 
       if (options.once) return;
       await sleep(decision.delayMs);

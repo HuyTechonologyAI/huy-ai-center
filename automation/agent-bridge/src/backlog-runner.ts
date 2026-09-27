@@ -1,7 +1,7 @@
 /** Serial, fail-closed roadmap coordinator. Run with npx tsx automation/agent-bridge/src/backlog-runner.ts. */
 import { existsSync, mkdirSync, openSync, closeSync, unlinkSync, readFileSync, writeFileSync, renameSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process';
+import { spawn, spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { runTask } from './task-runner.js';
 import { checkpointStage, readLatestCheckpoint } from './checkpoints.js';
@@ -17,11 +17,11 @@ type BacklogState = { tasks: Record<string, { status: Status; reason?: string; b
 const GATED = new Set<RiskLevel>(['R3', 'R4']);
 const forbidden = ['.env', '.artifacts/', '.agent-worktrees/', 'secrets/', 'supabase/migrations/', 'supabase/rollback/'];
 
-export type RemoteSyncStatus = 'SYNC_PENDING' | 'SYNCED' | 'DIVERGED_FAIL_CLOSED';
+export type RemoteSyncStatus = 'REMOTE_SYNC_DEFERRED' | 'SYNC_PENDING' | 'SYNCED' | 'DIVERGED_FAIL_CLOSED';
 
 export function classifyRemoteSyncFailure(input: {
   stderr?: string; stdout?: string; timedOut?: boolean; error?: Error & { code?: string };
-}): Exclude<RemoteSyncStatus, 'SYNCED'> {
+}): 'SYNC_PENDING' | 'DIVERGED_FAIL_CLOSED' {
   const message = `${input.stderr ?? ''} ${input.stdout ?? ''} ${input.error?.message ?? ''}`;
   // Explicit rejection takes precedence even if another ref hit a transient error.
   if (/non-fast-forward|rejected|fetch[ -]first|divergen/i.test(message)) return 'DIVERGED_FAIL_CLOSED';
@@ -36,11 +36,70 @@ export function remotePushSpawnOptions(): SpawnSyncOptionsWithStringEncoding {
   return { encoding: 'utf8', timeout: 15000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } };
 }
 
+export function remoteSyncBackoffMs(attempt: number, baseMs = 30_000, capMs = 900_000): number {
+  const safeAttempt = Math.max(1, Math.floor(attempt));
+  return Math.min(capMs, baseMs * (2 ** (safeAttempt - 1)));
+}
+
+export interface RemotePushResult {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  error?: Error & { code?: string };
+}
+
+interface RemoteSyncQueueRecord {
+  taskId: string;
+  featureBranch: string;
+  featureCommit: string;
+  taskBranch?: string;
+  refs?: string[];
+  status: RemoteSyncStatus;
+  attempts?: Array<{ branch: string; status: RemoteSyncStatus; exitCode: number | null; errorCode?: string; at: string }>;
+  retryCount?: number;
+  maxAttempts?: number;
+  backoffMs?: number;
+  nextAttemptAt?: string | null;
+  retryExhausted?: boolean;
+  updatedAt: string;
+}
+
+export async function runRemotePushWithDeadline(
+  cwd: string,
+  ref: string,
+  options: { timeoutMs?: number; gitBinary?: string; env?: NodeJS.ProcessEnv } = {}
+): Promise<RemotePushResult> {
+  assertPushBranch(ref);
+  const timeoutMs = Math.max(50, Math.min(options.timeoutMs ?? 15_000, 20_000));
+  const seconds = (timeoutMs / 1000).toFixed(3);
+  return new Promise(resolvePromise => {
+    let stdout = '', stderr = '';
+    const child = spawn('timeout', [
+      '--signal=TERM', '--kill-after=0.2s', seconds,
+      options.gitBinary ?? 'git', 'push', 'origin', ref
+    ], {
+      cwd, env: { ...process.env, ...options.env, GIT_TERMINAL_PROMPT: '0' },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    child.stdout?.on('data', chunk => { stdout = (stdout + String(chunk)).slice(-8000); });
+    child.stderr?.on('data', chunk => { stderr = (stderr + String(chunk)).slice(-8000); });
+    child.once('error', error => resolvePromise({
+      exitCode: null, stdout, stderr, timedOut: false, error: error as Error & { code?: string }
+    }));
+    child.once('close', code => resolvePromise({
+      exitCode: code, stdout, stderr, timedOut: code === 124 || code === 137,
+      error: code === 124 || code === 137
+        ? Object.assign(new Error('REMOTE_SYNC_TIMEOUT'), { code: 'ETIMEDOUT' }) : undefined
+    }));
+  });
+}
+
 export function isLocalDeliveryComplete(
   checkpoint: { stage?: string; status?: string } | null | undefined,
   remoteSyncStatus: RemoteSyncStatus
 ): boolean {
-  return checkpoint?.stage === 'DELIVERY' && (remoteSyncStatus === 'SYNC_PENDING' || remoteSyncStatus === 'SYNCED');
+  return checkpoint?.stage === 'DELIVERY' && ['REMOTE_SYNC_DEFERRED', 'SYNC_PENDING', 'SYNCED'].includes(remoteSyncStatus);
 }
 
 export function shouldResumeBlockedTask(
@@ -96,6 +155,63 @@ function persist(path: string, data: unknown): void {
   const temp = `${path}.${process.pid}.tmp`;
   writeFileSync(temp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 }); renameSync(temp, path);
 }
+
+export async function processRemoteSyncQueue(
+  root: string,
+  nowMs = Date.now()
+): Promise<{ processed: number; status?: RemoteSyncStatus; taskId?: string }> {
+  root = resolve(root);
+  const runtime = join(root, '.artifacts/agent-bridge');
+  if (!existsSync(runtime)) return { processed: 0 };
+  const files = readdirSync(runtime).filter(name => /^remote-sync-.+\.json$/.test(name)).sort();
+  for (const name of files) {
+    const path = join(runtime, name);
+    let record: RemoteSyncQueueRecord;
+    try { record = JSON.parse(readFileSync(path, 'utf8')) as RemoteSyncQueueRecord; } catch { continue; }
+    if (!['REMOTE_SYNC_DEFERRED', 'SYNC_PENDING'].includes(record.status) || record.retryExhausted) continue;
+    if (record.nextAttemptAt && Date.parse(record.nextAttemptAt) > nowMs) continue;
+    const refs = record.refs?.length
+      ? record.refs
+      : [record.taskBranch, record.featureBranch].filter((ref): ref is string => Boolean(ref));
+    if (!refs.length) continue;
+    record.refs = refs;
+    record.attempts = Array.isArray(record.attempts) ? record.attempts : [];
+    record.retryCount = Number.isFinite(record.retryCount) ? record.retryCount! : 0;
+    record.maxAttempts = Number.isFinite(record.maxAttempts) ? record.maxAttempts! : 6;
+    record.backoffMs = Number.isFinite(record.backoffMs) ? record.backoffMs! : 0;
+    let pending = false;
+    for (const ref of refs) {
+      const pushed = await runRemotePushWithDeadline(root, ref);
+      const status = pushed.exitCode === 0 && !pushed.error ? 'SYNCED' : classifyRemoteSyncFailure({
+        stderr: pushed.stderr, stdout: pushed.stdout, error: pushed.error, timedOut: pushed.timedOut
+      });
+      record.attempts.push({
+        branch: ref, status, exitCode: pushed.exitCode, errorCode: pushed.error?.code,
+        at: new Date(nowMs).toISOString()
+      });
+      if (status === 'DIVERGED_FAIL_CLOSED') {
+        record.status = status; record.nextAttemptAt = null; record.updatedAt = new Date().toISOString();
+        persist(path, record); return { processed: 1, status, taskId: record.taskId };
+      }
+      pending ||= status === 'SYNC_PENDING';
+    }
+    if (!pending) {
+      record.status = 'SYNCED'; record.nextAttemptAt = null;
+    } else {
+      const retryCount = (record.retryCount ?? 0) + 1;
+      const maxAttempts = record.maxAttempts ?? 6;
+      record.retryCount = retryCount;
+      record.status = 'SYNC_PENDING';
+      record.backoffMs = remoteSyncBackoffMs(retryCount);
+      record.retryExhausted = retryCount >= maxAttempts;
+      record.nextAttemptAt = record.retryExhausted ? null : new Date(nowMs + record.backoffMs).toISOString();
+    }
+    record.updatedAt = new Date().toISOString(); persist(path, record);
+    return { processed: 1, status: record.status, taskId: record.taskId };
+  }
+  return { processed: 0 };
+}
+
 function lease(path: string, node: RoadmapNode, branch: string, worktree: string): () => void {
   const fd = openSync(path, 'wx', 0o600); // Existing lease is never silently stolen.
   try { writeFileSync(fd, JSON.stringify({ taskId: node.id, pid: process.pid, worktreePath: worktree, taskBranch: branch, owner: 'CODEX_IMPLEMENTER', phase: 'RUNNING', acquiredAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 7200000).toISOString(), allowedPaths: node.allowed_paths })); }
@@ -234,26 +350,21 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
             taskBranch: contract.repository.taskBranch }, method: 'git merge --ff-only task branch on Node01',
           result: 'Verified commit integrated into local feature branch', next: 'Best-effort remote sync; next DAG node',
           receipts: [featureCommit] });
-        const attempts: { branch: string; status: RemoteSyncStatus; exitCode: number | null; errorCode?: string }[] = [];
-        let remoteSyncStatus: RemoteSyncStatus = 'SYNC_PENDING';
-        const saveSync = () => persist(syncPath, {
-          taskId: node.id, featureBranch: branch, featureCommit,
-          status: remoteSyncStatus, attempts, updatedAt: new Date().toISOString()
-        });
-        saveSync();
-        for (const ref of [contract.repository.taskBranch, branch]) {
-          assertPushBranch(ref);
-          const pushed = spawnSync('git', ['push', 'origin', ref], { ...remotePushSpawnOptions(), cwd: root });
-          const status: RemoteSyncStatus = pushed.status === 0 && !pushed.error ? 'SYNCED' : classifyRemoteSyncFailure({
-            stderr: pushed.stderr ?? '', stdout: pushed.stdout ?? '', error: pushed.error,
-            timedOut: pushed.error?.code === 'ETIMEDOUT'
-          });
-          attempts.push({ branch: ref, status, exitCode: pushed.status, errorCode: pushed.error?.code });
-          remoteSyncStatus = status === 'DIVERGED_FAIL_CLOSED' ? status
-            : attempts.length === 2 && attempts.every(attempt => attempt.status === 'SYNCED') ? 'SYNCED' : 'SYNC_PENDING';
-          saveSync();
-          if (remoteSyncStatus === 'DIVERGED_FAIL_CLOSED') throw Error('DIVERGED_FAIL_CLOSED');
-        }
+        const queuedAt = new Date().toISOString();
+        const remoteSync: RemoteSyncQueueRecord = {
+          taskId: node.id,
+          featureBranch: branch,
+          featureCommit,
+          refs: [contract.repository.taskBranch, branch],
+          status: 'REMOTE_SYNC_DEFERRED',
+          attempts: [],
+          retryCount: 0,
+          maxAttempts: 6,
+          backoffMs: 0,
+          nextAttemptAt: queuedAt,
+          updatedAt: queuedAt
+        };
+        persist(syncPath, remoteSync);
         update('COMPLETED');
         return { status: 'COMPLETED', taskId: node.id };
       } catch (error) {
