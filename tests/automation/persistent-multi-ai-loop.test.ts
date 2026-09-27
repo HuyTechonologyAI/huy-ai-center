@@ -362,3 +362,8 @@ test('edit-budget-aware prompts enforce test designer and implementer line limit
   assert.match(implementerPrompt, /before finishing/i);
   assert.match(implementerPrompt, /git diff --numstat HEAD.*before finishing/i);
 });
+
+test('independent reviewer has a bounded long-review budget', () => {
+  assert.equal(plannedProviderTimeoutMs('REVIEWER', Number.MAX_SAFE_INTEGER), 240_000);
+  assert.equal(plannedProviderTimeoutMs('REVIEWER', 90_000), 90_000);
+});

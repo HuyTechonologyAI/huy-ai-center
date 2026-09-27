@@ -19,7 +19,7 @@ let meshHealth = createProviderHealth();
 
 export function plannedProviderTimeoutMs(role: AgentRole, requestedMs: number): number {
   const maximum = {
-    PLANNER: 120_000, REVIEWER: 120_000, TEST_DESIGNER: 300_000, IMPLEMENTER: 600_000
+    PLANNER: 120_000, REVIEWER: 240_000, TEST_DESIGNER: 300_000, IMPLEMENTER: 600_000
   }[role];
   return Math.max(1, Math.min(
     Number.isFinite(requestedMs) && requestedMs > 0 ? requestedMs : maximum, maximum
