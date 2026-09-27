@@ -24,6 +24,10 @@ import {
 } from "../../automation/agent-bridge/src/index.js";
 import type { TaskContract } from "../../automation/agent-bridge/src/types.js";
 
+export function liveVerificationCommands(): string[] {
+  return ['npm run typecheck', 'npm run test:bridge-fixture'];
+}
+
 const dryRunContract: TaskContract = {
   taskId: "bridge-dry-run-001",
   title: "Agent bridge E2E dry-run - create fixture file",
@@ -146,6 +150,13 @@ describe("A. SAFE_DEGRADATION_TEST", () => {
 });
 
 describe("B. REAL_E2E_BRIDGE_TEST", () => {
+  it("requires post-implementation fixture verification evidence", () => {
+    assert.deepEqual(liveVerificationCommands(), [
+      'npm run typecheck',
+      'npm run test:bridge-fixture',
+    ]);
+  });
+
   it("REAL_E2E: Executes full flow to PASS if CLIs are AUTH_READY, otherwise reports NOT_EXECUTED_CI_ENVIRONMENT", async () => {
     const codex = checkCodex();
     const agy = checkAntigravity();
@@ -165,7 +176,7 @@ describe("B. REAL_E2E_BRIDGE_TEST", () => {
       taskId: liveTaskId,
       objective: `Append acceptance run ID ${liveTaskId} to tests/fixtures/agent-bridge-dry-run/README.md and explain the bridge dry-run.`,
       repository: { ...dryRunContract.repository },
-      verification: { commands: ['npm run typecheck'] },
+      verification: { commands: liveVerificationCommands() },
     };
     realContract.repository.taskBranch = `agent-task/${realContract.taskId}`;
 

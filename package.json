@@ -32,7 +32,8 @@
     "test:dr-v1-2": "npx tsx --test tests/automation/dr-hardening-v1-2.test.ts",
     "test:autonomy-loop": "npx tsx --test tests/automation/persistent-multi-ai-loop.test.ts",
     "autonomy:once": "npx tsx automation/agent-bridge/src/persistent-supervisor.ts --once",
-    "autonomy:daemon": "npx tsx automation/agent-bridge/src/persistent-supervisor.ts"
+    "autonomy:daemon": "npx tsx automation/agent-bridge/src/persistent-supervisor.ts",
+    "test:bridge-fixture": "node --test tests/fixtures/agent-bridge-dry-run/acceptance.test.mjs"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

@@ -16,6 +16,10 @@ describe("Command Guard", () => {
     assert.equal(checkCommandSync("npm run typecheck"), "ALLOW");
   });
 
+  it("ALLOW: npm run test:bridge-fixture", () => {
+    assert.equal(checkCommandSync("npm run test:bridge-fixture"), "ALLOW");
+  });
+
   it("ALLOW: git diff --stat HEAD", () => {
     assert.equal(checkCommandSync("git diff --stat HEAD"), "ALLOW");
   });
