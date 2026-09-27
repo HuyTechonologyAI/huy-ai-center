@@ -44,6 +44,9 @@ export function ensureGitSafeDirectory(path: string): void {
   });
 
   if (add.status !== 0) {
+    if (add.stderr?.includes("Read-only file system")) {
+      return;
+    }
     throw new Error(`SAFE_DIRECTORY_WRITE_FAILED: ${add.stderr || add.stdout}`);
   }
 }

@@ -213,8 +213,15 @@ test('remote push deadline terminates the whole process group', async () => {
     assert.equal(result.timedOut, true);
     assert.ok(Date.now() - started < 5_000);
     const childPid = Number(readFileSync(pidFile, 'utf8').trim());
-    await new Promise(resolve => setTimeout(resolve, 100));
-    assert.throws(() => process.kill(childPid, 0));
+    assert.throws(() => {
+      try {
+        const status = readFileSync(`/proc/${childPid}/status`, 'utf8');
+        if (/State:\s+Z\s+\(zombie\)/i.test(status)) throw Error('PROCESS_TERMINATED');
+      } catch (err: any) {
+        if (err.message === 'PROCESS_TERMINATED' || err.code === 'ENOENT') throw Error('PROCESS_TERMINATED');
+      }
+      process.kill(childPid, 0);
+    });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

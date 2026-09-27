@@ -72,26 +72,47 @@ export async function runRemotePushWithDeadline(
 ): Promise<RemotePushResult> {
   assertPushBranch(ref);
   const timeoutMs = Math.max(50, Math.min(options.timeoutMs ?? 15_000, 20_000));
-  const seconds = (timeoutMs / 1000).toFixed(3);
   return new Promise(resolvePromise => {
     let stdout = '', stderr = '';
-    const child = spawn('timeout', [
-      '--signal=TERM', '--kill-after=0.2s', seconds,
-      options.gitBinary ?? 'git', 'push', 'origin', ref
-    ], {
-      cwd, env: { ...process.env, ...options.env, GIT_TERMINAL_PROMPT: '0' },
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
+    const child = spawn(
+      options.gitBinary ?? 'git',
+      ['push', 'origin', ref],
+      {
+        cwd,
+        env: { ...process.env, ...options.env, GIT_TERMINAL_PROMPT: '0' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true
+      }
+    );
     child.stdout?.on('data', chunk => { stdout = (stdout + String(chunk)).slice(-8000); });
     child.stderr?.on('data', chunk => { stderr = (stderr + String(chunk)).slice(-8000); });
-    child.once('error', error => resolvePromise({
-      exitCode: null, stdout, stderr, timedOut: false, error: error as Error & { code?: string }
-    }));
-    child.once('close', code => resolvePromise({
-      exitCode: code, stdout, stderr, timedOut: code === 124 || code === 137,
-      error: code === 124 || code === 137
-        ? Object.assign(new Error('REMOTE_SYNC_TIMEOUT'), { code: 'ETIMEDOUT' }) : undefined
-    }));
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      if (child.pid) {
+        try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+      }
+    }, timeoutMs);
+    child.once('error', error => {
+      clearTimeout(timer);
+      resolvePromise({
+        exitCode: null, stdout, stderr, timedOut: false, error: error as Error & { code?: string }
+      });
+    });
+    child.once('close', code => {
+      clearTimeout(timer);
+      if (child.pid && timedOut) {
+        try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+      }
+      resolvePromise({
+        exitCode: timedOut ? 124 : code,
+        stdout,
+        stderr,
+        timedOut,
+        error: timedOut
+          ? Object.assign(new Error('REMOTE_SYNC_TIMEOUT'), { code: 'ETIMEDOUT' }) : undefined
+      });
+    });
   });
 }
 
