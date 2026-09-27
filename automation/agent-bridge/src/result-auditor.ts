@@ -58,7 +58,7 @@ export function collectReviewDiff(worktreePath: string): string {
     return result.stdout ?? '';
   });
   const diff = [tracked.stdout ?? '', ...untracked].join('\n');
-  if (!diff || diff.length > 100_000 || /GIT binary patch|Binary files differ/.test(diff)) throw Error('REVIEW_DIFF_UNAVAILABLE');
+  if (!diff || diff.length > 128_000 || /GIT binary patch|Binary files differ/.test(diff)) throw Error('REVIEW_DIFF_UNAVAILABLE');
   if (redact(diff) !== diff) throw Error('REVIEW_DIFF_SENSITIVE');
   return diff;
 }

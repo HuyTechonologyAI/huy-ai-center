@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { checkpointStage, readLatestCheckpoint } from '../../automation/agent-bridge/src/checkpoints.js';
-import { enforceEditBudget } from '../../automation/agent-bridge/src/result-auditor.js';
+import { collectReviewDiff, enforceEditBudget } from '../../automation/agent-bridge/src/result-auditor.js';
 
 test('checkpoints are linked, append-only, and point to recoverable evidence', () => {
   const root = mkdtempSync(join(tmpdir(), 'bridge-checkpoints-'));
@@ -34,4 +35,20 @@ test('edit budget rejects oversized changes and oversized new files', () => {
   assert.doesNotThrow(() => enforceEditBudget('diff --git a/a b/a\n+small\n-small'));
   assert.throws(() => enforceEditBudget('diff --git a/a b/a\n' + '+line\n'.repeat(201)), /EDIT_OVER_200_LINES/);
   assert.throws(() => enforceEditBudget('diff --git a/new b/new\nnew file mode 100644\n' + '+line\n'.repeat(201)), /NEW_FILE_OVER_200_LINES/);
+});
+
+test('review transport accepts a large textual patch when edit budget remains small', () => {
+  const root = mkdtempSync(join(tmpdir(), 'bridge-review-diff-'));
+  try {
+    const git = (...args: string[]) => {
+      const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+    };
+    git('init'); git('config', 'user.email', 'test@example.invalid'); git('config', 'user.name', 'Test');
+    writeFileSync(join(root, 'base.txt'), 'base\n'); git('add', '.'); git('commit', '-m', 'base');
+    writeFileSync(join(root, 'large.txt'), 'x'.repeat(105_000) + '\n');
+    const diff = collectReviewDiff(root);
+    assert.ok(diff.length > 100_000 && diff.length < 128_000);
+    assert.doesNotThrow(() => enforceEditBudget(diff));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
