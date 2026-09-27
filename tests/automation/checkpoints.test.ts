@@ -46,9 +46,9 @@ test('review transport accepts a large textual patch when edit budget remains sm
     };
     git('init'); git('config', 'user.email', 'test@example.invalid'); git('config', 'user.name', 'Test');
     writeFileSync(join(root, 'base.txt'), 'base\n'); git('add', '.'); git('commit', '-m', 'base');
-    writeFileSync(join(root, 'large.txt'), 'x'.repeat(105_000) + '\n');
+    writeFileSync(join(root, 'large.txt'), 'x'.repeat(160_000) + '\n');
     const diff = collectReviewDiff(root);
-    assert.ok(diff.length > 100_000 && diff.length < 128_000);
+    assert.ok(diff.length > 128_000 && diff.length < 256_000);
     assert.doesNotThrow(() => enforceEditBudget(diff));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
