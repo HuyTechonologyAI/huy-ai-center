@@ -1,7 +1,7 @@
 /** Serial, fail-closed roadmap coordinator. Run with npx tsx automation/agent-bridge/src/backlog-runner.ts. */
 import { existsSync, mkdirSync, openSync, closeSync, unlinkSync, readFileSync, writeFileSync, renameSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { runTask } from './task-runner.js';
 import { checkpointStage, readLatestCheckpoint } from './checkpoints.js';
@@ -16,6 +16,32 @@ type Status = 'COMPLETED' | 'BLOCKED' | 'HUMAN_GATE' | 'TOOL_CAPACITY_WAIT' | 'R
 type BacklogState = { tasks: Record<string, { status: Status; reason?: string; branch?: string; updatedAt: string }> };
 const GATED = new Set<RiskLevel>(['R3', 'R4']);
 const forbidden = ['.env', '.artifacts/', '.agent-worktrees/', 'secrets/', 'supabase/migrations/', 'supabase/rollback/'];
+
+export type RemoteSyncStatus = 'SYNC_PENDING' | 'SYNCED' | 'DIVERGED_FAIL_CLOSED';
+
+export function classifyRemoteSyncFailure(input: {
+  stderr?: string; stdout?: string; timedOut?: boolean; error?: Error & { code?: string };
+}): Exclude<RemoteSyncStatus, 'SYNCED'> {
+  const message = `${input.stderr ?? ''} ${input.stdout ?? ''} ${input.error?.message ?? ''}`;
+  // Explicit rejection takes precedence even if another ref hit a transient error.
+  if (/non-fast-forward|rejected|fetch[ -]first|divergen/i.test(message)) return 'DIVERGED_FAIL_CLOSED';
+  if (input.timedOut || /ETIMEDOUT|ECONNRESET|ECONNREFUSED|EHOSTUNREACH|ENETUNREACH|EAI_AGAIN/.test(input.error?.code ?? '') ||
+      /could not read (username|password)|authentication failed|terminal prompts disabled|permission denied \(publickey\)|invalid (username|password|credentials)|could not resolve (host|hostname|proxy)|connection.*(timed out|reset|refused|closed)|timed? ?out|network is unreachable|temporary failure|remote end hung up|TLS connection.*terminated|HTTP (502|503|504)|requested URL returned error: (401|502|503|504)/i.test(message)) {
+    return 'SYNC_PENDING';
+  }
+  return 'DIVERGED_FAIL_CLOSED';
+}
+
+export function remotePushSpawnOptions(): SpawnSyncOptionsWithStringEncoding {
+  return { encoding: 'utf8', timeout: 15000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } };
+}
+
+export function isLocalDeliveryComplete(
+  checkpoint: { stage?: string; status?: string } | null | undefined,
+  remoteSyncStatus: RemoteSyncStatus
+): boolean {
+  return checkpoint?.stage === 'DELIVERY' && (remoteSyncStatus === 'SYNC_PENDING' || remoteSyncStatus === 'SYNCED');
+}
 
 export function shouldResumeBlockedTask(
   prior?: { status?: string; reason?: string },
@@ -116,8 +142,15 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
     if (execute && git(root, 'status', '--porcelain')) throw Error('PRIMARY_WORKTREE_DIRTY');
     for (const node of ordered) {
       const latest = readLatestCheckpoint(root, node.id);
+      const syncPath = join(runtime, `remote-sync-${node.id}.json`);
+      const syncStatus: RemoteSyncStatus = existsSync(syncPath)
+        ? (JSON.parse(readFileSync(syncPath, 'utf8')) as { status: RemoteSyncStatus }).status
+        : 'SYNC_PENDING';
+      if (latest?.stage === 'DELIVERY' && !isLocalDeliveryComplete(latest, syncStatus)) {
+        return { status: 'BLOCKED', taskId: node.id, reason: 'DIVERGED_FAIL_CLOSED' };
+      }
       if (state.tasks[node.id]?.status === 'COMPLETED') {
-        if (latest?.stage !== 'DELIVERY') throw Error('COMPLETION_CHECKPOINT_MISSING');
+        if (!isLocalDeliveryComplete(latest, syncStatus)) throw Error('COMPLETION_CHECKPOINT_MISSING');
         continue;
       }
       if (node.depends_on.some(id => state.tasks[id]?.status !== 'COMPLETED')) continue;
@@ -137,7 +170,7 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
         return { status: 'BLOCKED', taskId: node.id, reason: prior.reason ?? 'Non-retryable previous failure' };
       }
 
-      if (latest?.stage === 'DELIVERY' && prior?.status !== 'COMPLETED') {
+      if (isLocalDeliveryComplete(latest, syncStatus) && prior?.status !== 'COMPLETED') {
         state.tasks[node.id] = {
           status: 'COMPLETED',
           branch: `agent-task/${node.id}`,
@@ -190,18 +223,37 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
         if (git(result.worktree!.path, 'branch', '--show-current') !== contract.repository.taskBranch) throw Error('TASK_BRANCH_CHANGED');
         if (git(result.worktree!.path, 'status', '--porcelain')) throw Error('TASK_WORKTREE_DIRTY_AFTER_COMMIT');
         assertPushBranch(contract.repository.taskBranch);
-        git(result.worktree!.path, 'push', 'origin', contract.repository.taskBranch);
         // A dependency is complete only after the feature integration ref
         // contains its commit. --ff-only refuses concurrent/divergent changes.
         if (git(root, 'status', '--porcelain')) throw Error('PRIMARY_WORKTREE_DIRTY_BEFORE_INTEGRATION');
         if (git(root, 'branch', '--show-current') !== branch) throw Error('COORDINATOR_BRANCH_CHANGED');
         git(root, 'merge', '--ff-only', contract.repository.taskBranch);
-        git(root, 'push', 'origin', branch);
+        const featureCommit = git(root, 'rev-parse', 'HEAD');
         checkpointStage(root, { taskId: node.id, stage: 'DELIVERY', owner: 'COORDINATOR',
-          objective: node.objective, evidence: { featureBranch: branch, featureCommit: git(root, 'rev-parse', 'HEAD'),
-            taskBranch: contract.repository.taskBranch }, method: 'git push origin feature branch',
-          result: 'Verified commit pushed to feature integration branch', next: 'Next DAG node',
-          receipts: [git(root, 'rev-parse', 'HEAD')] });
+          objective: node.objective, evidence: { featureBranch: branch, featureCommit,
+            taskBranch: contract.repository.taskBranch }, method: 'git merge --ff-only task branch on Node01',
+          result: 'Verified commit integrated into local feature branch', next: 'Best-effort remote sync; next DAG node',
+          receipts: [featureCommit] });
+        const attempts: { branch: string; status: RemoteSyncStatus; exitCode: number | null; errorCode?: string }[] = [];
+        let remoteSyncStatus: RemoteSyncStatus = 'SYNC_PENDING';
+        const saveSync = () => persist(syncPath, {
+          taskId: node.id, featureBranch: branch, featureCommit,
+          status: remoteSyncStatus, attempts, updatedAt: new Date().toISOString()
+        });
+        saveSync();
+        for (const ref of [contract.repository.taskBranch, branch]) {
+          assertPushBranch(ref);
+          const pushed = spawnSync('git', ['push', 'origin', ref], { ...remotePushSpawnOptions(), cwd: root });
+          const status: RemoteSyncStatus = pushed.status === 0 && !pushed.error ? 'SYNCED' : classifyRemoteSyncFailure({
+            stderr: pushed.stderr ?? '', stdout: pushed.stdout ?? '', error: pushed.error,
+            timedOut: pushed.error?.code === 'ETIMEDOUT'
+          });
+          attempts.push({ branch: ref, status, exitCode: pushed.status, errorCode: pushed.error?.code });
+          remoteSyncStatus = status === 'DIVERGED_FAIL_CLOSED' ? status
+            : attempts.length === 2 && attempts.every(attempt => attempt.status === 'SYNCED') ? 'SYNCED' : 'SYNC_PENDING';
+          saveSync();
+          if (remoteSyncStatus === 'DIVERGED_FAIL_CLOSED') throw Error('DIVERGED_FAIL_CLOSED');
+        }
         update('COMPLETED');
         return { status: 'COMPLETED', taskId: node.id };
       } catch (error) {

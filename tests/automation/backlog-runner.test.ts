@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { validateRoadmap, projectRoadmapNodeToContract, assertPushBranch, assertLiveAcceptance, shouldResumeBlockedTask, type Roadmap, type RoadmapNode } from '../../automation/agent-bridge/src/backlog-runner.js';
+import { validateRoadmap, projectRoadmapNodeToContract, assertPushBranch, assertLiveAcceptance, shouldResumeBlockedTask, classifyRemoteSyncFailure, remotePushSpawnOptions, isLocalDeliveryComplete, type Roadmap, type RoadmapNode } from '../../automation/agent-bridge/src/backlog-runner.js';
 import { collectChangedFiles } from '../../automation/agent-bridge/src/result-auditor.js';
 import { createWorktree } from '../../automation/agent-bridge/src/worktree-manager.js';
 
@@ -163,4 +163,30 @@ test('AI HR charter is fail-closed and cannot self-grant production authority', 
   assert.ok(agent.responsibilities.includes('WORKFORCE_PLANNING'));
   assert.ok(agent.responsibilities.includes('AGENT_RECRUITMENT'));
   assert.ok(agent.responsibilities.includes('CAPABILITY_VERIFICATION'));
+});
+
+test('Node01-authoritative delivery classifies remote sync failures correctly', () => {
+  assert.equal(classifyRemoteSyncFailure({ stderr: "fatal: could not read Username for 'https://github.com': No such device or address" }), 'SYNC_PENDING');
+  assert.equal(classifyRemoteSyncFailure({ stderr: 'fatal: Authentication failed for https://github.com/' }), 'SYNC_PENDING');
+  assert.equal(classifyRemoteSyncFailure({ timedOut: true }), 'SYNC_PENDING');
+  assert.equal(classifyRemoteSyncFailure({ stderr: 'Connection timed out' }), 'SYNC_PENDING');
+  assert.equal(classifyRemoteSyncFailure({ stderr: 'error: failed to push some refs ... [rejected] (non-fast-forward)' }), 'DIVERGED_FAIL_CLOSED');
+  assert.equal(classifyRemoteSyncFailure({ stderr: 'fatal: fetch first' }), 'DIVERGED_FAIL_CLOSED');
+});
+
+test('remote push options configure non-interactive terminal and positive finite timeout', () => {
+  const opts = remotePushSpawnOptions();
+  assert.equal(opts.env?.GIT_TERMINAL_PROMPT, '0');
+  assert.ok(typeof opts.timeout === 'number' && Number.isFinite(opts.timeout) && opts.timeout > 0);
+  assert.ok(opts.timeout! <= 20_000, 'remote sync timeout must stay off the critical path');
+  assert.throws(() => assertPushBranch('main'), /PUSH_BRANCH_DENIED/);
+  assert.throws(() => assertPushBranch('master'), /PUSH_BRANCH_DENIED/);
+});
+
+test('local DELIVERY checkpoint is dependency-complete even when remote sync is SYNC_PENDING', () => {
+  assert.equal(isLocalDeliveryComplete({ stage: 'DELIVERY', status: 'VERIFIED' }, 'SYNC_PENDING'), true);
+  assert.equal(isLocalDeliveryComplete({ stage: 'DELIVERY' }, 'SYNC_PENDING'), true);
+  assert.equal(isLocalDeliveryComplete({ stage: 'DELIVERY', status: 'VERIFIED' }, 'DIVERGED_FAIL_CLOSED'), false);
+  assert.equal(isLocalDeliveryComplete({ stage: 'TEST_DESIGN', status: 'VERIFIED' }, 'SYNC_PENDING'), false);
+  assert.equal(isLocalDeliveryComplete(undefined, 'SYNC_PENDING'), false);
 });
