@@ -17,11 +17,14 @@ import {
 } from '../../automation/agent-bridge/src/provider-mesh.js';
 
 import {
+  classifyStall,
+  buildBottleneckReport,
   decideSupervisorNextAction,
   type BacklogCycleResult
 } from '../../automation/agent-bridge/src/persistent-supervisor.js';
 
 import {
+  plannedProviderTimeoutMs,
   buildPlanningPrompt,
   buildTestDesignPrompt,
   planningPrompt
@@ -134,6 +137,76 @@ test('supervisor retries recoverable AI/provider blockage instead of asking owne
   assert.equal(next.state, 'WAITING_PROVIDER');
   assert.equal(next.notifyHuman, false);
   assert.equal(next.delayMs, 60_000);
+});
+
+test('supervisor retries invalid reviewer output without notifying a human', () => {
+  const next = decideSupervisorNextAction(
+    { status: 'BLOCKED', reason: 'AUDIT_INVALID: reviewer output invalid' },
+    { idleMs: 30_000, blockedMs: 60_000 }
+  );
+  assert.equal(next.state, 'WAITING_PROVIDER');
+  assert.equal(next.notifyHuman, false);
+});
+
+test('stall classification counts only consecutive identical task, status and reason', () => {
+  const current = { taskId: 't1', status: 'BLOCKED', reason: 'CODEX_UNAVAILABLE' };
+  const threshold = 3;
+  // Planned contract: previous snapshot carries repeatCount; result carries state/repeatCount.
+  const first = classifyStall(undefined, current, threshold);
+  assert.notEqual(first.state, 'STALLED');
+  assert.equal(first.repeatCount, 1);
+  for (const repeatCount of [1, 2, 3]) {
+    const next = classifyStall({ ...current, repeatCount }, current, threshold);
+    assert.equal(next.repeatCount, repeatCount + 1);
+    assert.equal(next.state === 'STALLED', repeatCount + 1 >= threshold);
+  }
+  for (const change of [{ taskId: 't2' }, { status: 'READY' }, { reason: 'AUDIT_INVALID' }]) {
+    const next = classifyStall({ ...current, repeatCount: 10 }, { ...current, ...change }, threshold);
+    assert.notEqual(next.state, 'STALLED');
+    assert.equal(next.repeatCount, 1);
+  }
+});
+
+test('bottleneck report is deterministic plain data with no sensitive fields', () => {
+  const input = {
+    taskId: 't1', reason: 'CODEX_UNAVAILABLE', state: 'WAITING_PROVIDER' as const,
+    providers: { codex: { available: false, authenticated: false } },
+    timestamp: '2026-09-27T00:00:00.000Z'
+  };
+  const report = buildBottleneckReport(input);
+  assert.equal(Object.getPrototypeOf(report), Object.prototype);
+  assert.deepEqual(report, buildBottleneckReport(structuredClone(input)));
+  assert.deepEqual(Object.keys(report).sort(), [
+    'taskId', 'reason', 'supervisorState', 'providers', 'timestamp', 'recommendedAction'
+  ].sort());
+  assert.deepEqual(report, {
+    taskId: input.taskId, reason: input.reason, supervisorState: input.state,
+    providers: input.providers, timestamp: input.timestamp, recommendedAction: report.recommendedAction
+  });
+  assert.equal(typeof report.recommendedAction, 'string');
+  assert.ok(report.recommendedAction.trim().length > 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(report)), report);
+  const checkFields = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      assert.doesNotMatch(key, /env|secret|token|credential/i);
+      checkFields(child);
+    }
+  };
+  checkFields(report);
+});
+
+test('provider timeouts are positive, finite and capped per role and request', () => {
+  for (const role of ['PLANNER', 'REVIEWER', 'TEST_DESIGNER', 'IMPLEMENTER'] as const) {
+    const maximum = plannedProviderTimeoutMs(role, Number.MAX_SAFE_INTEGER);
+    assert.ok(Number.isFinite(maximum) && maximum > 0 && maximum < Number.MAX_SAFE_INTEGER, role);
+    assert.equal(plannedProviderTimeoutMs(role, maximum * 2), maximum, role);
+    assert.equal(plannedProviderTimeoutMs(role, maximum), maximum, role);
+    for (const requestedMs of [1, maximum / 2]) {
+      const timeout = plannedProviderTimeoutMs(role, requestedMs);
+      assert.ok(Number.isFinite(timeout) && timeout > 0 && timeout <= requestedMs, role);
+    }
+  }
 });
 
 test('role priority contains independent planner, implementer, test designer and reviewer paths', () => {
@@ -289,4 +362,3 @@ test('edit-budget-aware prompts enforce test designer and implementer line limit
   assert.match(implementerPrompt, /before finishing/i);
   assert.match(implementerPrompt, /git diff --numstat HEAD.*before finishing/i);
 });
-

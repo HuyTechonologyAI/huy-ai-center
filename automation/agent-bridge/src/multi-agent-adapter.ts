@@ -17,6 +17,15 @@ import { redact } from './log-redactor.js';
 
 let meshHealth = createProviderHealth();
 
+export function plannedProviderTimeoutMs(role: AgentRole, requestedMs: number): number {
+  const maximum = {
+    PLANNER: 120_000, REVIEWER: 120_000, TEST_DESIGNER: 300_000, IMPLEMENTER: 600_000
+  }[role];
+  return Math.max(1, Math.min(
+    Number.isFinite(requestedMs) && requestedMs > 0 ? requestedMs : maximum, maximum
+  ));
+}
+
 export interface MultiAgentExecutionResult {
   provider?: ProviderId;
   success: boolean;
@@ -140,7 +149,7 @@ export async function generatePlanMulti(req: {
       prompt,
       cwd: req.repositoryRoot,
       mode: 'READ_ONLY',
-      timeoutMs: (req.timeoutSeconds ?? 120) * 1000
+      timeoutMs: plannedProviderTimeoutMs('PLANNER', (req.timeoutSeconds ?? 120) * 1000)
     });
 
     if (result.success) {
@@ -225,7 +234,10 @@ export async function executeImplementationMulti(
 
   for (const provider of candidates) {
     if (provider === 'codex') {
-      const result = await execCodexTask(req);
+      const result = await execCodexTask({
+        ...req,
+        timeoutSeconds: plannedProviderTimeoutMs('IMPLEMENTER', (req.timeoutSeconds ?? 1800) * 1000) / 1000
+      });
       if (result.success) {
         markProviderSuccess(meshHealth.codex);
         return {
@@ -248,7 +260,7 @@ export async function executeImplementationMulti(
       prompt: req.prompt,
       cwd: req.worktreePath,
       mode: 'WORKSPACE_WRITE',
-      timeoutMs: (req.timeoutSeconds ?? 1800) * 1000
+      timeoutMs: plannedProviderTimeoutMs('IMPLEMENTER', (req.timeoutSeconds ?? 1800) * 1000)
     });
 
     if (result.success) {
@@ -302,7 +314,7 @@ async function executeRolePrompt(
       prompt: req.prompt,
       cwd: req.cwd,
       mode: req.mode,
-      timeoutMs: req.timeoutMs
+      timeoutMs: plannedProviderTimeoutMs(role, req.timeoutMs)
     });
 
     if (result.success) {
@@ -363,7 +375,7 @@ export async function auditResultMulti(req: {
       prompt,
       cwd: req.repositoryRoot,
       mode: 'READ_ONLY',
-      timeoutMs: (req.timeoutSeconds ?? 120) * 1000
+      timeoutMs: plannedProviderTimeoutMs('REVIEWER', (req.timeoutSeconds ?? 120) * 1000)
     });
 
     if (!result.success) {
