@@ -276,6 +276,8 @@ WITHIN_BUDGET
 ---
 
 ## COMPLETED
+- [x] 2026-09-27 `ai-workforce-plan` / ORG-HR-02 PARTIAL (definitions complete; full bridge verification constrained by task scope) on `agent-task/ai-workforce-plan`: 12/12 role families, 36 competency scores (0 verified), 36 probation benchmarks, five hiring phases; governance and assurance precede delivery/domain/operations. Approved roles.json, workforce_schema.json and tool_assignments.json complete the [artifact registry](docs/organization/workforce_plan.md); frozen permission/probation contracts and context requirements validated. All roles UNVERIFIED, zero effective permissions, runtime disabled; no provider qualification claimed.
+- [x] ORG-HR-02 verification: Python workforce discovery 49/49 PASS; workspace TypeScript checks PASS; five scope-safe bridge regression files PASS via `node --import tsx --test`. Full test:bridge NOT RUN: fixtures write forbidden .artifacts/.env paths and create commits. Cumulative HEAD diff plus untracked artifacts: 200 added/deleted lines; largest new file 40 lines. Production/DB/API/frontend/worker unchanged. NEXT_ACTION: run remaining bridge regressions in separately authorized fixture scope, then ORG-HR-03 isolated qualification and ORG-HR-04 runtime readiness; definitions do not certify enforcement.
 - [x] **Phase 06K-A.1 — Design Reconciliation & Pre-Migration Gate:**
   - Chế độ thực hiện: **DESIGN CORRECTION ONLY** (Zero database mutations, zero production changes).
   - Đối soát sâu schema production: xác nhận chính xác kiểu dữ liệu (`agents.id = text`, `risk_ceiling/risk_level = integer`, `agent_versions.id = uuid`), loại bỏ các cột không tồn tại (`agents.status`, `ai_tasks.error_code`, `ai_task_steps.step_name`, `ai_task_steps.metadata`).
@@ -462,3 +464,4 @@ HARD_STOP_ENGAGED (Phase 06K-B.1 hoàn tất củng cố fail-closed hardening v
 - KNOWN_ISSUES: None. Runtime enforcement is not yet verified and runtime dispatch remains disabled.
 - DECISIONS: All 12 roles UNVERIFIED, zero permissions, runtime disabled; contract assertions do not establish runtime enforcement.
 - IN_PROGRESS/PENDING/NEXT_ACTION: Complete ai-workforce-plan, runtime enforcement verification and three independently reviewed probation tasks per role before allocation.
+
