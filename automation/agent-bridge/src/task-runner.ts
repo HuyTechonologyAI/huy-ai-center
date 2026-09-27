@@ -37,10 +37,18 @@ import {
   allVerificationsPassed,
 } from "./result-auditor.js";
 import { safeJsonStringify } from "./log-redactor.js";
-import { checkpointStage } from './checkpoints.js';
+import { checkpointStage, readLatestCheckpoint } from './checkpoints.js';
 
 const ARTIFACTS_ROOT = ".artifacts/agent-bridge";
 const MAX_CYCLES = 8;
+
+export function shouldRunTestDesignOnResume(
+  latest?: { stage?: string; status?: string } | null
+): boolean {
+  const testDesignAlreadyVerified = latest?.status === 'VERIFIED' &&
+    ['TEST_DESIGN', 'IMPLEMENTATION', 'CROSS_REVIEW', 'DELIVERY'].includes(latest.stage ?? '');
+  return !testDesignAlreadyVerified;
+}
 
 // ─────────────────────────────────────────────────
 // Entry point
@@ -59,6 +67,7 @@ export async function runTask(
 
   const artifactDir = join(repositoryRoot, ARTIFACTS_ROOT, contract.taskId);
   ensureDir(artifactDir);
+  const resumeCheckpoint = checkpoint ? readLatestCheckpoint(repositoryRoot, contract.taskId) : undefined;
 
   // ── 1. Static risk assessment (deterministic, fail-closed) ─────
   state.status = "RISK_ASSESSED";
@@ -176,6 +185,7 @@ export async function runTask(
   state.worktree = worktree;
 
   // ── 5. Test-first design stage (mandatory before production-code edits) ──
+  if (shouldRunTestDesignOnResume(resumeCheckpoint)) {
   const testDesignPrompt = buildTestDesignPrompt({
     taskId: contract.taskId,
     objective: contract.objective,
@@ -243,6 +253,7 @@ export async function runTask(
       result: 'Test-first baseline captured',
       next: 'IMPLEMENTATION',
     });
+  }
   }
 
   // ── 6. Self-correction implementation loop ─────────────────────

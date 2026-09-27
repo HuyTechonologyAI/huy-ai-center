@@ -34,6 +34,8 @@ import {
   buildImplementationPrompt
 } from '../../automation/agent-bridge/src/codex-adapter.js';
 
+import { shouldRunTestDesignOnResume } from '../../automation/agent-bridge/src/task-runner.js';
+
 test('provider mesh registers all five autonomous AI providers', () => {
   assert.deepEqual(
     [...ALL_PROVIDER_IDS].sort(),
@@ -366,4 +368,13 @@ test('edit-budget-aware prompts enforce test designer and implementer line limit
 test('independent reviewer has a bounded long-review budget', () => {
   assert.equal(plannedProviderTimeoutMs('REVIEWER', Number.MAX_SAFE_INTEGER), 240_000);
   assert.equal(plannedProviderTimeoutMs('REVIEWER', 90_000), 90_000);
+});
+
+test('verified TEST_DESIGN checkpoint is not executed again on resume', () => {
+  assert.equal(shouldRunTestDesignOnResume(undefined), true);
+  assert.equal(shouldRunTestDesignOnResume({ stage: 'PLAN', status: 'VERIFIED' }), true);
+  assert.equal(shouldRunTestDesignOnResume({ stage: 'TEST_DESIGN', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunTestDesignOnResume({ stage: 'IMPLEMENTATION', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunTestDesignOnResume({ stage: 'CROSS_REVIEW', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunTestDesignOnResume({ stage: 'DELIVERY', status: 'VERIFIED' }), false);
 });
