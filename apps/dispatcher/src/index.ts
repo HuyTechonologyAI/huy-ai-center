@@ -6,6 +6,7 @@ import { TaskRouter } from './router/task-router.js';
 import { HeartbeatManager } from './heartbeat.js';
 import { QueuePoller } from './queue/poller.js';
 import { HealthServer } from './health.js';
+import { parseTelemetryOnly, shouldStartTaskPoller } from './runtime-mode.js';
 
 async function bootstrap() {
   const logger = rootLogger.child('DispatcherDaemon');
@@ -90,10 +91,18 @@ async function bootstrap() {
   // Register worker in DB & start background loops
   await heartbeat.register();
   heartbeat.start();
-  poller.start();
+  const taskPollingEnabled = shouldStartTaskPoller(parseTelemetryOnly(process.env.WORKER_TELEMETRY_ONLY));
+  if (taskPollingEnabled) {
+    poller.start();
+  } else {
+    logger.info('Telemetry-only mode active: queue polling and task dispatch are disabled.');
+  }
   isReady = true;
 
-  logger.info(`Dispatcher is ready. Provider mode: [${env.AI_PROVIDER_MODE}]. Concurrency: ${env.WORKER_CONCURRENCY}`);
+  logger.info(
+    `Dispatcher is ready. Provider mode: [${env.AI_PROVIDER_MODE}]. Concurrency: ${env.WORKER_CONCURRENCY}. ` +
+    `Task polling: ${taskPollingEnabled ? 'ENABLED' : 'DISABLED'}`
+  );
 
   // Graceful shutdown handling
   let isShuttingDown = false;
