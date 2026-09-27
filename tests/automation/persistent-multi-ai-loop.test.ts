@@ -9,6 +9,7 @@ import {
   markProviderSuccess,
   selectProvider,
   providerCommandSpec,
+  providerStdioSpec,
   detectProviderSemanticFailure,
   parseCodexAuthStatus,
   parseClaudeAuthStatus,
@@ -95,6 +96,15 @@ test('safe command specs never use dangerous blanket permission bypasses', () =>
     assert.equal(joined.includes('dangerously-skip-permissions'), false, id);
     assert.equal(joined.includes('danger-full-access'), false, id);
     assert.equal(joined.includes('--yolo'), false, id);
+  }
+});
+
+test('Codex headless execution requires stdin to be ignored while stdout and stderr remain piped', () => {
+  assert.deepEqual(providerStdioSpec('codex'), ['ignore', 'pipe', 'pipe']);
+
+  for (const id of ALL_PROVIDER_IDS) {
+    if (id === 'codex') continue;
+    assert.deepEqual(providerStdioSpec(id), ['pipe', 'pipe', 'pipe']);
   }
 });
 

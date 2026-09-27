@@ -214,6 +214,15 @@ export function providerCommandSpec(
   }
 }
 
+export function providerStdioSpec(
+  provider: ProviderId | string
+): ['ignore', 'pipe', 'pipe'] | ['pipe', 'pipe', 'pipe'] {
+  if (provider === 'codex') {
+    return ['ignore', 'pipe', 'pipe'];
+  }
+  return ['pipe', 'pipe', 'pipe'];
+}
+
 function checkAuthText(text: string): boolean {
   const lower = text.toLowerCase();
   return AUTH_PATTERNS.some(pattern => lower.includes(pattern));
@@ -529,6 +538,7 @@ export async function runProviderPrompt(req: ProviderRunRequest): Promise<Provid
   const spec = providerCommandSpec(req.provider, req);
   const r = spawnSync(spec.command, spec.args, {
     cwd: req.cwd,
+    stdio: providerStdioSpec(req.provider),
     encoding: 'utf8',
     timeout: timeoutMs,
     shell: false,
