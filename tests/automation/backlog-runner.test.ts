@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { validateRoadmap, projectRoadmapNodeToContract, assertPushBranch, assertLiveAcceptance, type Roadmap, type RoadmapNode } from '../../automation/agent-bridge/src/backlog-runner.js';
+import { validateRoadmap, projectRoadmapNodeToContract, assertPushBranch, assertLiveAcceptance, shouldResumeBlockedTask, type Roadmap, type RoadmapNode } from '../../automation/agent-bridge/src/backlog-runner.js';
 import { collectChangedFiles } from '../../automation/agent-bridge/src/result-auditor.js';
 import { createWorktree } from '../../automation/agent-bridge/src/worktree-manager.js';
 
@@ -14,6 +14,14 @@ const node = (id: string, depends_on: string[] = []): RoadmapNode => ({
   id, title: id, objective: id, risk: 'R2', depends_on, allowed_paths: ['docs/automation/'], verification: ['npm run typecheck'], human_gate: false,
 });
 const graph = (tasks: RoadmapNode[]): Roadmap => ({ mode: 'SERIAL_FAIL_CLOSED', max_concurrency: 1, tasks });
+
+test('blocked task resumes only from a verified non-delivery checkpoint', () => {
+  assert.equal(shouldResumeBlockedTask({ status: 'BLOCKED', reason: 'Task runner: BLOCKED' }, { stage: 'TEST_DESIGN', status: 'VERIFIED' }), true);
+  assert.equal(shouldResumeBlockedTask({ status: 'BLOCKED', reason: 'Task runner: BLOCKED' }, undefined), false);
+  assert.equal(shouldResumeBlockedTask({ status: 'HUMAN_GATE', reason: 'Owner approval required' }, { stage: 'TEST_DESIGN', status: 'VERIFIED' }), false);
+  assert.equal(shouldResumeBlockedTask({ status: 'BLOCKED', reason: 'Task runner: BLOCKED' }, { stage: 'DELIVERY', status: 'VERIFIED' }), false);
+  assert.equal(shouldResumeBlockedTask({ status: 'BLOCKED', reason: 'Task runner: BLOCKED' }, { stage: 'TEST_DESIGN', status: 'UNVERIFIED' }), false);
+});
 
 test('canonical roadmap is serial and orders dependencies', () => {
   const nodes = validateRoadmap(source);

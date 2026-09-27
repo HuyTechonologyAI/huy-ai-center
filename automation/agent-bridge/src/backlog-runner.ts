@@ -17,6 +17,13 @@ type BacklogState = { tasks: Record<string, { status: Status; reason?: string; b
 const GATED = new Set<RiskLevel>(['R3', 'R4']);
 const forbidden = ['.env', '.artifacts/', '.agent-worktrees/', 'secrets/', 'supabase/migrations/', 'supabase/rollback/'];
 
+export function shouldResumeBlockedTask(
+  prior?: { status?: string; reason?: string },
+  latest?: { stage?: string; status?: string } | null
+): boolean {
+  return prior?.status === 'BLOCKED' && latest?.status === 'VERIFIED' && Boolean(latest.stage) && latest.stage !== 'DELIVERY';
+}
+
 export function validateRoadmap(roadmap: Roadmap): RoadmapNode[] {
   if (roadmap?.mode !== 'SERIAL_FAIL_CLOSED' || roadmap.max_concurrency !== 1 || !Array.isArray(roadmap.tasks)) throw Error('SERIAL_POLICY_REQUIRED');
   const byId = new Map<string, RoadmapNode>();
@@ -119,13 +126,14 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
         return { status: 'HUMAN_GATE', taskId: node.id, reason: prior.reason ?? 'Owner approval required' };
       }
 
-      const resumableCheckpoint = latest && latest.stage !== 'DELIVERY';
+      const resumableCheckpoint = Boolean(latest && latest.status === 'VERIFIED' && latest.stage !== 'DELIVERY');
+      const blockedCheckpointResume = shouldResumeBlockedTask(prior, latest);
       const retryablePrior =
         prior?.status === 'TOOL_CAPACITY_WAIT' ||
         prior?.status === 'RUNNING' ||
         (prior?.status === 'BLOCKED' && isRetryableBlock(prior.reason));
 
-      if (prior?.status === 'BLOCKED' && !retryablePrior) {
+      if (prior?.status === 'BLOCKED' && !retryablePrior && !blockedCheckpointResume) {
         return { status: 'BLOCKED', taskId: node.id, reason: prior.reason ?? 'Non-retryable previous failure' };
       }
 
