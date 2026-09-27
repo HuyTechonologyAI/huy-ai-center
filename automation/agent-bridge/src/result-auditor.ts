@@ -113,6 +113,13 @@ export function collectChangedFiles(worktreePath: string): string[] {
   return files;
 }
 
+
+export function buildVerificationEnv(baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env = { ...baseEnv };
+  delete env.NODE_TEST_CONTEXT;
+  return env;
+}
+
 // ─────────────────────────────────────────────────
 // Run verification commands (guarded by command-guard)
 // ─────────────────────────────────────────────────
@@ -153,6 +160,7 @@ export function runVerificationCommands(params: {
       encoding: "utf-8",
       timeout: timeoutMs,
       shell: false,
+      env: buildVerificationEnv(),
     });
 
     const durationMs = Date.now() - start;

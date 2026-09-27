@@ -31,6 +31,7 @@ import { checkCommandSync } from "../../automation/agent-bridge/src/command-guar
 import { evaluateGate } from "../../automation/agent-bridge/src/approval-gate.js";
 import {
   runVerificationCommands,
+  buildVerificationEnv,
   collectChangedFiles,
   collectDiffStat,
 } from "../../automation/agent-bridge/src/result-auditor.js";
@@ -90,6 +91,17 @@ describe("Required Security Cases & Guard Enforcement (AI-DEV-BRIDGE-A.1)", () =
     const trunc = classifyCommand("TRUNCATE TABLE ai_tasks");
     assert.equal(drop.risk, "R4");
     assert.equal(trunc.risk, "R4");
+  });
+
+  it("verification child environment removes inherited node:test context", () => {
+    const env = buildVerificationEnv({
+      PATH: '/usr/bin',
+      NODE_TEST_CONTEXT: 'child-v8',
+      SAFE_VALUE: 'ok',
+    });
+    assert.equal(env.NODE_TEST_CONTEXT, undefined);
+    assert.equal(env.SAFE_VALUE, 'ok');
+    assert.equal(env.PATH, '/usr/bin');
   });
 
   it("verification command cannot bypass guard", () => {
