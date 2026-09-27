@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, chmodSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { validateRoadmap, projectRoadmapNodeToContract, assertPushBranch, assertLiveAcceptance, shouldResumeBlockedTask, classifyRemoteSyncFailure, remotePushSpawnOptions, isLocalDeliveryComplete, remoteSyncBackoffMs, runRemotePushWithDeadline, processRemoteSyncQueue, type Roadmap, type RoadmapNode } from '../../automation/agent-bridge/src/backlog-runner.js';
+import { validateRoadmap, projectRoadmapNodeToContract, assertPushBranch, assertLiveAcceptance, shouldResumeBlockedTask, canReuseDirtyCheckpointWorktree, classifyRemoteSyncFailure, remotePushSpawnOptions, isLocalDeliveryComplete, remoteSyncBackoffMs, runRemotePushWithDeadline, processRemoteSyncQueue, type Roadmap, type RoadmapNode } from '../../automation/agent-bridge/src/backlog-runner.js';
 import { collectChangedFiles } from '../../automation/agent-bridge/src/result-auditor.js';
 import { createWorktree } from '../../automation/agent-bridge/src/worktree-manager.js';
 
@@ -246,4 +246,13 @@ test('remote sync worker migrates legacy queue records before retrying', async (
     process.env.PATH = priorPath;
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('dirty task worktree is reusable only from verified non-delivery checkpoint with clean scope', () => {
+  const checkpoint = { stage: 'TEST_DESIGN', status: 'VERIFIED' };
+  assert.equal(canReuseDirtyCheckpointWorktree(checkpoint, true), true);
+  assert.equal(canReuseDirtyCheckpointWorktree(checkpoint, false), false);
+  assert.equal(canReuseDirtyCheckpointWorktree({ stage: 'DELIVERY', status: 'VERIFIED' }, true), false);
+  assert.equal(canReuseDirtyCheckpointWorktree({ stage: 'TEST_DESIGN', status: 'UNVERIFIED' }, true), false);
+  assert.equal(canReuseDirtyCheckpointWorktree(undefined, true), false);
 });

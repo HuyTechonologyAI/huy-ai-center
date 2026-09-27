@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, openSync, closeSync, unlinkSync, readFileSync, w
 import { join, resolve } from 'node:path';
 import { spawn, spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { runTask } from './task-runner.js';
+import { runTask, verifyPathScope } from './task-runner.js';
 import { checkpointStage, readLatestCheckpoint } from './checkpoints.js';
 import type { TaskContract, RiskLevel } from './types.js';
 
@@ -107,6 +107,14 @@ export function shouldResumeBlockedTask(
   latest?: { stage?: string; status?: string } | null
 ): boolean {
   return prior?.status === 'BLOCKED' && latest?.status === 'VERIFIED' && Boolean(latest.stage) && latest.stage !== 'DELIVERY';
+}
+
+export function canReuseDirtyCheckpointWorktree(
+  latest: { stage?: string; status?: string } | null | undefined,
+  scopeInScope: boolean
+): boolean {
+  return latest?.status === 'VERIFIED' && Boolean(latest.stage) &&
+    latest.stage !== 'DELIVERY' && scopeInScope;
 }
 
 export function validateRoadmap(roadmap: Roadmap): RoadmapNode[] {
@@ -315,7 +323,20 @@ export async function runBacklog(root: string, execute = false): Promise<{ statu
       if (!contract.verification.commands.length) throw Error('VERIFICATION_REQUIRED');
       const worktree = join(root, '.agent-worktrees', node.id === 'bridge-b-core' ? 'bridge-b-autonomous-backlog' : node.id);
       if (existsSync(worktree)) {
-        if (git(worktree, 'branch', '--show-current') !== contract.repository.taskBranch || git(worktree, 'status', '--porcelain')) throw Error('TASK_WORKTREE_UNSAFE');
+        if (git(worktree, 'branch', '--show-current') !== contract.repository.taskBranch) {
+          throw Error('TASK_WORKTREE_UNSAFE');
+        }
+        const dirty = Boolean(git(worktree, 'status', '--porcelain'));
+        if (dirty) {
+          const scope = verifyPathScope({
+            worktreePath: worktree,
+            allowedPaths: contract.scope.allowedPaths,
+            forbiddenPaths: contract.scope.forbiddenPaths
+          });
+          if (!canReuseDirtyCheckpointWorktree(latest, scope.inScope)) {
+            throw Error(scope.inScope ? 'TASK_WORKTREE_UNSAFE' : `TASK_WORKTREE_RESUME_SCOPE_VIOLATION:${scope.violations.join('|')}`);
+          }
+        }
       }
       const leases = join(runtime, 'leases');
       if (requireLeaseFree(leases)) throw Error('OTHER_LEASE_ACTIVE');
