@@ -22,8 +22,13 @@ import {
 
 import {
   buildPlanningPrompt,
+  buildTestDesignPrompt,
   planningPrompt
 } from '../../automation/agent-bridge/src/multi-agent-adapter.js';
+
+import {
+  buildImplementationPrompt
+} from '../../automation/agent-bridge/src/codex-adapter.js';
 
 test('provider mesh registers all five autonomous AI providers', () => {
   assert.deepEqual(
@@ -237,3 +242,41 @@ test('planning prompt explicitly forbids tool calls, shell commands, and reposit
   assert.match(prompt, /prompt context only/i);
   assert.match(prompt, /numbered steps only|parseable numbered plan/i);
 });
+
+test('edit-budget-aware prompts enforce test designer and implementer line limits', () => {
+  assert.equal(typeof buildTestDesignPrompt, 'function');
+  assert.equal(typeof buildImplementationPrompt, 'function');
+
+  const testDesignPrompt = buildTestDesignPrompt({
+    taskId: 'task-budget-test',
+    objective: 'Verify edit budget constraints in prompts',
+    planSteps: [
+      { stepIndex: 1, description: 'Design test fixture within pre-implementation budget' }
+    ],
+    allowedPaths: ['tests/automation/persistent-multi-ai-loop.test.ts'],
+    forbiddenPaths: ['.env'],
+    verification: ['npm test']
+  });
+
+  assert.match(testDesignPrompt, /pre-implementation budget/i);
+  assert.match(testDesignPrompt, /at most 80 changed lines/i);
+  assert.match(testDesignPrompt, /hard final total edit budget is 200 lines/i);
+
+  const implementerPrompt = buildImplementationPrompt({
+    taskId: 'task-budget-impl',
+    objective: 'Implement feature within edit budget',
+    planSteps: [
+      { stepIndex: 1, description: 'Implement minimal changes' }
+    ],
+    allowedPaths: ['automation/agent-bridge/src/codex-adapter.ts'],
+    forbiddenPaths: ['.env']
+  });
+
+  assert.match(implementerPrompt, /final cumulative diff from HEAD/i);
+  assert.match(implementerPrompt, /at or below 200 added\/deleted lines/i);
+  assert.match(implementerPrompt, /no new file over 200 lines/i);
+  assert.match(implementerPrompt, /git diff --numstat HEAD/);
+  assert.match(implementerPrompt, /before finishing/i);
+  assert.match(implementerPrompt, /git diff --numstat HEAD.*before finishing/i);
+});
+

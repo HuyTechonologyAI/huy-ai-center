@@ -323,5 +323,8 @@ Rules:
 - Write clean, typed TypeScript where applicable.
 - Ensure existing tests still pass after your changes.
 - Do not commit — the bridge handles commits separately.
+- The final cumulative diff from HEAD must be at or below 200 added/deleted lines.
+- No new file over 200 lines.
+- Run and check \`git diff --numstat HEAD\` before finishing.
 `.trim();
 }
