@@ -6,7 +6,7 @@ import { TaskRouter } from './router/task-router.js';
 import { HeartbeatManager } from './heartbeat.js';
 import { QueuePoller } from './queue/poller.js';
 import { HealthServer } from './health.js';
-import { parseTelemetryOnly, shouldStartTaskPoller } from './runtime-mode.js';
+import { parseTelemetryOnly, resolveHealthBindHost, shouldStartTaskPoller } from './runtime-mode.js';
 
 async function bootstrap() {
   const logger = rootLogger.child('DispatcherDaemon');
@@ -20,6 +20,14 @@ async function bootstrap() {
     env = parseWorkerEnv(process.env);
   } catch (err) {
     logger.error('Invalid environment configuration. Check your environment variables.', err);
+    process.exit(1);
+  }
+
+  let telemetryOnly: boolean;
+  try {
+    telemetryOnly = parseTelemetryOnly(process.env.WORKER_TELEMETRY_ONLY);
+  } catch (err) {
+    logger.error('Invalid WORKER_TELEMETRY_ONLY value. Expected true or false.', err);
     process.exit(1);
   }
 
@@ -51,6 +59,7 @@ async function bootstrap() {
   const healthServer = new HealthServer(
     {
       port: env.DISPATCHER_HEALTH_PORT,
+      host: resolveHealthBindHost(telemetryOnly),
       workerId: env.WORKER_NODE_ID,
       getActiveJobs: () => currentActiveJobs,
       isReady: () => isReady,
@@ -91,7 +100,7 @@ async function bootstrap() {
   // Register worker in DB & start background loops
   await heartbeat.register();
   heartbeat.start();
-  const taskPollingEnabled = shouldStartTaskPoller(parseTelemetryOnly(process.env.WORKER_TELEMETRY_ONLY));
+  const taskPollingEnabled = shouldStartTaskPoller(telemetryOnly);
   if (taskPollingEnabled) {
     poller.start();
   } else {

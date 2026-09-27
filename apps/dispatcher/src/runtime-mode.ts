@@ -1,4 +1,4 @@
-/** Runtime-mode safety interlock for phased Node01 activation. */
+/** Runtime-mode safety interlocks for phased Node01 activation. */
 export function parseTelemetryOnly(value: string | undefined): boolean {
   if (value === undefined || value.trim() === '' || value.trim().toLowerCase() === 'false') return false;
   if (value.trim().toLowerCase() === 'true') return true;
@@ -7,4 +7,8 @@ export function parseTelemetryOnly(value: string | undefined): boolean {
 
 export function shouldStartTaskPoller(telemetryOnly: boolean): boolean {
   return telemetryOnly !== true;
+}
+
+export function resolveHealthBindHost(telemetryOnly: boolean): string {
+  return telemetryOnly ? '127.0.0.1' : '0.0.0.0';
 }

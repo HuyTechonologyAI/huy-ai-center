@@ -3,6 +3,7 @@ import { Logger } from '@huy-ai/shared';
 
 export interface HealthServerOptions {
   port: number;
+  host?: string;
   workerId: string;
   getActiveJobs: () => number;
   isReady: () => boolean;
@@ -57,8 +58,9 @@ export class HealthServer {
         res.end(JSON.stringify({ error: 'Endpoint not found. Use /health or /ready' }));
       });
 
-      this.server.listen(this.options.port, () => {
-        this.logger.info(`Health check HTTP server listening on port ${this.options.port} (/health, /ready)`);
+      const host = this.options.host ?? '0.0.0.0';
+      this.server.listen(this.options.port, host, () => {
+        this.logger.info('Health check HTTP server listening on ' + host + ':' + this.options.port + ' (/health, /ready)');
         resolve();
       });
     });
