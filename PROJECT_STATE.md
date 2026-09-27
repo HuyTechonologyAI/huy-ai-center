@@ -454,3 +454,11 @@ PRODUCTION_MIGRATED_STABLE
 
 ## PRIOR_NEXT_ACTION (historical)
 HARD_STOP_ENGAGED (Phase 06K-B.1 hoàn tất củng cố fail-closed hardening và evidence generation: 39/39 security tests PASS, 12/12 stages dry run lifecycle PASS trên isolated database `phase06kb_test`, 0 chạm production. Nhánh feature/06k-b-migration-dry-run đã sẵn sàng tại PR #1. Dừng lại chờ Human Owner phê duyệt trước khi cấp quyền Phase 06K-C).
+
+## AI HR bootstrap — 2026-09-27
+- CURRENT_PHASE: ORG-HR-01 PARTIAL; task `ai-hr-bootstrap`; CURRENT_BRANCH: `agent-task/ai-hr-bootstrap`.
+- COMPLETED: [x] Planning charter, fail-closed policy contract, initial staffing plan; DATABASE/API/FRONTEND/WORKER unchanged.
+- TEST_STATUS: HR boundary tests 6/6 PASS, npm run typecheck PASS, npm run test:bridge 129/129 PASS. Prior totals above are historical.
+- KNOWN_ISSUES: None. Runtime enforcement is not yet verified and runtime dispatch remains disabled.
+- DECISIONS: All 12 roles UNVERIFIED, zero permissions, runtime disabled; contract assertions do not establish runtime enforcement.
+- IN_PROGRESS/PENDING/NEXT_ACTION: Complete ai-workforce-plan, runtime enforcement verification and three independently reviewed probation tasks per role before allocation.
