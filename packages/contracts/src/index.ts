@@ -5,3 +5,4 @@ export * from './agent.js';
 export * from './api.js';
 export * from './haip.js';
 export * from './canonical-hash.js';
+export * from './dispatcher-v2.js';
