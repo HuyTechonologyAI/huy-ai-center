@@ -25,8 +25,6 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-CapabilityBoundingSet=
-AmbientCapabilities=
 
 [Install]
 WantedBy=default.target
