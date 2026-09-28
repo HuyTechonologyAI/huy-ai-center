@@ -626,7 +626,9 @@ export function safeScopedCommit(params: {
   const stagedFiles: string[] = [];
   const rejectedFiles: string[] = [];
 
-  const lines = (statusResult.stdout ?? "").trim().split("\n").filter(Boolean);
+  // Preserve porcelain's leading status column; trimming the whole output
+  // corrupts paths for unstaged tracked files such as " M PROJECT_STATE.md".
+  const lines = (statusResult.stdout ?? "").split("\n").filter(Boolean);
 
   for (const line of lines) {
     const status = line.slice(0, 2);

@@ -157,6 +157,7 @@ describe("Required Security Cases & Guard Enforcement (AI-DEV-BRIDGE-A.1)", () =
 
       // Initial commit
       writeFileSync(join(tempDir, "allowed-src", "initial.txt"), "hello", "utf-8");
+      writeFileSync(join(tempDir, "PROJECT_STATE.md"), "baseline\n", "utf-8");
       spawnSync("git", ["add", "."], { cwd: tempDir });
       spawnSync("git", ["commit", "-m", "initial"], { cwd: tempDir });
 
@@ -172,6 +173,9 @@ describe("Required Security Cases & Guard Enforcement (AI-DEV-BRIDGE-A.1)", () =
 
       // 4. Sensitive file (.env)
       writeFileSync(join(tempDir, ".env.local"), "SECRET=123", "utf-8");
+
+      // 5. Modified tracked root file explicitly allowed by exact path.
+      writeFileSync(join(tempDir, "PROJECT_STATE.md"), "baseline\nupdated\n", "utf-8");
 
       // Test 1: Untracked files appear in collectChangedFiles & collectDiffStat
       const changed = collectChangedFiles(tempDir);
@@ -199,20 +203,22 @@ describe("Required Security Cases & Guard Enforcement (AI-DEV-BRIDGE-A.1)", () =
         worktreePath: tempDir,
         taskId: "test-sec-001",
         title: "Test safe scoped commit",
-        allowedPaths: ["allowed-src/"],
+        allowedPaths: ["allowed-src/", "PROJECT_STATE.md"],
         forbiddenPaths: ["forbidden-dir/"],
       });
 
-      // Assert only new-file.ts was staged
+      // Assert allowed directory file and exact-path root file are staged.
       assert.ok(stageResult.stagedFiles.some((f) => f.includes("new-file.ts")), "new allowed file must be staged");
+      assert.ok(stageResult.stagedFiles.includes("PROJECT_STATE.md"), "modified allowed root file must be staged without losing its first character");
       assert.ok(!stageResult.stagedFiles.some((f) => f.includes("forbidden-dir")), "forbidden file must never be staged");
       assert.ok(!stageResult.stagedFiles.some((f) => f.includes(".env")), ".env must never be staged");
       assert.ok(!stageResult.stagedFiles.some((f) => f.includes("other-dir")), "out of scope file must never be staged");
 
       // Check git status in fixture repo after commit
       const postStatus = spawnSync("git", ["status", "--porcelain"], { cwd: tempDir, encoding: "utf-8" });
-      // new-file.ts is committed, other-dir.ts and forbidden-dir are still untracked
+      // Allowed files are committed; out-of-scope and forbidden files remain untracked.
       assert.ok(!postStatus.stdout.includes("new-file.ts"), "new-file.ts should now be committed");
+      assert.ok(!postStatus.stdout.includes("PROJECT_STATE.md"), "PROJECT_STATE.md should now be committed");
       assert.ok(postStatus.stdout.includes("other-dir.ts"), "other-dir.ts should remain uncommitted");
       assert.ok(postStatus.stdout.includes("forbidden-dir"), "forbidden-dir should remain uncommitted");
     } finally {
