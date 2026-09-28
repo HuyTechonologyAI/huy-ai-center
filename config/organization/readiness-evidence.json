@@ -1,0 +1,25 @@
+{
+"priority":"ORG_READINESS", "receipts":[], "evidence":{}, "revoked":[],
+"tasks":[
+{"id": "ai-hr-bootstrap", "owner": "ai-hr-001", "capabilities": ["workforce-planning"], "permissions": ["read:config/organization/", "read:docs/organization/", "read:tests/automation/", "read:PROJECT_STATE.md"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "ai-workforce-plan", "owner": "chief-architect", "capabilities": ["architecture-planning"], "permissions": ["read:config/organization/", "read:docs/organization/", "read:tests/automation/", "read:PROJECT_STATE.md"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "ai-core-team-recruitment", "owner": "ai-hr-001", "capabilities": ["workforce-planning"], "permissions": ["read:config/organization/", "read:config/autonomy/", "read:docs/organization/", "read:tests/automation/", "read:PROJECT_STATE.md"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "ai-org-readiness", "owner": "qa", "capabilities": ["test-automation"], "permissions": ["read:config/organization/", "read:config/autonomy/", "read:docs/organization/", "read:tests/automation/", "read:PROJECT_STATE.md"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "06k-c-readiness", "owner": "data", "capabilities": ["data-modeling"], "permissions": ["read:docs/architecture/", "read:docs/automation/", "read:scripts/", "read:PROJECT_STATE.md"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "06k-c-production-apply", "owner": "data", "capabilities": ["data-modeling"], "permissions": ["read:supabase/migrations/", "read:docs/architecture/", "read:PROJECT_STATE.md"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "07a-dispatcher-v2", "owner": "primary-coder", "capabilities": ["antigravity-coding"], "permissions": ["read:apps/dispatcher/", "read:packages/contracts/", "read:tests/", "read:docs/"], "providers": ["antigravity", "codex"], "budget": 0},
+{"id": "07b-dell-deploy", "owner": "devops", "capabilities": ["ci-cd-orchestration"], "permissions": ["read:deploy/", "read:docs/", "read:PROJECT_STATE.md"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "07c-e2e", "owner": "qa", "capabilities": ["test-automation"], "permissions": ["read:tests/", "read:docs/", "read:PROJECT_STATE.md"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "08a-model-gateway", "owner": "chief-architect", "capabilities": ["architecture-planning"], "permissions": ["read:config/", "read:packages/", "read:apps/", "read:tests/", "read:docs/"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "08b-ollama-dell", "owner": "devops", "capabilities": ["ci-cd-orchestration"], "permissions": ["read:deploy/", "read:docs/", "read:PROJECT_STATE.md"], "providers": ["gemini", "codex"], "budget": 0},
+{"id": "08c-model-routing-e2e", "owner": "qa", "capabilities": ["test-automation"], "permissions": ["read:tests/", "read:apps/", "read:packages/", "read:docs/"], "providers": ["gemini", "codex"], "budget": 0}
+], "roles":[
+{"id": "chief-architect", "capabilities": ["architecture-planning", "system-design", "adr-authoring"], "permissions": [], "ceiling": [], "probation": ["task-prob-arch-001", "task-prob-arch-002", "task-prob-arch-003"]},
+{"id": "primary-coder", "capabilities": ["antigravity-coding", "fullstack-implementation", "code-refactoring"], "permissions": [], "ceiling": [], "probation": ["task-prob-code-001", "task-prob-code-002", "task-prob-code-003"]},
+{"id": "qa", "capabilities": ["test-automation", "probation-verification", "regression-testing"], "permissions": [], "ceiling": [], "probation": ["task-prob-qa-001", "task-prob-qa-002", "task-prob-qa-003"]},
+{"id": "security", "capabilities": ["secret-scanning", "boundary-audit", "vulnerability-analysis"], "permissions": [], "ceiling": [], "probation": ["task-prob-sec-001", "task-prob-sec-002", "task-prob-sec-003"]},
+{"id": "devops", "capabilities": ["ci-cd-orchestration", "deployment-hardening", "infrastructure-monitoring"], "permissions": [], "ceiling": [], "probation": ["task-prob-ops-001", "task-prob-ops-002", "task-prob-ops-003"]},
+{"id": "data", "capabilities": ["data-modeling", "schema-validation", "migration-verification"], "permissions": [], "ceiling": [], "probation": ["task-prob-data-001", "task-prob-data-002", "task-prob-data-003"]},
+{"id": "ai-hr-001", "capabilities": ["workforce-planning"], "permissions": [], "ceiling": [], "probation": ["hr-1", "hr-2", "hr-3"]}
+], "providers":[]
+}

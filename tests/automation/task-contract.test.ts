@@ -7,6 +7,7 @@
  */
 
 import { describe, it } from "node:test";
+import './org-readiness.test.js';
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 it("workforce planning contracts", () => {

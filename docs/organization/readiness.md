@@ -1,0 +1,16 @@
+# Organization readiness — 2026-09-28
+
+Decision: **ORG_READINESS / BLOCKED**. All 12 canonical roadmap items have accountable owners in `config/organization/readiness-evidence.json`; these are planning assignments, not activation grants. Required capabilities, proposed read scopes, zero incremental task budgets, ordered provider candidates and probation references are explicit. Existing role ceilings remain empty, provider verification and admissible receipts remain absent. Synthetic recruitment checks are not real probation evidence.
+
+Release requires complete unique roadmap coverage, verified capability coverage, exact task permissions within independently approved role ceilings, and three distinct isolated PASS receipts per owner. Each receipt must match the owner and a required capability, have an independent reviewer, matching SHA-256 evidence bytes, verification within 30 days, a future expiry and no revocation. Missing or unverifiable evidence blocks all work. Provider selection must preserve capability, exact permission and per-task budget constraints during outages; absent authorized alternatives must fail closed.
+
+| Blocker | Accountable owner | Resolution criterion |
+| --- | --- | --- |
+| Unverified workforce and probation | Each task owner in manifest; ai-hr-001 coordinates | Independently qualify assigned capabilities and supply three current probation receipts with evidence bytes; verify reviewer identity and isolation outside fixtures. |
+| Empty permission ceilings and grants | security | Approve minimal scopes per task after sandbox verification; preserve production and human gates. Read scopes in this manifest cannot authorize implementation or deployment. |
+| Unverified primary/fallback providers | devops | Supply independently verified authorization, availability, capabilities, scoped permissions and cost records; repeat outage tests within zero incremental budget. Candidate names alone establish no authorization. |
+| Runtime integration and trustworthy provenance | chief-architect | Verify the scheduler consumes current canonical coverage and authenticated evidence, rechecks before dispatch and retains all R3/R4 approvals. The pure evaluator is a snapshot assessor, not a runtime authorization boundary. |
+
+`readiness.ts` never dispatches, reads files, changes grants or mutates inputs. Its positive fixture result tests decision logic only; caller-supplied reviewer strings and hashes do not authenticate provenance. The canonical gate stays closed until every blocker above is resolved; no technical roadmap status or runtime dispatch flag is activated here. Revalidate coverage against `system-roadmap.json` whenever it changes.
+
+Validation: 42 readiness cases initially failed for missing implementation/evidence; all 43 cases now pass after adding complete capability evidence coverage, covering successful primary selection, mocked outage fallback, unavailable/unauthorized/over-budget/excess-permission alternatives, receipt failures, malformed records and revocation. Run `node --import tsx tests/automation/org-readiness.test.ts`; it is also imported by the existing bridge task-contract suite. Full bridge tests include forbidden-path writes and are not executed under this task's scope.
