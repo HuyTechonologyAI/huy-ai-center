@@ -1,0 +1,14 @@
+# Core AI Team Recruitment & Probation Governance Specification
+- **chief-architect** (Architecture & Planning): HAIP decomposition, multi-org boundary validation, ADR authoring.
+- **primary-coder** (Antigravity Primary Coding): Isolated implementation, policy evaluation helper, TypeScript type guards.
+- **qa** (Quality Assurance): Synthetic receipt validation, test coverage enforcement, regression isolation.
+- **security** (Security Review): Credential leakage scanning, forbidden path enforcement, SHA-256 evidence integrity.
+- **devops** (DevOps & SRE): Offline build pipeline isolation, worker health probes, rollback state machine validation.
+- **data** (Data Engineering): JSON Schema Draft 2020-12 validation, mock read invariants, backward-compatibility auditing.
+
+All six roles start `UNVERIFIED`, with empty permissions, `authority_source: INHERIT_POLICY`, no permission overrides and runtime dispatch disabled. The roster maps each role to three capabilities and three probation fixtures with unique task and sandbox labels.
+The policy-owned Draft 2020-12 receipt schema requires exactly 12 fields: role_id, capability, task_id, sandbox_id, reviewer, evidence_sha256, verdict, isolated, secret_exposure, production_mutations, safety_gates_passed and fixture_only. Validation binds canonical role, task, sandbox, capability and output digest; rejects malformed evidence and replay within a run; and preserves its inputs.
+Scorecard: all 18 fixtures must pass, with isolation true, zero secret exposure, zero production mutations, safety gates true and simulated independent-qa review. Fixture PASS grants no authority. Every fixture sorts synthetic input tokens in fresh memory; it does not demonstrate the named professional capability or OS sandbox isolation.
+Policy defaults to DENY, including unknown roles/capabilities, missing or stale evidence, self-approval and unauthorized mutation. Filesystem, network, processes, secrets and database access are denied. Forbidden paths: `.env`, `.artifacts/`, `.agent-worktrees/`, `secrets/`, `supabase/migrations/`, `supabase/rollback/`. Corrupt policy requires DENY_ALL rollback without privilege expansion.
+Run `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/automation -p 'test_*.py'` with jsonschema and PyYAML installed. Record fixture-only receipt hashes and results in PROJECT_STATE.md. No provider is contacted; the test helper is not a runtime authorization service.
+Live qualification remains pending: enforce and independently verify OS isolation and path restrictions, authenticate agent and reviewer identities, persist replay/freshness checks, and independently review three real tasks per role against every safety gate. Human approval is required before activation; synthetic receipts cannot authorize deployment or promotion.

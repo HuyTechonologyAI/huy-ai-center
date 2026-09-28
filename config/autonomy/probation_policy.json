@@ -1,0 +1,36 @@
+{
+  "default_decision": "DENY",
+  "sandbox": {"mode": "PURE_SYNTHETIC", "filesystem": "DENY", "network": "DENY", "process_execution": "DENY", "secret_access": "DENY", "database": "DENY", "promotion": "INDEPENDENT_RUNTIME_REVIEW_AND_HUMAN_APPROVAL"},
+  "paths": {
+    "forbidden": [".env", ".artifacts/", ".agent-worktrees/", "secrets/", "supabase/migrations/", "supabase/rollback/"],
+    "deny_overrides_allow": true, "resolve_symlinks": true, "deny_outside_workspace": true, "deny_nested_forbidden": true,
+    "deny_env_variants": true, "reject_parent_traversal": true, "reject_absolute_paths": true, "component_boundary_matching": true
+  },
+  "gates": {
+    "unknown_role": "DENY", "unknown_capability": "DENY", "missing_evidence": "DENY", "failed_tests": "DENY", "self_approval": "DENY",
+    "malformed_request": "DENY", "missing_policy": "DENY", "invalid_policy": "DENY", "stale_evidence": "DENY", "scope_mismatch": "DENY",
+    "unverified_runtime": "DENY", "empty_path": "DENY", "nul_path": "DENY", "encoded_traversal": "DENY", "backslash_traversal": "DENY",
+    "secret_exposure": "DENY", "production_mutation": "DENY", "cross_role_task": "DENY", "replayed_receipt": "DENY"
+  },
+  "rollback": {
+    "on_invalid_policy": "DENY_ALL", "preserve_revocations": true, "revalidate_evidence": true, "allow_privilege_expansion": false
+  },
+  "receipt_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "additionalProperties": false,
+    "required": ["role_id", "capability", "task_id", "sandbox_id", "reviewer", "evidence_sha256", "verdict", "isolated", "secret_exposure", "production_mutations", "safety_gates_passed", "fixture_only"],
+    "properties": {
+      "role_id": {"type": "string"}, "capability": {"type": "string"}, "task_id": {"type": "string"}, "sandbox_id": {"type": "string"},
+      "reviewer": {"const": "independent-qa"}, "evidence_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "verdict": {"const": "PASS"}, "isolated": {"const": true}, "secret_exposure": {"const": false},
+      "production_mutations": {"type": "integer", "const": 0}, "safety_gates_passed": {"const": true}, "fixture_only": {"const": true}
+    },
+    "oneOf": [
+      {"properties": {"role_id": {"const": "chief-architect"}, "capability": {"enum": ["architecture-planning", "system-design", "adr-authoring"]}, "task_id": {"enum": ["task-prob-arch-001", "task-prob-arch-002", "task-prob-arch-003"]}, "sandbox_id": {"enum": ["sb-prob-arch-001", "sb-prob-arch-002", "sb-prob-arch-003"]}}},
+      {"properties": {"role_id": {"const": "primary-coder"}, "capability": {"enum": ["antigravity-coding", "fullstack-implementation", "code-refactoring"]}, "task_id": {"enum": ["task-prob-code-001", "task-prob-code-002", "task-prob-code-003"]}, "sandbox_id": {"enum": ["sb-prob-code-001", "sb-prob-code-002", "sb-prob-code-003"]}}},
+      {"properties": {"role_id": {"const": "qa"}, "capability": {"enum": ["test-automation", "probation-verification", "regression-testing"]}, "task_id": {"enum": ["task-prob-qa-001", "task-prob-qa-002", "task-prob-qa-003"]}, "sandbox_id": {"enum": ["sb-prob-qa-001", "sb-prob-qa-002", "sb-prob-qa-003"]}}},
+      {"properties": {"role_id": {"const": "security"}, "capability": {"enum": ["secret-scanning", "boundary-audit", "vulnerability-analysis"]}, "task_id": {"enum": ["task-prob-sec-001", "task-prob-sec-002", "task-prob-sec-003"]}, "sandbox_id": {"enum": ["sb-prob-sec-001", "sb-prob-sec-002", "sb-prob-sec-003"]}}},
+      {"properties": {"role_id": {"const": "devops"}, "capability": {"enum": ["ci-cd-orchestration", "deployment-hardening", "infrastructure-monitoring"]}, "task_id": {"enum": ["task-prob-ops-001", "task-prob-ops-002", "task-prob-ops-003"]}, "sandbox_id": {"enum": ["sb-prob-ops-001", "sb-prob-ops-002", "sb-prob-ops-003"]}}},
+      {"properties": {"role_id": {"const": "data"}, "capability": {"enum": ["data-modeling", "schema-validation", "migration-verification"]}, "task_id": {"enum": ["task-prob-data-001", "task-prob-data-002", "task-prob-data-003"]}, "sandbox_id": {"enum": ["sb-prob-data-001", "sb-prob-data-002", "sb-prob-data-003"]}}}
+    ]
+  }
+}
