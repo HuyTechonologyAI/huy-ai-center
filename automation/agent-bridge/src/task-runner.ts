@@ -71,6 +71,16 @@ export function coordinatorStateChanged(baseline: string, current: string): bool
   return baseline !== current;
 }
 
+export function classifyImplementationChanges(
+  changedFiles: string[]
+): { status: "CORRECTION_REQUIRED"; feedback: string } | null {
+  if (changedFiles.length > 0) return null;
+  return {
+    status: "CORRECTION_REQUIRED",
+    feedback: "IMPLEMENTATION_NO_CHANGE: implementer produced no reviewable changes; retry with a provider that must modify the allowed scope.",
+  };
+}
+
 
 // ─────────────────────────────────────────────────
 // Entry point
@@ -397,6 +407,29 @@ export async function runTask(
 
       writeArtifact(artifactDir, `execution-cycle-${cycle}.json`, result);
       continue; // Retry in next cycle with scope correction feedback
+    }
+
+    const changedFilesAfterImplementation = collectChangedFiles(worktree.path);
+    const noChange = classifyImplementationChanges(changedFilesAfterImplementation);
+    if (noChange) {
+      lastStatus = noChange.status;
+      auditorFeedback = noChange.feedback;
+      previousDiffSummary = collectDiffStat(worktree.path);
+      const result = buildAgentResult({
+        taskId: contract.taskId,
+        planId: plan.planId,
+        cycle,
+        status: noChange.status,
+        changedFiles: [],
+        diffStat: previousDiffSummary,
+        verificationResults: [],
+        auditNotes: noChange.feedback,
+        errorMessage: noChange.feedback,
+      });
+      state.result = result;
+      writeArtifact(artifactDir, `execution-cycle-${cycle}.json`, result);
+      console.warn(`[task-runner] Cycle ${cycle} IMPLEMENTATION_NO_CHANGE, retrying with feedback...`);
+      continue;
     }
 
     // ── 8. Guarded Verification ─────────────────────────────────

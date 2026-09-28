@@ -45,7 +45,8 @@ import {
   shouldRunTestDesignOnResume,
   shouldRunPlanOnResume,
   shouldRunImplementationOnResume,
-  coordinatorStateChanged
+  coordinatorStateChanged,
+  classifyImplementationChanges
 } from '../../automation/agent-bridge/src/task-runner.js';
 
 test('provider mesh registers cloud providers plus local Ollama fallback', () => {
@@ -127,6 +128,14 @@ test('Codex-backed headless providers ignore stdin while stdout and stderr remai
     if (id === 'codex' || id === 'ollama') continue;
     assert.deepEqual(providerStdioSpec(id), ['pipe', 'pipe', 'pipe']);
   }
+});
+
+test('empty implementation changes become retryable correction instead of review-diff exception', () => {
+  assert.deepEqual(classifyImplementationChanges([]), {
+    status: 'CORRECTION_REQUIRED',
+    feedback: 'IMPLEMENTATION_NO_CHANGE: implementer produced no reviewable changes; retry with a provider that must modify the allowed scope.'
+  });
+  assert.equal(classifyImplementationChanges(['tests/fixture.md']), null);
 });
 
 test('supervisor continues immediately after a completed task', () => {
