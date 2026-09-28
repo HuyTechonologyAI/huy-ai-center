@@ -10,9 +10,15 @@ if ! flock -n 9; then
   printf '%s\n' '{"status":"skipped_locked","candidates":[],"probation_pending":[],"human_gate_candidates":[]}'
   exit 0
 fi
-node_bin=${AI_HR_NODE_BIN:-node}
+if [[ -n "${AI_HR_NODE_BIN:-}" ]]; then
+  node_bin="$AI_HR_NODE_BIN"
+elif [[ -x /home/huyadmin/.nvm/versions/node/v24.21.0/bin/node ]]; then
+  node_bin=/home/huyadmin/.nvm/versions/node/v24.21.0/bin/node
+else
+  node_bin=$(command -v node || true)
+fi
 # Node 24 supplies native TypeScript stripping and fetch; no package installs.
-"$node_bin" -e 'if (Number(process.versions.node.split(".")[0]) < 24) process.exit(1)' || {
+[[ -n "$node_bin" ]] && "$node_bin" -e 'if (Number(process.versions.node.split(".")[0]) < 24) process.exit(1)' || {
   echo 'GitHub radar requires Node.js 24 or later.' >&2
   exit 1
 }
