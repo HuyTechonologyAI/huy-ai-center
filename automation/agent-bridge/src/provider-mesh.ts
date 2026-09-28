@@ -7,7 +7,8 @@ export const ALL_PROVIDER_IDS = [
   'claude',
   'antigravity',
   'gemini',
-  'chatgpt'
+  'chatgpt',
+  'ollama'
 ] as const;
 
 export type ProviderId = typeof ALL_PROVIDER_IDS[number];
@@ -49,14 +50,19 @@ export interface ProviderRunResult {
 export interface ProviderCommandSpec {
   command: string;
   args: string[];
+  env?: NodeJS.ProcessEnv;
   virtual?: boolean;
 }
 
+const LOCAL_OLLAMA_BIN = process.env.HUY_AI_OLLAMA_BIN ?? '/mnt/data1/HUY-AI/runtime/ollama/bin/ollama';
+const LOCAL_OLLAMA_HOST = process.env.HUY_AI_OLLAMA_HOST ?? 'http://127.0.0.1:11434';
+const LOCAL_OLLAMA_MODEL = process.env.HUY_AI_LOCAL_MODEL ?? 'qwen2.5-coder:3b';
+
 export const DEFAULT_ROLE_PRIORITY: Record<AgentRole, ProviderId[]> = {
-  PLANNER: ['antigravity', 'gemini', 'claude', 'chatgpt', 'codex'],
-  TEST_DESIGNER: ['gemini', 'claude', 'codex', 'chatgpt', 'antigravity'],
-  IMPLEMENTER: ['antigravity', 'codex', 'gemini', 'claude'],
-  REVIEWER: ['gemini', 'claude', 'chatgpt', 'antigravity', 'codex']
+  PLANNER: ['antigravity', 'gemini', 'claude', 'chatgpt', 'codex', 'ollama'],
+  TEST_DESIGNER: ['gemini', 'claude', 'codex', 'chatgpt', 'antigravity', 'ollama'],
+  IMPLEMENTER: ['antigravity', 'codex', 'gemini', 'claude', 'ollama'],
+  REVIEWER: ['gemini', 'claude', 'chatgpt', 'antigravity', 'codex', 'ollama']
 };
 
 /** Provider availability is runtime evidence-driven; never quarantine by a hard-coded calendar date. */
@@ -224,6 +230,23 @@ export function providerCommandSpec(
         ]
       };
 
+    case 'ollama':
+      return {
+        command: 'codex',
+        args: [
+          'exec',
+          '--oss',
+          '--local-provider',
+          'ollama',
+          '-m',
+          LOCAL_OLLAMA_MODEL,
+          '--sandbox',
+          request.mode === 'READ_ONLY' ? 'read-only' : 'workspace-write',
+          '--ephemeral',
+          request.prompt
+        ]
+      };
+
     case 'chatgpt':
       return {
         command: 'chatgpt-api',
@@ -236,7 +259,7 @@ export function providerCommandSpec(
 export function providerStdioSpec(
   provider: ProviderId | string
 ): ['ignore', 'pipe', 'pipe'] | ['pipe', 'pipe', 'pipe'] {
-  if (provider === 'codex') {
+  if (provider === 'codex' || provider === 'ollama') {
     return ['ignore', 'pipe', 'pipe'];
   }
   return ['pipe', 'pipe', 'pipe'];
@@ -391,6 +414,20 @@ function probeInstalledAuth(id: ProviderId): boolean {
     );
   }
 
+  if (id === 'ollama') {
+    const r = spawnSync(LOCAL_OLLAMA_BIN, ['list'], {
+      encoding: 'utf8',
+      timeout: 8_000,
+      shell: false,
+      env: {
+        ...process.env,
+        OLLAMA_HOST: LOCAL_OLLAMA_HOST.replace(/^https?:\/\//, '')
+      }
+    });
+    if (r.status !== 0 || r.error) return false;
+    return (r.stdout ?? '').split('\n').some(line => line.trimStart().startsWith(`${LOCAL_OLLAMA_MODEL} `));
+  }
+
   return false;
 }
 
@@ -400,8 +437,8 @@ export function probeProviders(
 ): Record<ProviderId, ProviderHealth> {
   const health = previous ?? createProviderHealth(now);
 
-  for (const id of ['codex', 'claude', 'antigravity', 'gemini'] as ProviderId[]) {
-    const command = id === 'antigravity' ? 'agy' : id;
+  for (const id of ['codex', 'claude', 'antigravity', 'gemini', 'ollama'] as ProviderId[]) {
+    const command = id === 'antigravity' ? 'agy' : id === 'ollama' ? LOCAL_OLLAMA_BIN : id;
     const version = runVersion(command);
     const h = health[id];
     h.available = version.installed;
@@ -568,7 +605,7 @@ export async function runProviderPrompt(req: ProviderRunRequest): Promise<Provid
     encoding: 'utf8',
     timeout: timeoutMs,
     shell: false,
-    env: { ...process.env }
+    env: { ...process.env, ...spec.env }
   });
 
   const output = redact(r.stdout ?? '');

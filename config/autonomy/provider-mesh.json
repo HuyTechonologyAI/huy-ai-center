@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "mode": "PERSISTENT_MULTI_AI_FAIL_CLOSED",
   "max_concurrency": 1,
   "provider_probe_seconds": 60,
@@ -15,27 +15,31 @@
       "gemini",
       "claude",
       "chatgpt",
-      "codex"
+      "codex",
+      "ollama"
     ],
     "TEST_DESIGNER": [
       "gemini",
       "claude",
       "codex",
       "chatgpt",
-      "antigravity"
+      "antigravity",
+      "ollama"
     ],
     "IMPLEMENTER": [
       "antigravity",
       "codex",
       "gemini",
-      "claude"
+      "claude",
+      "ollama"
     ],
     "REVIEWER": [
       "gemini",
       "claude",
       "chatgpt",
       "antigravity",
-      "codex"
+      "codex",
+      "ollama"
     ]
   },
   "invariants": {
@@ -64,5 +68,15 @@
     "sandbox_required": true,
     "ide_role": "PRIMARY_INTERACTIVE_CODING_WORKBENCH",
     "cli_role": "PRIMARY_HEADLESS_IMPLEMENTER"
+  },
+  "ollama": {
+    "mode": "LOCAL_CODEX_OSS",
+    "endpoint": "http://127.0.0.1:11434",
+    "model_env": "HUY_AI_LOCAL_MODEL",
+    "default_model": "qwen2.5-coder:3b",
+    "fallback_priority": "LAST_RESORT_ALL_ROLES",
+    "sandbox_required": true,
+    "cloud_quota_required": false,
+    "cpu_safe_mode": true
   }
 }

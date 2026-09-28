@@ -48,11 +48,14 @@ import {
   coordinatorStateChanged
 } from '../../automation/agent-bridge/src/task-runner.js';
 
-test('provider mesh registers all five autonomous AI providers', () => {
+test('provider mesh registers cloud providers plus local Ollama fallback', () => {
   assert.deepEqual(
     [...ALL_PROVIDER_IDS].sort(),
-    ['antigravity', 'chatgpt', 'claude', 'codex', 'gemini'].sort()
+    ['antigravity', 'chatgpt', 'claude', 'codex', 'gemini', 'ollama'].sort()
   );
+  for (const role of ['PLANNER', 'TEST_DESIGNER', 'IMPLEMENTER', 'REVIEWER'] as const) {
+    assert.equal(DEFAULT_ROLE_PRIORITY[role].at(-1), 'ollama', `${role} local fallback must be last-resort`);
+  }
 });
 
 test('role routing prefers specialized agents and fails over without human involvement', () => {
@@ -116,11 +119,12 @@ test('safe command specs never use dangerous blanket permission bypasses', () =>
   }
 });
 
-test('Codex headless execution requires stdin to be ignored while stdout and stderr remain piped', () => {
+test('Codex-backed headless providers ignore stdin while stdout and stderr remain piped', () => {
   assert.deepEqual(providerStdioSpec('codex'), ['ignore', 'pipe', 'pipe']);
+  assert.deepEqual(providerStdioSpec('ollama'), ['ignore', 'pipe', 'pipe']);
 
   for (const id of ALL_PROVIDER_IDS) {
-    if (id === 'codex') continue;
+    if (id === 'codex' || id === 'ollama') continue;
     assert.deepEqual(providerStdioSpec(id), ['pipe', 'pipe', 'pipe']);
   }
 });
@@ -488,4 +492,39 @@ test('deterministic fallback reviewer passes only bounded R0-R2 evidence with gr
   assert.equal(deterministicFallbackAudit({ ...base, risk: 'R3' as const }).decision, 'AUDIT_INVALID');
   assert.equal(deterministicFallbackAudit({ ...base, verificationResults: [{ command: 'npm run typecheck', exitCode: 1, passed: false, durationMs: 1 }] }).decision, 'AUDIT_INVALID');
   assert.equal(deterministicFallbackAudit({ ...base, changedFiles: ['secrets/key.txt'] }).decision, 'AUDIT_INVALID');
+});
+
+test('local Ollama fallback uses Codex OSS sandbox without cloud auth or permission bypass', () => {
+  const read = providerCommandSpec('ollama' as never, {
+    prompt: 'plan safely', cwd: '/tmp/worktree', mode: 'READ_ONLY'
+  }) as { command: string; args: string[]; env?: Record<string, string> };
+  assert.equal(read.command, 'codex');
+  assert.ok(read.args.includes('exec'));
+  assert.ok(read.args.includes('--oss'));
+  assert.ok(read.args.includes('--local-provider'));
+  assert.ok(read.args.includes('ollama'));
+  assert.ok(read.args.includes('-m'));
+  assert.ok(read.args.includes('qwen2.5-coder:3b'));
+  assert.ok(read.args.includes('read-only'));
+  assert.equal(read.env, undefined);
+
+  const write = providerCommandSpec('ollama' as never, {
+    prompt: 'edit safely', cwd: '/tmp/worktree', mode: 'WORKSPACE_WRITE'
+  }) as { command: string; args: string[]; env?: Record<string, string> };
+  const joined = write.args.join(' ');
+  assert.match(joined, /workspace-write/);
+  assert.doesNotMatch(joined, /dangerously-skip-permissions|bypassPermissions|--yolo/i);
+});
+
+test('local Ollama provider is selected when every cloud route is unavailable', () => {
+  const now = Date.parse('2026-09-28T14:00:00Z');
+  const health = createProviderHealth(now) as Record<string, any>;
+  for (const id of ['codex', 'claude', 'antigravity', 'gemini', 'chatgpt']) {
+    health[id].available = false;
+    health[id].authenticated = false;
+  }
+  health.ollama.available = true;
+  health.ollama.authenticated = true;
+  assert.equal(selectProvider('IMPLEMENTER', health as never, { now })?.id, 'ollama');
+  assert.equal(selectProvider('PLANNER', health as never, { now })?.id, 'ollama');
 });
