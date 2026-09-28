@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync, verify } from "node:crypto";
 import {
   buildTelemetryPayload,
+  deriveWorkExecution,
   deriveRemoteSyncStatus,
   sanitizeProviderSnapshot,
   signTelemetryEnvelope,
@@ -59,3 +60,29 @@ describe("node01 telemetry publisher", () => {
     assert.equal(deriveRemoteSyncStatus(null), "SYNC_PENDING");
   });
 });
+
+  it("derives bounded current work logic from supervisor, backlog and checkpoint evidence", () => {
+    assert.deepEqual(deriveWorkExecution({
+      supervisor: { taskId: "06k-c-production-apply", backlogStatus: "HUMAN_GATE" },
+      backlog: { "06k-c-production-apply": { status: "HUMAN_GATE", reason: "Owner approval required for R4" } },
+      checkpoint: null,
+    }), {
+      currentTask: "06k-c-production-apply",
+      stage: "HUMAN_GATE",
+      checkpointStatus: "HUMAN_GATE",
+      lastAction: "Owner approval required for R4",
+      nextAction: "Human Owner approval required before execution",
+    });
+
+    assert.deepEqual(deriveWorkExecution({
+      supervisor: { taskId: "task-a", backlogStatus: "RUNNING" },
+      backlog: { "task-a": { status: "RUNNING" } },
+      checkpoint: { stage: "TEST_DESIGN", status: "VERIFIED", completed_work: "Tests designed", next_step: "IMPLEMENTATION" },
+    }), {
+      currentTask: "task-a",
+      stage: "TEST_DESIGN",
+      checkpointStatus: "VERIFIED",
+      lastAction: "Tests designed",
+      nextAction: "IMPLEMENTATION",
+    });
+  });

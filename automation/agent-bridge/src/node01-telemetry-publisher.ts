@@ -26,6 +26,27 @@ export function summarizeBacklogState(raw:any){
   if(!raw||typeof raw!=="object"||Array.isArray(raw)) return {};
   return Object.fromEntries(Object.entries(raw).map(([id,v]:any)=>[id,{status:String(v?.status??"UNKNOWN"),...(v?.reason?{reason:redact(String(v.reason))}:{})}]));
 }
+function boundedText(v:unknown, fallback:string){
+  const s=typeof v==="string"?redact(v).trim():"";
+  return (s||fallback).replace(/[\u0000-\u001f\u007f]/g," ").slice(0,512);
+}
+export function deriveWorkExecution(input:{supervisor?:any;backlog?:any;checkpoint?:any}){
+  const backlog=input.backlog&&typeof input.backlog==="object"?input.backlog:{};
+  const taskId=typeof input.supervisor?.taskId==="string"&&input.supervisor.taskId
+    ? input.supervisor.taskId
+    : Object.entries(backlog).find(([,v]:any)=>["RUNNING","BLOCKED","HUMAN_GATE"].includes(v?.status))?.[0] ?? "NONE";
+  const task:any=(backlog as any)[taskId]??{};
+  const cp=input.checkpoint&&typeof input.checkpoint==="object"?input.checkpoint:null;
+  const status=boundedText(cp?.status ?? task?.status ?? input.supervisor?.backlogStatus,"UNKNOWN");
+  const humanGate=(task?.status==="HUMAN_GATE"||input.supervisor?.backlogStatus==="HUMAN_GATE");
+  return {
+    currentTask: boundedText(taskId,"NONE"),
+    stage: boundedText(humanGate?"HUMAN_GATE":cp?.stage ?? task?.status ?? input.supervisor?.backlogStatus,"UNKNOWN"),
+    checkpointStatus: boundedText(humanGate?"HUMAN_GATE":status,"UNKNOWN"),
+    lastAction: boundedText(cp?.completed_work ?? task?.reason ?? input.supervisor?.reason,"No verified action recorded"),
+    nextAction: boundedText(humanGate?"Human Owner approval required before execution":cp?.next_step ?? task?.reason,"Continue from latest verified checkpoint"),
+  };
+}
 export function deriveRemoteSyncStatus(v:{behind:number;ahead:number}|null|undefined){
   if(!v||!Number.isInteger(v.behind)||!Number.isInteger(v.ahead)||v.behind<0||v.ahead<0) return "SYNC_PENDING";
   if(v.behind>0) return "DIVERGED_FAIL_CLOSED";
@@ -34,7 +55,7 @@ export function deriveRemoteSyncStatus(v:{behind:number;ahead:number}|null|undef
 export function buildTelemetryPayload(input:PayloadInput){
   const m=input.metrics;
   if(!m||![m.cpu,m.ram,m.disk].every(validPct)||![m.ramFree,m.ramTotal,m.active,m.queue].every(v=>Number.isFinite(v)&&v>=0)||m.ramFree>m.ramTotal) throw Error("INVALID_METRICS");
-  const src=input.metadata??{}, allowed=["supervisorState","providerHealth","backlogTaskStatuses","runtimeWorkers","latestBottleneck","remoteSyncStatus"];
+  const src=input.metadata??{}, allowed=["supervisorState","providerHealth","backlogTaskStatuses","runtimeWorkers","workExecution","latestBottleneck","remoteSyncStatus"];
   const metadata:any=Object.fromEntries(allowed.filter(k=>k in src).map(k=>[k,(src as any)[k]]));
   metadata.runtimeWorkers=workers(metadata.runtimeWorkers);
   return {version:1 as const,nodeId:NODE_ID,timestamp:input.timestamp,status:input.status,metrics:m,metadata};
@@ -58,6 +79,15 @@ function remoteSync(){
 function latestBottleneck(){
   try{const dir=join(STATE,"bottlenecks");return readdirSync(dir).filter(f=>f.endsWith(".md")).sort().at(-1)??null;}catch{return null;}
 }
+function latestCheckpoint(taskId:string){
+  if(!taskId||taskId==="NONE") return null;
+  try{
+    const dir=join(ROOT,".artifacts","agent-bridge","checkpoints",taskId);
+    const pointer=json(join(dir,"latest.json"));
+    const id=pointer?.checkpoint_id;
+    return typeof id==="string"&&id?json(join(dir,id+".json")):null;
+  }catch{return null;}
+}
 export async function publishOnce(){
   if(!existsSync(KEY)) throw Error("TELEMETRY_PRIVATE_KEY_MISSING");
   const hb=json(join(STATE,"supervisors","persistent-multi-ai-heartbeat.json"))??{};
@@ -65,7 +95,11 @@ export async function publishOnce(){
   const rw=runtimeWorkers(), active=Object.values(rw).reduce((a,b)=>a+b,0), total=Math.round(totalmem()/1048576), free=Math.round(freemem()/1048576);
   const metrics:Metrics={cpu:Math.min(100,Math.max(0,loadavg()[0]/Math.max(1,cpus().length)*100)),ram:(1-free/Math.max(1,total))*100,disk:diskPct(),ramFree:free,ramTotal:total,active,queue:Object.values(backlog as any).filter((t:any)=>["PENDING","RUNNING","BLOCKED"].includes(t?.status)).length};
   const providers=Object.fromEntries(Object.entries(hb.providers??{}).map(([k,v])=>[k,sanitizeProviderSnapshot(v)]));
-  const payload=buildTelemetryPayload({timestamp:new Date().toISOString(),status:"ONLINE",metrics,metadata:{supervisorState:String(hb.state??"UNKNOWN"),providerHealth:providers,backlogTaskStatuses:summarizeBacklogState(backlog),runtimeWorkers:rw,latestBottleneck:latestBottleneck(),remoteSyncStatus:deriveRemoteSyncStatus(remoteSync())}});
+  const currentTask=typeof hb.taskId==="string"&&hb.taskId
+    ? hb.taskId
+    : Object.entries(backlog as any).find(([,v]:any)=>["RUNNING","BLOCKED","HUMAN_GATE"].includes(v?.status))?.[0] ?? "NONE";
+  const workExecution=deriveWorkExecution({supervisor:hb,backlog,checkpoint:latestCheckpoint(currentTask)});
+  const payload=buildTelemetryPayload({timestamp:new Date().toISOString(),status:hb.state==="RUNNING"?"ONLINE":"DEGRADED",metrics,metadata:{supervisorState:String(hb.state??"UNKNOWN"),providerHealth:providers,backlogTaskStatuses:summarizeBacklogState(backlog),runtimeWorkers:rw,workExecution,latestBottleneck:latestBottleneck(),remoteSyncStatus:deriveRemoteSyncStatus(remoteSync())}});
   const envelope=signTelemetryEnvelope(payload,createPrivateKey(readFileSync(KEY)));
   const res=await fetch(ENDPOINT,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(envelope),signal:AbortSignal.timeout(15000)});
   if(!res.ok) throw Error("TELEMETRY_HTTP_"+res.status);
