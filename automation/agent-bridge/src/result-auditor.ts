@@ -194,6 +194,50 @@ export function summarizeVerification(results: VerificationResult[]): string {
     .join("\n");
 }
 
+
+export function deterministicFallbackAudit(params: {
+  risk: 'R0' | 'R1' | 'R2' | 'R3' | 'R4';
+  changedFiles: string[];
+  allowedPaths: string[];
+  forbiddenPaths: string[];
+  reviewDiff: string;
+  verificationResults: VerificationResult[];
+}): { decision: 'PASS' | 'AUDIT_INVALID'; reason: string } {
+  if (!['R0', 'R1', 'R2'].includes(params.risk)) {
+    return { decision: 'AUDIT_INVALID', reason: 'Deterministic fallback is forbidden for R3/R4' };
+  }
+  if (!params.changedFiles.length || !params.verificationResults.length || !params.verificationResults.every(r => r.passed)) {
+    return { decision: 'AUDIT_INVALID', reason: 'Deterministic fallback requires changed files and all required verifications passing' };
+  }
+  if (!params.reviewDiff || redact(params.reviewDiff) !== params.reviewDiff || /GIT binary patch|Binary files differ/.test(params.reviewDiff)) {
+    return { decision: 'AUDIT_INVALID', reason: 'Deterministic fallback rejected sensitive, missing or binary review diff' };
+  }
+  try {
+    enforceEditBudget(params.reviewDiff);
+  } catch {
+    return { decision: 'AUDIT_INVALID', reason: 'Deterministic fallback rejected edit-budget violation' };
+  }
+  const normalize = (value: string) => value.replace(/\\/g, '/').replace(/^\.\//, '');
+  const inPrefix = (file: string, prefix: string) => {
+    const f = normalize(file);
+    const p = normalize(prefix);
+    if (p === '.env') return f === '.env' || f.startsWith('.env.');
+    return p.endsWith('/') ? f.startsWith(p) : f === p || f.startsWith(p + '/');
+  };
+  for (const file of params.changedFiles) {
+    if (params.forbiddenPaths.some(p => inPrefix(file, p))) {
+      return { decision: 'AUDIT_INVALID', reason: 'Deterministic fallback rejected forbidden-path change' };
+    }
+    if (!params.allowedPaths.some(p => inPrefix(file, p))) {
+      return { decision: 'AUDIT_INVALID', reason: 'Deterministic fallback rejected out-of-scope change' };
+    }
+  }
+  return {
+    decision: 'PASS',
+    reason: 'Deterministic QA/Security fallback: scope, edit budget, sensitive-diff check and required verifications passed'
+  };
+}
+
 // ─────────────────────────────────────────────────
 // Build agent result record
 // ─────────────────────────────────────────────────

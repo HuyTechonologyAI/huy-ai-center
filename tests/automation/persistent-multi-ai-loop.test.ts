@@ -13,7 +13,8 @@ import {
   detectProviderSemanticFailure,
   parseCodexAuthStatus,
   parseClaudeAuthStatus,
-  parseAntigravityAuthStatus
+  parseAntigravityAuthStatus,
+  isProviderTemporarilyQuarantined
 } from '../../automation/agent-bridge/src/provider-mesh.js';
 
 import {
@@ -34,6 +35,10 @@ import {
 import {
   buildImplementationPrompt
 } from '../../automation/agent-bridge/src/codex-adapter.js';
+
+import {
+  deterministicFallbackAudit
+} from '../../automation/agent-bridge/src/result-auditor.js';
 
 import {
   shouldRunTestDesignOnResume,
@@ -425,4 +430,28 @@ test('audit parser accepts evidence-backed decisions wrapped by harmless provide
   });
   assert.equal(parseAuditDecision('PASS'), null);
   assert.equal(parseAuditDecision('PASS | CORRECTION_REQUIRED | HUMAN_DECISION_REQUIRED\nREASON: template only'), null);
+});
+
+test('Antigravity is quarantined only until the declared quota restore time', () => {
+  assert.equal(isProviderTemporarilyQuarantined('antigravity', Date.parse('2026-09-30T11:59:59+07:00')), true);
+  assert.equal(isProviderTemporarilyQuarantined('antigravity', Date.parse('2026-09-30T12:00:00+07:00')), false);
+  assert.equal(isProviderTemporarilyQuarantined('codex', Date.parse('2026-09-29T00:00:00+07:00')), false);
+});
+
+test('deterministic fallback reviewer passes only bounded R0-R2 evidence with green verification', () => {
+  const base = {
+    risk: 'R2' as const,
+    changedFiles: ['config/organization/core_team_roster.json'],
+    allowedPaths: ['config/organization/'],
+    forbiddenPaths: ['.env', 'secrets/', 'supabase/migrations/'],
+    reviewDiff: 'diff --git a/a b/a\n+safe line',
+    verificationResults: [{ command: 'npm run typecheck', exitCode: 0, passed: true, durationMs: 1 }]
+  };
+  assert.deepEqual(deterministicFallbackAudit(base), {
+    decision: 'PASS',
+    reason: 'Deterministic QA/Security fallback: scope, edit budget, sensitive-diff check and required verifications passed'
+  });
+  assert.equal(deterministicFallbackAudit({ ...base, risk: 'R3' as const }).decision, 'AUDIT_INVALID');
+  assert.equal(deterministicFallbackAudit({ ...base, verificationResults: [{ command: 'npm run typecheck', exitCode: 1, passed: false, durationMs: 1 }] }).decision, 'AUDIT_INVALID');
+  assert.equal(deterministicFallbackAudit({ ...base, changedFiles: ['secrets/key.txt'] }).decision, 'AUDIT_INVALID');
 });

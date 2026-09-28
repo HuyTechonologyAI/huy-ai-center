@@ -59,6 +59,15 @@ export const DEFAULT_ROLE_PRIORITY: Record<AgentRole, ProviderId[]> = {
   REVIEWER: ['gemini', 'claude', 'chatgpt', 'antigravity', 'codex']
 };
 
+export const ANTIGRAVITY_QUOTA_RESTORE_AT = Date.parse('2026-09-30T12:00:00+07:00');
+
+export function isProviderTemporarilyQuarantined(
+  provider: ProviderId,
+  now = Date.now()
+): boolean {
+  return provider === 'antigravity' && now < ANTIGRAVITY_QUOTA_RESTORE_AT;
+}
+
 const AUTH_PATTERNS = [
   'unauthenticated',
   'please login',
@@ -116,6 +125,7 @@ export function markProviderSuccess(
 }
 
 function isEligible(provider: ProviderHealth, now: number): boolean {
+  if (isProviderTemporarilyQuarantined(provider.id, now)) return false;
   if (!provider.available || !provider.authenticated) return false;
   if (provider.circuit === 'OPEN') {
     if ((provider.cooldownUntil ?? Number.MAX_SAFE_INTEGER) > now) return false;
