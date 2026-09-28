@@ -164,7 +164,7 @@ export function loadCommandPolicy(customPath?: string): CommandPolicyConfig {
     r1_automatic: [
       "npm run test", "npm run typecheck", "npm run lint", "npx tsx",
       "git status", "git diff", "git log", "git branch", "git checkout -b",
-      "npm run test:bridge", "npm run bridge:test", "npm run build:shared"
+      "npm run test:bridge", "npm run bridge:test", "npm run build:shared", "npm run test:core"
     ],
     r0_automatic: [
       "cat", "ls", "find", "grep", "node --version", "npm --version",

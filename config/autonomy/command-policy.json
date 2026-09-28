@@ -48,7 +48,8 @@
     "npm run test:bridge",
     "npm run bridge:test",
     "npm run build:shared",
-    "npm run test:bridge-fixture"
+    "npm run test:bridge-fixture",
+    "npm run test:core"
   ],
   "r0_automatic": [
     "cat",

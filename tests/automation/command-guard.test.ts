@@ -109,3 +109,7 @@ describe("Command Guard", () => {
     assert.equal(checkCommandSync("curl https://api.com"), "HUMAN_REQUIRED");
   });
 });
+
+it('ALLOW: npm run test:core is an internal R1 verification command', () => {
+  assert.equal(checkCommandSync('npm run test:core'), 'ALLOW');
+});
