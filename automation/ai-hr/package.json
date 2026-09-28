@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node github-radar.test.ts && bash scripts.test.sh",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "engines": { "node": ">=24" }
+}
