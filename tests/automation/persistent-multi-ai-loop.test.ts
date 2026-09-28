@@ -27,7 +27,8 @@ import {
   plannedProviderTimeoutMs,
   buildPlanningPrompt,
   buildTestDesignPrompt,
-  planningPrompt
+  planningPrompt,
+  parseAuditDecision
 } from '../../automation/agent-bridge/src/multi-agent-adapter.js';
 
 import {
@@ -410,4 +411,18 @@ test('coordinator baseline guard is reusable across planning and audit phases', 
   const baseline = ' M docs/example.md';
   assert.equal(coordinatorStateChanged(baseline, baseline), false);
   assert.equal(coordinatorStateChanged(baseline, baseline + '\n?? unexpected.txt'), true);
+});
+
+test('audit parser accepts evidence-backed decisions wrapped by harmless provider formatting', () => {
+  assert.deepEqual(parseAuditDecision('PASS\nREASON: verification evidence is complete'), {
+    decision: 'PASS', reason: 'verification evidence is complete'
+  });
+  assert.deepEqual(parseAuditDecision('\`\`\`text\nPASS\nREASON: scoped diff and tests pass\n\`\`\`'), {
+    decision: 'PASS', reason: 'scoped diff and tests pass'
+  });
+  assert.deepEqual(parseAuditDecision('Reviewer result:\nCORRECTION_REQUIRED\nREASON: missing rollback evidence\nmetadata: done'), {
+    decision: 'CORRECTION_REQUIRED', reason: 'missing rollback evidence'
+  });
+  assert.equal(parseAuditDecision('PASS'), null);
+  assert.equal(parseAuditDecision('PASS | CORRECTION_REQUIRED | HUMAN_DECISION_REQUIRED\nREASON: template only'), null);
 });

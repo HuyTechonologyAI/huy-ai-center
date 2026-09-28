@@ -336,6 +336,18 @@ async function executeRolePrompt(
   };
 }
 
+export function parseAuditDecision(stdout: string): {
+  decision: 'PASS' | 'CORRECTION_REQUIRED' | 'HUMAN_DECISION_REQUIRED';
+  reason: string;
+} | null {
+  const match = /(?:^|\r?\n)\s*(PASS|CORRECTION_REQUIRED|HUMAN_DECISION_REQUIRED)\s*\r?\n\s*REASON:\s*([^\r\n]+)/im.exec(stdout);
+  if (!match) return null;
+  return {
+    decision: match[1].toUpperCase() as 'PASS' | 'CORRECTION_REQUIRED' | 'HUMAN_DECISION_REQUIRED',
+    reason: match[2].trim().slice(0, 500)
+  };
+}
+
 export async function auditResultMulti(req: {
   taskId: string;
   objective: string;
@@ -385,17 +397,16 @@ export async function auditResultMulti(req: {
     }
 
     const stdout = redact(result.output).trim();
-    const match = /^(PASS|CORRECTION_REQUIRED|HUMAN_DECISION_REQUIRED)\s*\r?\nREASON:\s*(.+)$/im.exec(stdout);
+    const parsed = parseAuditDecision(stdout);
 
-    if (!match) {
+    if (!parsed) {
       markProviderFailure(meshHealth[provider], 'AUDIT_PARSE_FAILED');
       continue;
     }
 
     markProviderSuccess(meshHealth[provider]);
     return {
-      decision: match[1].toUpperCase() as 'PASS' | 'CORRECTION_REQUIRED' | 'HUMAN_DECISION_REQUIRED',
-      reason: match[2].slice(0, 500),
+      ...parsed,
       provider
     };
   }
