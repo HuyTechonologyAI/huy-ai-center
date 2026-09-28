@@ -1,0 +1,32 @@
+[Unit]
+Description=HUY AI Center Dispatcher V2 (07B queue-gated)
+After=network-online.target huy-ai-persistent-multi-ai.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/mnt/data1/HUY-AI/runtime/autonomy-control
+Environment=DISPATCHER_V2_HOST=127.0.0.1
+Environment=DISPATCHER_V2_PORT=18081
+Environment=DISPATCHER_V2_QUEUE_GATE=CLOSED_07C
+ExecStart=/home/huyadmin/.nvm/versions/node/v24.21.0/bin/node /mnt/data1/HUY-AI/runtime/autonomy-control/deploy/node01/dispatcher-v2-runtime.mjs
+Restart=always
+RestartSec=10
+TimeoutStopSec=20
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=default.target
