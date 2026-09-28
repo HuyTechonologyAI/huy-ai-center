@@ -7,8 +7,8 @@
  */
 
 import { execSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { existsSync, mkdirSync, rmSync, readFileSync, readdirSync, symlinkSync, lstatSync, realpathSync } from "node:fs";
+import { resolve, join, relative } from "node:path";
 import type { WorktreeInfo } from "./types.js";
 
 const WORKTREES_ROOT = ".agent-worktrees";
@@ -19,6 +19,49 @@ function worktreePath(taskId: string): string {
 
 function sanitizeTaskId(taskId: string): string {
   return taskId.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
+/** Bind internal monorepo workspace packages to this exact worktree. */
+export function ensureWorkspacePackageLinks(worktreeRoot: string): void {
+  const manifestPath = join(worktreeRoot, "package.json");
+  if (!existsSync(manifestPath)) return;
+
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+    workspaces?: string[] | { packages?: string[] };
+  };
+  const patterns = Array.isArray(manifest.workspaces)
+    ? manifest.workspaces
+    : manifest.workspaces?.packages ?? [];
+
+  for (const pattern of patterns) {
+    if (!/^[a-zA-Z0-9_-]+\/\*$/.test(pattern)) continue;
+    const workspaceDir = join(worktreeRoot, pattern.slice(0, -2));
+    if (!existsSync(workspaceDir)) continue;
+
+    for (const entry of readdirSync(workspaceDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const packageRoot = join(workspaceDir, entry.name);
+      const packageManifest = join(packageRoot, "package.json");
+      if (!existsSync(packageManifest)) continue;
+      const { name } = JSON.parse(readFileSync(packageManifest, "utf8")) as { name?: string };
+      if (!name || !/^@huy-ai\/[a-z0-9][a-z0-9-]*$/.test(name)) continue;
+
+      const [, packageName] = name.split("/");
+      const scopeDir = join(worktreeRoot, "node_modules", "@huy-ai");
+      const linkPath = join(scopeDir, packageName);
+      mkdirSync(scopeDir, { recursive: true });
+
+      const existing = lstatSync(linkPath, { throwIfNoEntry: false });
+      if (existing) {
+        if (!existing.isSymbolicLink() || realpathSync(linkPath) !== realpathSync(packageRoot)) {
+          throw new Error(`WORKTREE_WORKSPACE_LINK_CONFLICT:${linkPath}`);
+        }
+        continue;
+      }
+
+      symlinkSync(relative(scopeDir, packageRoot), linkPath, "dir");
+    }
+  }
 }
 
 
@@ -90,6 +133,7 @@ export function createWorktree(params: {
     if (existing.status !== 0 || existing.stdout.trim() !== branch) {
       throw new Error(`TASK_WORKTREE_BRANCH_MISMATCH: ${path}`);
     }
+    ensureWorkspacePackageLinks(path);
     return { taskId: safeId, path, branch, created: false, cleanedUp: false };
   }
 
@@ -117,6 +161,7 @@ export function createWorktree(params: {
       );
     }
 
+    ensureWorkspacePackageLinks(path);
     return { taskId: safeId, path, branch, created: true, cleanedUp: false };
   } catch (err) {
     throw new Error(`Failed to create worktree for task ${taskId}: ${err}`);

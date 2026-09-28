@@ -1,5 +1,5 @@
-import { canonicalSha256, classifications, DispatchContextV2, DispatchRequestV2 } from '../../../packages/contracts/dist/index.js';
-import type { DispatchDecision, DispatchPorts } from '../../../packages/contracts/dist/index.js';
+import { canonicalSha256, classifications, DispatchContextV2, DispatchRequestV2 } from '@huy-ai/contracts';
+import type { DispatchDecision, DispatchPorts } from '@huy-ai/contracts';
 
 /** Local-only core. The provider must authenticate org authorization before returning context. */
 export async function dispatchV2(input: unknown, ports: DispatchPorts): Promise<DispatchDecision> {

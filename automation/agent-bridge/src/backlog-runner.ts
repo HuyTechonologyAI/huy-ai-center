@@ -120,7 +120,10 @@ export function isLocalDeliveryComplete(
   checkpoint: { stage?: string; status?: string } | null | undefined,
   remoteSyncStatus: RemoteSyncStatus
 ): boolean {
-  return checkpoint?.stage === 'DELIVERY' && ['REMOTE_SYNC_DEFERRED', 'SYNC_PENDING', 'SYNCED'].includes(remoteSyncStatus);
+  // Local DELIVERY is authoritative. Remote sync health is telemetry/retry state only
+  // and must never put GitHub back onto the AI Agency critical path.
+  void remoteSyncStatus;
+  return checkpoint?.stage === 'DELIVERY';
 }
 
 export function shouldResumeBlockedTask(

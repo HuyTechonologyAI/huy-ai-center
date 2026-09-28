@@ -26,6 +26,7 @@ import {
 
 import {
   plannedProviderTimeoutMs,
+  providerAttemptTimeoutMs,
   buildPlanningPrompt,
   buildTestDesignPrompt,
   planningPrompt,
@@ -432,10 +433,43 @@ test('audit parser accepts evidence-backed decisions wrapped by harmless provide
   assert.equal(parseAuditDecision('PASS | CORRECTION_REQUIRED | HUMAN_DECISION_REQUIRED\nREASON: template only'), null);
 });
 
-test('Antigravity is quarantined only until the declared quota restore time', () => {
-  assert.equal(isProviderTemporarilyQuarantined('antigravity', Date.parse('2026-09-30T11:59:59+07:00')), true);
-  assert.equal(isProviderTemporarilyQuarantined('antigravity', Date.parse('2026-09-30T12:00:00+07:00')), false);
+test('provider eligibility is not hard-coded to a calendar quota window', () => {
+  assert.equal(isProviderTemporarilyQuarantined('antigravity', Date.parse('2026-09-28T00:00:00+07:00')), false);
+  assert.equal(isProviderTemporarilyQuarantined('antigravity', Date.parse('2026-09-30T11:59:59+07:00')), false);
   assert.equal(isProviderTemporarilyQuarantined('codex', Date.parse('2026-09-29T00:00:00+07:00')), false);
+});
+
+test('quota and usage-limit failures open the provider circuit immediately', () => {
+  const now = Date.parse('2026-09-28T12:00:00Z');
+  const health = createProviderHealth(now).codex;
+  health.available = true;
+  health.authenticated = true;
+  markProviderFailure(health, 'PROVIDER_CAPACITY_WAIT:codex usage limit exceeded', now);
+  assert.equal(health.circuit, 'OPEN');
+  assert.equal(health.consecutiveFailures, 1);
+  assert.ok((health.cooldownUntil ?? 0) >= now + 60_000);
+});
+
+test('router prefers a previously proven provider before an unproven higher-priority provider', () => {
+  const now = Date.parse('2026-09-28T12:00:00Z');
+  const health = createProviderHealth(now);
+  for (const id of ['antigravity', 'codex'] as const) {
+    health[id].available = true;
+    health[id].authenticated = true;
+  }
+  health.codex.lastSuccessAt = now - 1_000;
+  const selected = selectProvider('IMPLEMENTER', health, { now });
+  assert.equal(selected?.id, 'codex');
+});
+
+test('unproven providers receive bounded canary time before failover', () => {
+  const full = plannedProviderTimeoutMs('IMPLEMENTER', 600_000);
+  assert.equal(full, 600_000);
+  assert.equal(providerAttemptTimeoutMs('PLANNER', false, 120_000), 30_000);
+  assert.equal(providerAttemptTimeoutMs('REVIEWER', false, 240_000), 30_000);
+  assert.equal(providerAttemptTimeoutMs('TEST_DESIGNER', false, 300_000), 90_000);
+  assert.equal(providerAttemptTimeoutMs('IMPLEMENTER', false, 600_000), 120_000);
+  assert.equal(providerAttemptTimeoutMs('IMPLEMENTER', true, 600_000), 600_000);
 });
 
 test('deterministic fallback reviewer passes only bounded R0-R2 evidence with green verification', () => {

@@ -10,8 +10,10 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:shared": "npm run build --workspace=@huy-ai/config --workspace=@huy-ai/contracts --workspace=@huy-ai/shared",
+    "pretypecheck": "npm run build:shared",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test:core",
+    "pretest:core": "npm run build:shared && npm run build --workspace=@huy-ai/dispatcher",
     "test:core": "npm run test --workspaces --if-present && npx tsx --test tests/ai-task-api.test.ts tests/architecture-v2-consistency.test.ts tests/ui-ux-v2-tokens.test.ts",
     "test:portfolio-contract": "npx tsx --test tests/ui-ux-v2-final-polish.test.ts",
     "lint": "npm run lint --workspaces --if-present",

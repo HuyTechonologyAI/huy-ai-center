@@ -59,13 +59,12 @@ export const DEFAULT_ROLE_PRIORITY: Record<AgentRole, ProviderId[]> = {
   REVIEWER: ['gemini', 'claude', 'chatgpt', 'antigravity', 'codex']
 };
 
-export const ANTIGRAVITY_QUOTA_RESTORE_AT = Date.parse('2026-09-30T12:00:00+07:00');
-
+/** Provider availability is runtime evidence-driven; never quarantine by a hard-coded calendar date. */
 export function isProviderTemporarilyQuarantined(
-  provider: ProviderId,
-  now = Date.now()
+  _provider: ProviderId,
+  _now = Date.now()
 ): boolean {
-  return provider === 'antigravity' && now < ANTIGRAVITY_QUOTA_RESTORE_AT;
+  return false;
 }
 
 const AUTH_PATTERNS = [
@@ -104,6 +103,17 @@ export function markProviderFailure(
   provider.lastError = redact(error).slice(0, 1000);
   provider.lastProbeAt = now;
 
+  const capacityFailure = /provider_capacity_wait|provider_timeout|rate limit|too many requests|\b429\b|quota|usage limit|resource[_ ]exhausted|insufficient_quota|limit reached|weighted tokens/i.test(error);
+  if (capacityFailure) {
+    const capacityCooldownMs = options.cooldownMs ?? Math.min(
+      6 * 60 * 60_000,
+      15 * 60_000 * (2 ** Math.max(0, provider.consecutiveFailures - 1))
+    );
+    provider.circuit = 'OPEN';
+    provider.cooldownUntil = now + capacityCooldownMs;
+    return;
+  }
+
   if (provider.consecutiveFailures >= threshold) {
     provider.circuit = 'OPEN';
     provider.cooldownUntil = now + cooldownMs;
@@ -130,7 +140,6 @@ function isEligible(provider: ProviderHealth, now: number): boolean {
   if (provider.circuit === 'OPEN') {
     if ((provider.cooldownUntil ?? Number.MAX_SAFE_INTEGER) > now) return false;
     provider.circuit = 'CLOSED';
-    provider.consecutiveFailures = 0;
     provider.cooldownUntil = undefined;
   }
   return true;
@@ -144,12 +153,12 @@ export function selectProvider(
   const now = options.now ?? Date.now();
   const exclude = new Set(options.exclude ?? []);
 
-  for (const id of DEFAULT_ROLE_PRIORITY[role]) {
-    if (exclude.has(id)) continue;
-    const candidate = health[id];
-    if (candidate && isEligible(candidate, now)) return candidate;
-  }
-  return null;
+  const eligible = DEFAULT_ROLE_PRIORITY[role]
+    .filter(id => !exclude.has(id))
+    .map(id => health[id])
+    .filter((candidate): candidate is ProviderHealth => Boolean(candidate && isEligible(candidate, now)));
+
+  return eligible.find(candidate => Boolean(candidate.lastSuccessAt)) ?? eligible[0] ?? null;
 }
 
 export function providerCommandSpec(
@@ -290,7 +299,14 @@ export function detectProviderSemanticFailure(
     'too many requests',
     '429',
     'temporarily unavailable',
-    'capacity'
+    'capacity',
+    'quota',
+    'usage limit',
+    'resource exhausted',
+    'resource_exhausted',
+    'insufficient_quota',
+    'limit reached',
+    'weighted tokens'
   ];
 
   if (capacityMarkers.some(marker => combined.includes(marker))) {
@@ -556,10 +572,14 @@ export async function runProviderPrompt(req: ProviderRunRequest): Promise<Provid
   });
 
   const output = redact(r.stdout ?? '');
-  const error = redact(r.stderr ?? '');
+  const processError = r.error ? redact(String(r.error.message ?? r.error)) : '';
+  const timedOut = (r.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT';
+  const error = [redact(r.stderr ?? ''), processError].filter(Boolean).join('\n');
   const combined = `${error}\n${output}`;
   const authRequired = r.status !== 0 && checkAuthText(combined);
-  const semanticFailure = detectProviderSemanticFailure(req.provider, output, error);
+  const semanticFailure = timedOut
+    ? { reason: `PROVIDER_TIMEOUT:${req.provider}`, retryable: true }
+    : detectProviderSemanticFailure(req.provider, output, error);
 
   return {
     provider: req.provider,

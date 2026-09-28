@@ -186,7 +186,7 @@ test('remote push options configure non-interactive terminal and positive finite
 test('local DELIVERY checkpoint is dependency-complete even when remote sync is SYNC_PENDING', () => {
   assert.equal(isLocalDeliveryComplete({ stage: 'DELIVERY', status: 'VERIFIED' }, 'SYNC_PENDING'), true);
   assert.equal(isLocalDeliveryComplete({ stage: 'DELIVERY' }, 'SYNC_PENDING'), true);
-  assert.equal(isLocalDeliveryComplete({ stage: 'DELIVERY', status: 'VERIFIED' }, 'DIVERGED_FAIL_CLOSED'), false);
+  assert.equal(isLocalDeliveryComplete({ stage: 'DELIVERY', status: 'VERIFIED' }, 'DIVERGED_FAIL_CLOSED'), true, 'remote divergence must stay off the local critical path');
   assert.equal(isLocalDeliveryComplete({ stage: 'TEST_DESIGN', status: 'VERIFIED' }, 'SYNC_PENDING'), false);
   assert.equal(isLocalDeliveryComplete(undefined, 'SYNC_PENDING'), false);
 });
@@ -262,4 +262,34 @@ test('dirty task worktree is reusable only from verified non-delivery checkpoint
   assert.equal(canReuseDirtyCheckpointWorktree({ stage: 'DELIVERY', status: 'VERIFIED' }, true), false);
   assert.equal(canReuseDirtyCheckpointWorktree({ stage: 'TEST_DESIGN', status: 'UNVERIFIED' }, true), false);
   assert.equal(canReuseDirtyCheckpointWorktree(undefined, true), false);
+});
+
+test('agent worktree binds internal workspace packages to the worktree itself', async () => {
+  const { realpathSync } = await import('node:fs');
+  const dir = mkdtempSync(join(tmpdir(), 'bridge-workspace-links-'));
+  const git = (...args: string[]) => {
+    const result = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  try {
+    git('init'); git('config', 'user.email', 'test@example.invalid'); git('config', 'user.name', 'Test');
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ private: true, workspaces: ['packages/*', 'apps/*'] }));
+    mkdirSync(join(dir, 'packages/contracts'), { recursive: true });
+    writeFileSync(join(dir, 'packages/contracts/package.json'), JSON.stringify({ name: '@huy-ai/contracts', version: '1.0.0' }));
+    mkdirSync(join(dir, 'apps/dispatcher'), { recursive: true });
+    writeFileSync(join(dir, 'apps/dispatcher/package.json'), JSON.stringify({ name: '@huy-ai/dispatcher', version: '1.0.0' }));
+    git('add', '.'); git('commit', '-m', 'workspace fixture');
+
+    const wt = createWorktree({ taskId: 'workspace-links', baseBranch: 'HEAD', repositoryRoot: dir });
+    assert.equal(
+      realpathSync(join(wt.path, 'node_modules/@huy-ai/contracts')),
+      realpathSync(join(wt.path, 'packages/contracts'))
+    );
+    assert.equal(
+      realpathSync(join(wt.path, 'node_modules/@huy-ai/dispatcher')),
+      realpathSync(join(wt.path, 'apps/dispatcher'))
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
