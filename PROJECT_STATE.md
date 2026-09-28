@@ -485,3 +485,14 @@ HARD_STOP_ENGAGED (Phase 06K-B.1 hoàn tất củng cố fail-closed hardening v
 - COMPLETED: Pure typed snapshot evaluator; 43 offline readiness cases including outage, privilege/budget limits, tampering and revocation; no grants or runtime activation.
 - TEST_STATUS: 139 selected TypeScript tests PASS (including 43 readiness); 52 Python automation tests PASS; workspace typechecks and strict evaluator typecheck PASS. Full bridge suite excluded because it writes forbidden paths; no build outputs generated.
 - BLOCKERS/NEXT_ACTION: Task owners and ai-hr-001 must qualify real probation; security must verify scoped authority; devops must verify provider availability/authorization/cost; chief-architect must verify runtime enforcement and evidence provenance. Resolution criteria: docs/organization/readiness.md. Technical roadmap priority remains withheld until every criterion passes; existing human gates remain mandatory.
+
+## 06k-c-readiness — 2026-09-28
+- PROJECT: HUY AI Center; read-only production migration readiness planning.
+- CURRENT_PHASE: PARTIAL; planning packet complete, production readiness BLOCKED; CURRENT_BRANCH: `agent-task/06k-c-readiness`.
+- COMPLETED: [x] [Packet](docs/automation/06K_C_READINESS_PACKET.md) and C01–C29 manual planning acceptance review.
+- IN_PROGRESS / PENDING: [ ] Verified snapshot, immutable manifest/checksums, exact commands/SQL, recovery evidence, operator/window and explicit R4 approval.
+- DATABASE_STATE: Current production state UNVERIFIED; historical claims above are not current evidence. No production connection or mutation performed.
+- API_STATE / FRONTEND_STATE / WORKER_STATE: No changes in this task.
+- TEST_STATUS: Rechecked 2026-09-28T11:55:35Z; typecheck with incremental disabled exit 0; prior draft records test:core exit 1 (sandbox IPC EPERM; workspace tests discovered zero tests); direct loader fallback rechecked, passed 3/3 source file suites.
+- KNOWN_ISSUES / DECISIONS: Missing authorized evidence blocks readiness; approval PENDING; no forbidden evidence inspection or production execution to resolve gaps.
+- NEXT_ACTION: Supply sanitized evidence in allowed paths, finalize reviewed artifacts, then obtain separately bound R4 execution approval; recovery mutations require explicit authorization.
