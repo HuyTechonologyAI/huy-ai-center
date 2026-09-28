@@ -113,7 +113,7 @@ ENFORCED
 DENIED (RLS Server-Only on `ai_task_steps`)
 
 ## DISPATCHER
-NOT_DEPLOYED
+DEPLOYED_QUEUE_GATED_07B (Node01 user service active on 127.0.0.1:18081; production queue gate CLOSED pending separate 07C Human Gate)
 
 ## DATABASE
 PRODUCTION_MIGRATED (Baseline + HAIP 10001-10006 applied)
