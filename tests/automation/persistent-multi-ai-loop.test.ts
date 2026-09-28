@@ -34,7 +34,11 @@ import {
   buildImplementationPrompt
 } from '../../automation/agent-bridge/src/codex-adapter.js';
 
-import { shouldRunTestDesignOnResume } from '../../automation/agent-bridge/src/task-runner.js';
+import {
+  shouldRunTestDesignOnResume,
+  shouldRunPlanOnResume,
+  shouldRunImplementationOnResume
+} from '../../automation/agent-bridge/src/task-runner.js';
 
 test('provider mesh registers all five autonomous AI providers', () => {
   assert.deepEqual(
@@ -378,3 +382,25 @@ test('verified TEST_DESIGN checkpoint is not executed again on resume', () => {
   assert.equal(shouldRunTestDesignOnResume({ stage: 'CROSS_REVIEW', status: 'VERIFIED' }), false);
   assert.equal(shouldRunTestDesignOnResume({ stage: 'DELIVERY', status: 'VERIFIED' }), false);
 });
+
+test('verified PLAN checkpoint is not planned again on resume', () => {
+  assert.equal(shouldRunPlanOnResume(undefined), true);
+  assert.equal(shouldRunPlanOnResume({ stage: 'RECEIVED', status: 'VERIFIED' }), true);
+  assert.equal(shouldRunPlanOnResume({ stage: 'PLAN', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunPlanOnResume({ stage: 'DECOMPOSITION', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunPlanOnResume({ stage: 'TEST_DESIGN', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunPlanOnResume({ stage: 'IMPLEMENTATION', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunPlanOnResume({ stage: 'CROSS_REVIEW', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunPlanOnResume({ stage: 'DELIVERY', status: 'VERIFIED' }), false);
+});
+
+test('verified IMPLEMENTATION or CROSS_REVIEW checkpoint is not implemented again on resume', () => {
+  assert.equal(shouldRunImplementationOnResume(undefined), true);
+  assert.equal(shouldRunImplementationOnResume({ stage: 'PLAN', status: 'VERIFIED' }), true);
+  assert.equal(shouldRunImplementationOnResume({ stage: 'DECOMPOSITION', status: 'VERIFIED' }), true);
+  assert.equal(shouldRunImplementationOnResume({ stage: 'TEST_DESIGN', status: 'VERIFIED' }), true);
+  assert.equal(shouldRunImplementationOnResume({ stage: 'IMPLEMENTATION', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunImplementationOnResume({ stage: 'CROSS_REVIEW', status: 'VERIFIED' }), false);
+  assert.equal(shouldRunImplementationOnResume({ stage: 'DELIVERY', status: 'VERIFIED' }), false);
+});
+

@@ -6,7 +6,7 @@
  * Maximum 3 self-correction cycles with real error feedback.
  */
 
-import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import type {
@@ -49,6 +49,23 @@ export function shouldRunTestDesignOnResume(
     ['TEST_DESIGN', 'IMPLEMENTATION', 'CROSS_REVIEW', 'DELIVERY'].includes(latest.stage ?? '');
   return !testDesignAlreadyVerified;
 }
+
+export function shouldRunPlanOnResume(
+  latest?: { stage?: string; status?: string } | null
+): boolean {
+  const planAlreadyVerified = latest?.status === 'VERIFIED' &&
+    ['PLAN', 'DECOMPOSITION', 'TEST_DESIGN', 'IMPLEMENTATION', 'CROSS_REVIEW', 'DELIVERY'].includes(latest.stage ?? '');
+  return !planAlreadyVerified;
+}
+
+export function shouldRunImplementationOnResume(
+  latest?: { stage?: string; status?: string } | null
+): boolean {
+  const implementationAlreadyVerified = latest?.status === 'VERIFIED' &&
+    ['IMPLEMENTATION', 'CROSS_REVIEW', 'DELIVERY'].includes(latest.stage ?? '');
+  return !implementationAlreadyVerified;
+}
+
 
 // ─────────────────────────────────────────────────
 // Entry point
@@ -110,59 +127,66 @@ export async function runTask(
   // ── 3. Planning (Antigravity with retry) ────────────────────────
   state.status = "PLANNING";
 
-  const coordinatorBeforePlan = gitPorcelain(repositoryRoot);
+  let plan: import("./types.js").TaskPlan;
+  const existingPlanFile = join(artifactDir, "plan.json");
+  if (!shouldRunPlanOnResume(resumeCheckpoint) && existsSync(existingPlanFile)) {
+    plan = JSON.parse(readFileSync(existingPlanFile, "utf-8")) as import("./types.js").TaskPlan;
+    state.plan = { ...plan, approvedByGate: true };
+  } else {
+    const coordinatorBeforePlan = gitPorcelain(repositoryRoot);
 
-  const plan = await generatePlanMulti({
-    taskId: contract.taskId,
-    title: contract.title,
-    objective: contract.objective,
-    allowedPaths: contract.scope.allowedPaths,
-    forbiddenPaths: contract.scope.forbiddenPaths,
-    repositoryRoot,
-    timeoutSeconds: 120,
-  });
-  if (gitPorcelain(repositoryRoot) !== coordinatorBeforePlan) throw new Error("PLANNER_MODIFIED_COORDINATOR");
-
-  state.plan = { ...plan, approvedByGate: true };
-  writeArtifact(artifactDir, "plan.json", plan);
-
-  if (plan.rawOutput === "HUMAN_AUTH_REQUIRED") {
-    state.status = "HUMAN_GATE";
-    writeArtifact(artifactDir, "audit.json", {
-      finalStatus: "HUMAN_AUTH_REQUIRED",
-      reason: "All available planning providers require human authentication",
+    plan = await generatePlanMulti({
+      taskId: contract.taskId,
+      title: contract.title,
+      objective: contract.objective,
+      allowedPaths: contract.scope.allowedPaths,
+      forbiddenPaths: contract.scope.forbiddenPaths,
+      repositoryRoot,
+      timeoutSeconds: 120,
     });
-    return state;
-  }
+    if (gitPorcelain(repositoryRoot) !== coordinatorBeforePlan) throw new Error("PLANNER_MODIFIED_COORDINATOR");
 
-  if (plan.rawOutput === "AGENT_PLAN_INVALID" || plan.rawOutput === "ALL_PLANNERS_UNAVAILABLE") {
-    state.status = "BLOCKED";
-    writeArtifact(artifactDir, "audit.json", {
-      finalStatus: plan.rawOutput,
-      reason: "No planning provider produced a valid executable plan",
-    });
-    return state;
-  }
+    state.plan = { ...plan, approvedByGate: true };
+    writeArtifact(artifactDir, "plan.json", plan);
 
-  if (checkpoint) {
-    if (!plan.steps.length) throw Error('PLAN_WITHOUT_STEPS');
-    for (const step of plan.steps) {
-      if (step.targetFiles?.some(file => !contract.scope.allowedPaths.some(path => file === path || file.startsWith(path)))) {
-        throw Error('PLAN_SCOPE_INVALID');
-      }
+    if (plan.rawOutput === "HUMAN_AUTH_REQUIRED") {
+      state.status = "HUMAN_GATE";
+      writeArtifact(artifactDir, "audit.json", {
+        finalStatus: "HUMAN_AUTH_REQUIRED",
+        reason: "All available planning providers require human authentication",
+      });
+      return state;
     }
-    checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'PLAN', owner: plan.model.toUpperCase(),
-      objective: contract.objective, evidence: plan, method: 'validated planner steps', result: 'Plan contains steps', next: 'DECOMPOSITION' });
-    const subtasks = plan.steps.map((step, index) => ({ subtask_id: `${contract.taskId}-${index + 1}`,
-      task_id: contract.taskId, owner_agent: 'MULTI_AI_IMPLEMENTER', objective: step.description,
-      input: contract.objective, output: step.targetFiles ?? contract.scope.allowedPaths,
-      depends_on: index ? [`${contract.taskId}-${index}`] : [],
-      allowed_paths: contract.scope.allowedPaths, acceptance: contract.verification.commands,
-      test_commands: contract.verification.commands, cross_review_agent: 'INDEPENDENT_PROVIDER',
-      source_checkpoint: 'PLAN_VERIFIED' }));
-    checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'DECOMPOSITION', owner: 'COORDINATOR',
-      objective: contract.objective, evidence: { contract, subtasks }, method: 'contract scope and plan steps',
-      result: 'Subtasks assigned to provider mesh within allowed paths', next: 'TEST_DESIGN' });
+
+    if (plan.rawOutput === "AGENT_PLAN_INVALID" || plan.rawOutput === "ALL_PLANNERS_UNAVAILABLE") {
+      state.status = "BLOCKED";
+      writeArtifact(artifactDir, "audit.json", {
+        finalStatus: plan.rawOutput,
+        reason: "No planning provider produced a valid executable plan",
+      });
+      return state;
+    }
+
+    if (checkpoint) {
+      if (!plan.steps.length) throw Error('PLAN_WITHOUT_STEPS');
+      for (const step of plan.steps) {
+        if (step.targetFiles?.some(file => !contract.scope.allowedPaths.some(path => file === path || file.startsWith(path)))) {
+          throw Error('PLAN_SCOPE_INVALID');
+        }
+      }
+      checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'PLAN', owner: plan.model.toUpperCase(),
+        objective: contract.objective, evidence: plan, method: 'validated planner steps', result: 'Plan contains steps', next: 'DECOMPOSITION' });
+      const subtasks = plan.steps.map((step, index) => ({ subtask_id: `${contract.taskId}-${index + 1}`,
+        task_id: contract.taskId, owner_agent: 'MULTI_AI_IMPLEMENTER', objective: step.description,
+        input: contract.objective, output: step.targetFiles ?? contract.scope.allowedPaths,
+        depends_on: index ? [`${contract.taskId}-${index}`] : [],
+        allowed_paths: contract.scope.allowedPaths, acceptance: contract.verification.commands,
+        test_commands: contract.verification.commands, cross_review_agent: 'INDEPENDENT_PROVIDER',
+        source_checkpoint: 'PLAN_VERIFIED' }));
+      checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'DECOMPOSITION', owner: 'COORDINATOR',
+        objective: contract.objective, evidence: { contract, subtasks }, method: 'contract scope and plan steps',
+        result: 'Subtasks assigned to provider mesh within allowed paths', next: 'TEST_DESIGN' });
+    }
   }
 
   // ── 4. Worktree isolation (taskBranch authoritative) ───────────
@@ -262,6 +286,29 @@ export async function runTask(
   let failedVerifications = "";
   let auditorFeedback = "";
   let scopeViolationNotes = "";
+
+  if (!shouldRunImplementationOnResume(resumeCheckpoint)) {
+    if (resumeCheckpoint?.stage === 'CROSS_REVIEW') {
+      const auditPath = join(artifactDir, "audit.json");
+      const existingAudit = existsSync(auditPath)
+        ? JSON.parse(readFileSync(auditPath, "utf-8")) as { finalStatus?: string; result?: import("./types.js").AgentResult }
+        : undefined;
+      if (existingAudit?.finalStatus === "PASS") {
+        if (contract.sourceControl.commitAllowed) {
+          safeScopedCommit({
+            worktreePath: worktree.path,
+            taskId: contract.taskId,
+            title: contract.title,
+            allowedPaths: contract.scope.allowedPaths,
+            forbiddenPaths: contract.scope.forbiddenPaths,
+          });
+        }
+        state.status = "COMPLETE";
+        state.result = existingAudit.result;
+        return state;
+      }
+    }
+  }
 
   for (let cycle = 1; cycle <= MAX_CYCLES; cycle++) {
     state.cycles = cycle;
