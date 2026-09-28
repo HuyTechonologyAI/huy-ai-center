@@ -37,7 +37,8 @@ import {
 import {
   shouldRunTestDesignOnResume,
   shouldRunPlanOnResume,
-  shouldRunImplementationOnResume
+  shouldRunImplementationOnResume,
+  coordinatorStateChanged
 } from '../../automation/agent-bridge/src/task-runner.js';
 
 test('provider mesh registers all five autonomous AI providers', () => {
@@ -404,3 +405,9 @@ test('verified IMPLEMENTATION or CROSS_REVIEW checkpoint is not implemented agai
   assert.equal(shouldRunImplementationOnResume({ stage: 'DELIVERY', status: 'VERIFIED' }), false);
 });
 
+
+test('coordinator baseline guard is reusable across planning and audit phases', () => {
+  const baseline = ' M docs/example.md';
+  assert.equal(coordinatorStateChanged(baseline, baseline), false);
+  assert.equal(coordinatorStateChanged(baseline, baseline + '\n?? unexpected.txt'), true);
+});

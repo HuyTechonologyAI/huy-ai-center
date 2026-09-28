@@ -66,6 +66,10 @@ export function shouldRunImplementationOnResume(
   return !implementationAlreadyVerified;
 }
 
+export function coordinatorStateChanged(baseline: string, current: string): boolean {
+  return baseline !== current;
+}
+
 
 // ─────────────────────────────────────────────────
 // Entry point
@@ -127,14 +131,13 @@ export async function runTask(
   // ── 3. Planning (Antigravity with retry) ────────────────────────
   state.status = "PLANNING";
 
+  const coordinatorBaseline = gitPorcelain(repositoryRoot);
   let plan: import("./types.js").TaskPlan;
   const existingPlanFile = join(artifactDir, "plan.json");
   if (!shouldRunPlanOnResume(resumeCheckpoint) && existsSync(existingPlanFile)) {
     plan = JSON.parse(readFileSync(existingPlanFile, "utf-8")) as import("./types.js").TaskPlan;
     state.plan = { ...plan, approvedByGate: true };
   } else {
-    const coordinatorBeforePlan = gitPorcelain(repositoryRoot);
-
     plan = await generatePlanMulti({
       taskId: contract.taskId,
       title: contract.title,
@@ -144,7 +147,7 @@ export async function runTask(
       repositoryRoot,
       timeoutSeconds: 120,
     });
-    if (gitPorcelain(repositoryRoot) !== coordinatorBeforePlan) throw new Error("PLANNER_MODIFIED_COORDINATOR");
+    if (coordinatorStateChanged(coordinatorBaseline, gitPorcelain(repositoryRoot))) throw new Error("PLANNER_MODIFIED_COORDINATOR");
 
     state.plan = { ...plan, approvedByGate: true };
     writeArtifact(artifactDir, "plan.json", plan);
@@ -431,7 +434,7 @@ export async function runTask(
     });
     const auditDecision = audit.decision;
     writeArtifact(artifactDir, `auditor-cycle-${cycle}.json`, audit);
-    if (gitPorcelain(repositoryRoot) !== coordinatorBeforePlan) throw new Error("AUDITOR_MODIFIED_COORDINATOR");
+    if (coordinatorStateChanged(coordinatorBaseline, gitPorcelain(repositoryRoot))) throw new Error("AUDITOR_MODIFIED_COORDINATOR");
 
     if (auditDecision === "HUMAN_AUTH_REQUIRED") {
       state.status = "HUMAN_GATE";
