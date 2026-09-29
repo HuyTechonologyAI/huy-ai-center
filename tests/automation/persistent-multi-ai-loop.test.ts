@@ -615,3 +615,18 @@ test('local test designer prompt isolates implementation plan noise and pins a d
   assert.doesNotMatch(compact, /touch tests\/model-gateway\/config\.json/);
   assert.doesNotMatch(compact, /apps\/model-gateway\/config\.json/);
 });
+
+
+test('local test designer keeps generated test inside the declared writable test scope', () => {
+  const prompt = buildLocalTestDesignerPrompt(
+    'bridge-e2e-live-12345678-1234-1234-1234-123456789abc',
+    [
+      'Objective: Append the acceptance run ID to the bridge fixture README.',
+      'Allowed paths: tests/fixtures/agent-bridge-dry-run/',
+      'Forbidden paths: .env, config/autonomy/',
+      'Verification commands that will later run: npm run typecheck | npm run test:bridge-fixture'
+    ].join('\n')
+  );
+  assert.match(prompt, /tests\/fixtures\/agent-bridge-dry-run\/bridge-e2e-live-12345678-1234-1234-1234-123456789abc\.test\.ts/);
+  assert.doesNotMatch(prompt, /tests\/automation\/bridge-e2e-live/);
+});

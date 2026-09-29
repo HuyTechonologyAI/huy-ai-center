@@ -267,11 +267,21 @@ export function buildLocalTestDesignerPrompt(taskId: string, fullPrompt: string)
   const objective = fullPrompt.match(/^Objective:\s*(.+)$/m)?.[1]?.trim() ?? 'Design regression tests for the approved task objective.';
   const verification = fullPrompt.match(/^Verification commands that will later run:\s*(.+)$/m)?.[1]?.trim() ?? 'project verification suite';
   const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 80);
+  const allowedPaths = (fullPrompt.match(/^Allowed paths:\s*(.+)$/m)?.[1] ?? '')
+    .split(',')
+    .map(path => path.trim().replace(/\\/g, '/'))
+    .filter(Boolean);
+  const writableTestScope = allowedPaths.find(path => path === 'tests/' || path.startsWith('tests/'));
+  const testPath = writableTestScope
+    ? (writableTestScope === 'tests/'
+        ? `tests/automation/${safeTaskId}.test.ts`
+        : `${writableTestScope.replace(/\/?$/, '/')}${safeTaskId}.test.ts`)
+    : `tests/automation/${safeTaskId}.test.ts`;
   return [
     `Task ID: ${taskId}`,
     `Objective: ${objective}`,
     'Role: TEST_DESIGNER. Create tests only; implementation does not exist yet.',
-    `Create exactly one concise pre-implementation test file at tests/automation/${safeTaskId}.test.ts.`,
+    `Create exactly one concise pre-implementation test file at ${testPath}.`,
     'Use node:test and node:assert/strict only. Do not import expect.',
     'Tests must inspect real future repository artifacts via node:fs or relative import and must fail while the implementation/config is missing.',
     'Cover the objective with concrete deterministic behavior, malformed inputs, policy ceilings/fail-closed behavior, and local-fallback safety when relevant.',
