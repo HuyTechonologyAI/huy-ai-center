@@ -9,6 +9,8 @@ import {
   parseRuntimeWorkersFromPs,
   normalizeA2ATimeline,
   deriveRuntimeAgents,
+  deriveHandoffs,
+  deriveProviderAttempts,
   sanitizeProviderSnapshot,
   signTelemetryEnvelope,
   summarizeBacklogState,
@@ -176,4 +178,21 @@ it("telemetry payload keeps bounded runtimeAgents and a2aTimeline while dropping
   assert.equal(payload.metadata.runtimeAgents?.[0]?.provider, "ollama");
   assert.equal(payload.metadata.a2aTimeline?.[0]?.stage, "PLAN");
   assert.equal("secret" in payload.metadata, false);
+});
+
+
+it("derives verified handoffs and provider-attempt history from checkpoint evidence", () => {
+  const timeline = [
+    { sequence: 1, taskId: "08a", stage: "RECEIVED", ownerAgent: "COORDINATOR", status: "VERIFIED", completedWork: "received", nextStep: "PLAN", createdAt: "2026-09-29T03:00:00Z", checkpointId: "cp1" },
+    { sequence: 2, taskId: "08a", stage: "PLAN", ownerAgent: "OLLAMA", status: "VERIFIED", completedWork: "planned", nextStep: "DECOMPOSITION", createdAt: "2026-09-29T03:01:00Z", checkpointId: "cp2" },
+    { sequence: 3, taskId: "08a", stage: "DECOMPOSITION", ownerAgent: "COORDINATOR", status: "VERIFIED", completedWork: "assigned", nextStep: "TEST_DESIGN", createdAt: "2026-09-29T03:02:00Z", checkpointId: "cp3" },
+  ];
+  const handoffs = deriveHandoffs(timeline);
+  assert.equal(handoffs.length, 2);
+  assert.deepEqual([handoffs[0].fromAgent, handoffs[0].toAgent], ["COORDINATOR", "OLLAMA"]);
+  const attempts = deriveProviderAttempts(timeline);
+  assert.equal(attempts.length, 1);
+  assert.equal(attempts[0].provider, "ollama");
+  assert.equal(attempts[0].role, "PLANNER");
+  assert.equal(attempts[0].status, "VERIFIED");
 });
