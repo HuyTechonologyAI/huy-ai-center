@@ -29,17 +29,29 @@ export function plannedProviderTimeoutMs(role: AgentRole, requestedMs: number): 
 export function providerAttemptTimeoutMs(
   role: AgentRole,
   proven: boolean,
-  requestedMs: number
+  requestedMs: number,
+  provider?: ProviderId
 ): number {
   const full = plannedProviderTimeoutMs(role, requestedMs);
   if (proven) return full;
-  const canaryCap = {
+
+  if (provider === 'ollama') {
+    const localCpuCap = {
+      PLANNER: 120_000,
+      REVIEWER: 120_000,
+      TEST_DESIGNER: 180_000,
+      IMPLEMENTER: 300_000
+    }[role];
+    return Math.min(full, localCpuCap);
+  }
+
+  const cloudCanaryCap = {
     PLANNER: 30_000,
     REVIEWER: 30_000,
     TEST_DESIGNER: 90_000,
     IMPLEMENTER: 120_000
   }[role];
-  return Math.min(full, canaryCap);
+  return Math.min(full, cloudCanaryCap);
 }
 
 export interface MultiAgentExecutionResult {
@@ -61,9 +73,11 @@ function refreshHealth(): Record<ProviderId, ProviderHealth> {
   return meshHealth;
 }
 
-function providerIsProven(provider: ProviderId): boolean {
-  const health = meshHealth[provider];
-  return Boolean(health.lastSuccessAt) || (provider === 'codex' && health.authenticated);
+export function providerIsProven(
+  provider: ProviderId,
+  health: Record<ProviderId, ProviderHealth> = meshHealth
+): boolean {
+  return Boolean(health[provider]?.lastSuccessAt);
 }
 
 function orderedCandidates(
@@ -170,7 +184,7 @@ export async function generatePlanMulti(req: {
       prompt,
       cwd: req.repositoryRoot,
       mode: 'READ_ONLY',
-      timeoutMs: providerAttemptTimeoutMs('PLANNER', providerIsProven(provider), (req.timeoutSeconds ?? 120) * 1000)
+      timeoutMs: providerAttemptTimeoutMs('PLANNER', providerIsProven(provider), (req.timeoutSeconds ?? 120) * 1000, provider)
     });
 
     if (result.success) {
@@ -257,7 +271,7 @@ export async function executeImplementationMulti(
     if (provider === 'codex') {
       const result = await execCodexTask({
         ...req,
-        timeoutSeconds: providerAttemptTimeoutMs('IMPLEMENTER', providerIsProven(provider), (req.timeoutSeconds ?? 1800) * 1000) / 1000
+        timeoutSeconds: providerAttemptTimeoutMs('IMPLEMENTER', providerIsProven(provider), (req.timeoutSeconds ?? 1800) * 1000, provider) / 1000
       });
       if (result.success) {
         markProviderSuccess(meshHealth.codex);
@@ -281,7 +295,7 @@ export async function executeImplementationMulti(
       prompt: req.prompt,
       cwd: req.worktreePath,
       mode: 'WORKSPACE_WRITE',
-      timeoutMs: providerAttemptTimeoutMs('IMPLEMENTER', providerIsProven(provider), (req.timeoutSeconds ?? 1800) * 1000)
+      timeoutMs: providerAttemptTimeoutMs('IMPLEMENTER', providerIsProven(provider), (req.timeoutSeconds ?? 1800) * 1000, provider)
     });
 
     if (result.success) {
@@ -335,7 +349,7 @@ async function executeRolePrompt(
       prompt: req.prompt,
       cwd: req.cwd,
       mode: req.mode,
-      timeoutMs: providerAttemptTimeoutMs(role, providerIsProven(provider), req.timeoutMs)
+      timeoutMs: providerAttemptTimeoutMs(role, providerIsProven(provider), req.timeoutMs, provider)
     });
 
     if (result.success) {
@@ -408,7 +422,7 @@ export async function auditResultMulti(req: {
       prompt,
       cwd: req.repositoryRoot,
       mode: 'READ_ONLY',
-      timeoutMs: providerAttemptTimeoutMs('REVIEWER', providerIsProven(provider), (req.timeoutSeconds ?? 120) * 1000)
+      timeoutMs: providerAttemptTimeoutMs('REVIEWER', providerIsProven(provider), (req.timeoutSeconds ?? 120) * 1000, provider)
     });
 
     if (!result.success) {

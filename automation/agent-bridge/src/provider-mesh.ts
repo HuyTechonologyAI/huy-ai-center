@@ -59,10 +59,10 @@ const LOCAL_OLLAMA_HOST = process.env.HUY_AI_OLLAMA_HOST ?? 'http://127.0.0.1:11
 const LOCAL_OLLAMA_MODEL = process.env.HUY_AI_LOCAL_MODEL ?? 'qwen2.5-coder:3b';
 
 export const DEFAULT_ROLE_PRIORITY: Record<AgentRole, ProviderId[]> = {
-  PLANNER: ['antigravity', 'gemini', 'claude', 'chatgpt', 'codex', 'ollama'],
-  TEST_DESIGNER: ['gemini', 'claude', 'codex', 'chatgpt', 'antigravity', 'ollama'],
-  IMPLEMENTER: ['antigravity', 'codex', 'gemini', 'claude', 'ollama'],
-  REVIEWER: ['gemini', 'claude', 'chatgpt', 'antigravity', 'codex', 'ollama']
+  PLANNER: ['ollama', 'antigravity', 'gemini', 'claude', 'chatgpt', 'codex'],
+  TEST_DESIGNER: ['ollama', 'gemini', 'claude', 'codex', 'chatgpt', 'antigravity'],
+  IMPLEMENTER: ['ollama', 'antigravity', 'codex', 'gemini', 'claude'],
+  REVIEWER: ['ollama', 'gemini', 'claude', 'chatgpt', 'antigravity', 'codex']
 };
 
 /** Provider availability is runtime evidence-driven; never quarantine by a hard-coded calendar date. */
@@ -164,6 +164,7 @@ export function selectProvider(
     .map(id => health[id])
     .filter((candidate): candidate is ProviderHealth => Boolean(candidate && isEligible(candidate, now)));
 
+  if (eligible[0]?.id === 'ollama') return eligible[0];
   return eligible.find(candidate => Boolean(candidate.lastSuccessAt)) ?? eligible[0] ?? null;
 }
 
@@ -568,8 +569,94 @@ async function runChatGptApi(prompt: string, timeoutMs: number): Promise<Provide
   });
 }
 
+async function runOllamaReadOnly(prompt: string, timeoutMs: number): Promise<ProviderRunResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${LOCAL_OLLAMA_HOST.replace(/\/$/, '')}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: LOCAL_OLLAMA_MODEL,
+        prompt,
+        stream: false,
+        options: {
+          temperature: 0,
+          num_predict: 768
+        }
+      }),
+      signal: controller.signal
+    });
+
+    const body = await response.text();
+    if (!response.ok) {
+      return {
+        provider: 'ollama',
+        success: false,
+        output: '',
+        error: `OLLAMA_HTTP_${response.status}: ${redact(body).slice(-2000)}`,
+        exitCode: response.status,
+        authRequired: false,
+        retryable: response.status === 408 || response.status === 429 || response.status >= 500
+      };
+    }
+
+    try {
+      const parsed = JSON.parse(body) as { response?: string; done?: boolean; error?: string };
+      if (parsed.error) {
+        return {
+          provider: 'ollama',
+          success: false,
+          output: '',
+          error: `OLLAMA_ERROR: ${redact(parsed.error)}`,
+          exitCode: 1,
+          authRequired: false,
+          retryable: true
+        };
+      }
+      return {
+        provider: 'ollama',
+        success: parsed.done !== false,
+        output: redact(parsed.response ?? ''),
+        error: parsed.done === false ? 'OLLAMA_INCOMPLETE_RESPONSE' : '',
+        exitCode: parsed.done === false ? 1 : 0,
+        authRequired: false,
+        retryable: parsed.done === false
+      };
+    } catch {
+      return {
+        provider: 'ollama',
+        success: false,
+        output: '',
+        error: 'OLLAMA_RESPONSE_PARSE_FAILED',
+        exitCode: response.status,
+        authRequired: false,
+        retryable: true
+      };
+    }
+  } catch (error) {
+    const timedOut = controller.signal.aborted;
+    return {
+      provider: 'ollama',
+      success: false,
+      output: '',
+      error: timedOut ? 'PROVIDER_TIMEOUT:ollama' : `OLLAMA_REQUEST_FAILED: ${redact(String(error))}`,
+      exitCode: null,
+      authRequired: false,
+      retryable: true
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function runProviderPrompt(req: ProviderRunRequest): Promise<ProviderRunResult> {
   const timeoutMs = req.timeoutMs ?? 20 * 60_000;
+
+  if (req.provider === 'ollama' && req.mode === 'READ_ONLY') {
+    return runOllamaReadOnly(req.prompt, timeoutMs);
+  }
 
   if (req.provider === 'chatgpt') {
     if (process.env.CHATGPT_AUTONOMY_COMMAND) {

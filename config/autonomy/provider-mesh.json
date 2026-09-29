@@ -11,35 +11,35 @@
   },
   "roles": {
     "PLANNER": [
+      "ollama",
       "antigravity",
       "gemini",
       "claude",
       "chatgpt",
-      "codex",
-      "ollama"
+      "codex"
     ],
     "TEST_DESIGNER": [
+      "ollama",
       "gemini",
       "claude",
       "codex",
       "chatgpt",
-      "antigravity",
-      "ollama"
+      "antigravity"
     ],
     "IMPLEMENTER": [
+      "ollama",
       "antigravity",
       "codex",
       "gemini",
-      "claude",
-      "ollama"
+      "claude"
     ],
     "REVIEWER": [
+      "ollama",
       "gemini",
       "claude",
       "chatgpt",
       "antigravity",
-      "codex",
-      "ollama"
+      "codex"
     ]
   },
   "invariants": {
@@ -74,7 +74,7 @@
     "endpoint": "http://127.0.0.1:11434",
     "model_env": "HUY_AI_LOCAL_MODEL",
     "default_model": "qwen2.5-coder:3b",
-    "fallback_priority": "LAST_RESORT_ALL_ROLES",
+    "fallback_priority": "LOCAL_FIRST_ALL_ROLES",
     "sandbox_required": true,
     "cloud_quota_required": false,
     "cpu_safe_mode": true

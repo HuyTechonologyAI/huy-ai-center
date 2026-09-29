@@ -27,6 +27,7 @@ import {
 import {
   plannedProviderTimeoutMs,
   providerAttemptTimeoutMs,
+  providerIsProven,
   buildPlanningPrompt,
   buildTestDesignPrompt,
   planningPrompt,
@@ -49,13 +50,13 @@ import {
   classifyImplementationChanges
 } from '../../automation/agent-bridge/src/task-runner.js';
 
-test('provider mesh registers cloud providers plus local Ollama fallback', () => {
+test('provider mesh registers cloud providers and prioritizes local Ollama for 24/7 continuity', () => {
   assert.deepEqual(
     [...ALL_PROVIDER_IDS].sort(),
     ['antigravity', 'chatgpt', 'claude', 'codex', 'gemini', 'ollama'].sort()
   );
   for (const role of ['PLANNER', 'TEST_DESIGNER', 'IMPLEMENTER', 'REVIEWER'] as const) {
-    assert.equal(DEFAULT_ROLE_PRIORITY[role].at(-1), 'ollama', `${role} local fallback must be last-resort`);
+    assert.equal(DEFAULT_ROLE_PRIORITY[role].at(0), 'ollama', `${role} must try local AI before quota-bound cloud routes`);
   }
 });
 
@@ -68,10 +69,18 @@ test('role routing prefers specialized agents and fails over without human invol
     health[id].authenticated = true;
   }
 
+  assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'ollama');
+  assert.equal(selectProvider('PLANNER', health, { now })?.id, 'ollama');
+
+  markProviderFailure(health.ollama, 'temporary local capacity', now, {
+    failureThreshold: 1,
+    cooldownMs: 60_000
+  });
+
   assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'antigravity');
   assert.equal(selectProvider('PLANNER', health, { now })?.id, 'antigravity');
 
-  markProviderFailure(health.antigravity, 'temporary capacity', now, {
+  markProviderFailure(health.antigravity, 'temporary cloud capacity', now, {
     failureThreshold: 1,
     cooldownMs: 60_000
   });
@@ -79,8 +88,9 @@ test('role routing prefers specialized agents and fails over without human invol
   assert.equal(selectProvider('IMPLEMENTER', health, { now })?.id, 'codex');
   assert.equal(selectProvider('REVIEWER', health, { now, exclude: ['codex'] })?.id, 'gemini');
 
-  markProviderSuccess(health.antigravity, now + 61_000);
-  assert.equal(selectProvider('IMPLEMENTER', health, { now: now + 61_000 })?.id, 'antigravity');
+  markProviderSuccess(health.ollama, now + 61_000);
+  assert.equal(selectProvider('PLANNER', health, { now: now + 61_000 })?.id, 'ollama');
+  assert.equal(selectProvider('IMPLEMENTER', health, { now: now + 61_000 })?.id, 'ollama');
 });
 
 test('circuit breaker opens after repeated provider failures and recovers after cooldown', () => {
@@ -236,12 +246,12 @@ test('provider timeouts are positive, finite and capped per role and request', (
   }
 });
 
-test('role priority contains independent planner, implementer, test designer and reviewer paths', () => {
-  assert.deepEqual(DEFAULT_ROLE_PRIORITY.PLANNER.slice(0, 4), [
-    'antigravity', 'gemini', 'claude', 'chatgpt'
+test('role priority is local-first while preserving independent cloud escalation paths', () => {
+  assert.deepEqual(DEFAULT_ROLE_PRIORITY.PLANNER.slice(0, 5), [
+    'ollama', 'antigravity', 'gemini', 'claude', 'chatgpt'
   ]);
-  assert.deepEqual(DEFAULT_ROLE_PRIORITY.IMPLEMENTER.slice(0, 4), [
-    'antigravity', 'codex', 'gemini', 'claude'
+  assert.deepEqual(DEFAULT_ROLE_PRIORITY.IMPLEMENTER.slice(0, 5), [
+    'ollama', 'antigravity', 'codex', 'gemini', 'claude'
   ]);
   assert.ok(DEFAULT_ROLE_PRIORITY.TEST_DESIGNER.includes('gemini'));
   assert.ok(DEFAULT_ROLE_PRIORITY.REVIEWER.includes('chatgpt'));
@@ -475,14 +485,25 @@ test('router prefers a previously proven provider before an unproven higher-prio
   assert.equal(selected?.id, 'codex');
 });
 
-test('unproven providers receive bounded canary time before failover', () => {
+test('local CPU provider receives a longer bounded SLA while cloud canaries fail over quickly', () => {
   const full = plannedProviderTimeoutMs('IMPLEMENTER', 600_000);
   assert.equal(full, 600_000);
-  assert.equal(providerAttemptTimeoutMs('PLANNER', false, 120_000), 30_000);
-  assert.equal(providerAttemptTimeoutMs('REVIEWER', false, 240_000), 30_000);
-  assert.equal(providerAttemptTimeoutMs('TEST_DESIGNER', false, 300_000), 90_000);
-  assert.equal(providerAttemptTimeoutMs('IMPLEMENTER', false, 600_000), 120_000);
-  assert.equal(providerAttemptTimeoutMs('IMPLEMENTER', true, 600_000), 600_000);
+  assert.equal(providerAttemptTimeoutMs('PLANNER', false, 120_000, 'codex'), 30_000);
+  assert.equal(providerAttemptTimeoutMs('PLANNER', false, 120_000, 'ollama'), 120_000);
+  assert.equal(providerAttemptTimeoutMs('REVIEWER', false, 240_000, 'ollama'), 120_000);
+  assert.equal(providerAttemptTimeoutMs('TEST_DESIGNER', false, 300_000, 'ollama'), 180_000);
+  assert.equal(providerAttemptTimeoutMs('IMPLEMENTER', false, 600_000, 'ollama'), 300_000);
+  assert.equal(providerAttemptTimeoutMs('IMPLEMENTER', false, 600_000, 'codex'), 120_000);
+  assert.equal(providerAttemptTimeoutMs('IMPLEMENTER', true, 600_000, 'codex'), 600_000);
+});
+
+test('authentication alone does not make a quota-bound provider proven', () => {
+  const health = createProviderHealth(Date.parse('2026-09-29T01:00:00Z'));
+  health.codex.available = true;
+  health.codex.authenticated = true;
+  assert.equal(providerIsProven('codex', health), false);
+  health.codex.lastSuccessAt = Date.parse('2026-09-29T00:59:00Z');
+  assert.equal(providerIsProven('codex', health), true);
 });
 
 test('deterministic fallback reviewer passes only bounded R0-R2 evidence with green verification', () => {
