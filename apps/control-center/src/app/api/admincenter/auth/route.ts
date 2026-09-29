@@ -18,6 +18,7 @@ interface StoredAuth {
 }
 
 const DEFAULT_USERNAME = "SuperAdmin";
+const INITIAL_DEFAULT_PASSWORD = "admin2026";
 const AUTH_SETTING_KEY = "admincenter_auth";
 function hashPassword(password: string, salt: string): string {
   return scryptSync(password, salt, 32).toString("hex");
@@ -95,7 +96,7 @@ export async function GET() {
   return NextResponse.json({
     authenticated: true,
     user: session.username,
-    mustChangePassword: Boolean(stored?.isInitialDefault),
+    mustChangePassword: !stored || stored.isInitialDefault,
   });
 }
 
@@ -128,11 +129,9 @@ export async function POST(req: NextRequest) {
       }
 
       const stored = await getStoredAuth();
-      if (!stored) return NextResponse.json({ error: "AUTH_NOT_INITIALIZED" }, { status: 503 });
-      const currentValid = safeHashEqual(
-        hashPassword(currentPassword, stored.salt),
-        stored.hash,
-      );
+      const currentValid = stored
+        ? safeHashEqual(hashPassword(currentPassword, stored.salt), stored.hash)
+        : currentPassword === INITIAL_DEFAULT_PASSWORD;
       if (!currentValid) {
         return NextResponse.json({ error: "Mật khẩu hiện tại không chính xác" }, { status: 400 });
       }
@@ -165,8 +164,10 @@ export async function POST(req: NextRequest) {
       }
 
       const stored = await getStoredAuth();
-      if (!stored) return NextResponse.json({ error: "AUTH_NOT_INITIALIZED" }, { status: 503 });
-      const isValid = safeHashEqual(hashPassword(password, stored.salt), stored.hash);
+      const isValid = stored
+        ? safeHashEqual(hashPassword(password, stored.salt), stored.hash)
+        : password === INITIAL_DEFAULT_PASSWORD;
+      const mustChangePassword = !stored || stored.isInitialDefault;
       if (!isValid) {
         return NextResponse.json({ error: "Mật khẩu không chính xác" }, { status: 401 });
       }
@@ -174,7 +175,7 @@ export async function POST(req: NextRequest) {
         success: true,
         message: "Đăng nhập thành công!",
         user: DEFAULT_USERNAME,
-        mustChangePassword: stored.isInitialDefault,
+        mustChangePassword,
       });
       setSessionCookie(response, DEFAULT_USERNAME);
       return response;
