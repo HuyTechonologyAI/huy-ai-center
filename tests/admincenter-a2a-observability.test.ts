@@ -125,3 +125,12 @@ test("AdminCenter password state persists through Supabase instead of serverless
   assert.match(auth, /cms_settings/);
   assert.match(auth, /admincenter_auth/);
 });
+
+
+test("AdminCenter preserves one-time bootstrap login only before durable auth exists", () => {
+  const auth = readFileSync(new URL("../apps/control-center/src/app/api/admincenter/auth/route.ts", import.meta.url), "utf8");
+  assert.match(auth, /INITIAL_DEFAULT_PASSWORD/);
+  assert.doesNotMatch(auth, /if \(!stored\) return NextResponse\.json\(\{ error: "AUTH_NOT_INITIALIZED"/);
+  assert.match(auth, /mustChangePassword\s*=\s*!stored\s*\|\|\s*stored\.isInitialDefault/);
+  assert.match(auth, /await saveStoredAuth\(updatedAuth\)/);
+});
