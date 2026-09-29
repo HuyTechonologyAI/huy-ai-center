@@ -12,14 +12,19 @@ import { redact } from './log-redactor.js';
 
 const LOCAL_OLLAMA_HOST = process.env.HUY_AI_OLLAMA_HOST?? 'http://127.0.0.1:11434';
 const LOCAL_OLLAMA_MODEL = process.env.HUY_AI_LOCAL_MODEL ?? 'qwen2.5-coder:3b';
-const MAX_SNAPSHOT_BYTES = 96 * 1024;
-const MAX_FILE_BYTES = 32 * 1024;
+const MAX_SNAPSHOT_BYTES = 16 * 1024;
+const MAX_FILE_BYTES = 12 * 1024;
 const MAX_EDIT_FILE_BYTES = 64 * 1024;
 
 export interface LocalFileEdit {
   path: string;
   content: string;
 }
+
+export type LocalPatchOperation =
+  | { op: 'append_text'; path: string; text: string }
+  | { op: 'replace_text'; path: string; oldText: string; newText: string }
+  | { op: 'create_file'; path: string; content: string };
 
 export interface ValidatedLocalEdits {
   edits: LocalFileEdit[];
@@ -115,6 +120,112 @@ export function parseLocalEditEnvelope(raw: string): { edits: LocalFileEdit[] } 
   } catch {
     return null;
   }
+}
+
+export function parseLocalPatchEnvelope(raw: string): { operations: LocalPatchOperation[] } | null {
+  try {
+    const parsed = JSON.parse(raw) as { operations?: unknown };
+    if (!Array.isArray(parsed.operations) || parsed.operations.length === 0 || parsed.operations.length > 12) return null;
+    const operations: LocalPatchOperation[] = [];
+    for (const item of parsed.operations) {
+      if (!item || typeof item !== 'object') return null;
+      const op = item as Record<string, unknown>;
+      if (op.op === 'append_text' && typeof op.path === 'string' && typeof op.text === 'string') {
+        operations.push({ op: 'append_text', path: op.path, text: op.text });
+        continue;
+      }
+      if (
+        op.op === 'replace_text' &&
+        typeof op.path === 'string' &&
+        typeof op.oldText === 'string' &&
+        typeof op.newText === 'string' &&
+        op.oldText.length > 0
+      ) {
+        operations.push({ op: 'replace_text', path: op.path, oldText: op.oldText, newText: op.newText });
+        continue;
+      }
+      if (op.op === 'create_file' && typeof op.path === 'string' && typeof op.content === 'string') {
+        operations.push({ op: 'create_file', path: op.path, content: op.content });
+        continue;
+      }
+      return null;
+    }
+    return { operations };
+  } catch {
+    return null;
+  }
+}
+
+function readPatchFile(worktreePath: string, path: string): string {
+  const normalized = assertSafePath(worktreePath, path);
+  const absolute = resolve(worktreePath, normalized);
+  if (!existsSync(absolute) || !lstatSync(absolute).isFile()) {
+    throw new Error(`LOCAL_PATCH_FILE_MISSING:${normalized}`);
+  }
+  const buffer = readFileSync(absolute);
+  if (buffer.includes(0) || buffer.length > MAX_EDIT_FILE_BYTES) {
+    throw new Error(`LOCAL_PATCH_FILE_UNSUPPORTED:${normalized}`);
+  }
+  return buffer.toString('utf8');
+}
+
+export function materializeLocalPatchOperations(
+  worktreePath: string,
+  operations: LocalPatchOperation[]
+): LocalFileEdit[] {
+  if (!Array.isArray(operations) || operations.length === 0 || operations.length > 12) {
+    throw new Error('LOCAL_PATCH_COUNT_INVALID');
+  }
+
+  const contentByPath = new Map<string, string>();
+  const order: string[] = [];
+
+  const currentContent = (path: string): string => {
+    const normalized = assertSafePath(worktreePath, path);
+    if (contentByPath.has(normalized)) return contentByPath.get(normalized)!;
+    const content = readPatchFile(worktreePath, normalized);
+    contentByPath.set(normalized, content);
+    order.push(normalized);
+    return content;
+  };
+
+  for (const operation of operations) {
+    const path = assertSafePath(worktreePath, operation.path);
+    if (operation.op === 'create_file') {
+      const absolute = resolve(worktreePath, path);
+      if (existsSync(absolute) || contentByPath.has(path)) {
+        throw new Error(`LOCAL_PATCH_CREATE_EXISTS:${path}`);
+      }
+      if (Buffer.byteLength(operation.content, 'utf8') > MAX_EDIT_FILE_BYTES) {
+        throw new Error(`LOCAL_PATCH_CONTENT_TOO_LARGE:${path}`);
+      }
+      contentByPath.set(path, operation.content);
+      order.push(path);
+      continue;
+    }
+
+    const before = currentContent(path);
+    if (operation.op === 'append_text') {
+      const next = before + operation.text;
+      if (Buffer.byteLength(next, 'utf8') > MAX_EDIT_FILE_BYTES) {
+        throw new Error(`LOCAL_PATCH_CONTENT_TOO_LARGE:${path}`);
+      }
+      contentByPath.set(path, next);
+      continue;
+    }
+
+    const first = before.indexOf(operation.oldText);
+    const last = before.lastIndexOf(operation.oldText);
+    if (first < 0) throw new Error(`LOCAL_PATCH_REPLACE_MISSING:${path}`);
+    if (first !== last) throw new Error(`LOCAL_PATCH_REPLACE_AMBIGUOUS:${path}`);
+    const next = before.slice(0, first) + operation.newText + before.slice(first + operation.oldText.length);
+    if (Buffer.byteLength(next, 'utf8') > MAX_EDIT_FILE_BYTES) {
+      throw new Error(`LOCAL_PATCH_CONTENT_TOO_LARGE:${path}`);
+    }
+    contentByPath.set(path, next);
+  }
+
+  return order.map(path => ({ path, content: contentByPath.get(path)! }));
 }
 
 export function changedLineBudget(oldText: string, newText: string): number {
@@ -265,9 +376,13 @@ export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<
   }
 
   const editorPrompt = [
-    'You are a deterministic repository file editor. You have NO shell and NO tools.',
+    'You are a deterministic repository patch editor. You have NO shell and NO tools.',
     'Return JSON only. Do not use Markdown fences.',
-    'Output schema: {"edits":[{"path":"relative/path","content":"FULL NEW FILE CONTENT"}]}',
+    'Preferred output schema: {"operations":[...]} where each operation is exactly one of:',
+    '{"op":"append_text","path":"relative/path","text":"TEXT TO APPEND"}',
+    '{"op":"replace_text","path":"relative/path","oldText":"EXACT UNIQUE OLD TEXT","newText":"REPLACEMENT"}',
+    '{"op":"create_file","path":"relative/path","content":"NEW FILE CONTENT"}',
+    'Prefer append_text or replace_text. Do NOT reproduce a full existing file.',
     'Only edit paths explicitly inside Allowed paths. Never edit Forbidden paths.',
     'Preserve existing file content unless the task requires a change.',
     'Create new files only when required by the task.',
@@ -294,7 +409,10 @@ export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<
         prompt: editorPrompt,
         stream: false,
         format: 'json',
-        options: { temperature: 0, num_predict: 2400 },
+        options: {
+          temperature: 0,
+          num_predict: Math.min(1600, Math.max(512, req.maxChangedLines * 10)),
+        },
       }),
       signal: controller.signal,
     });
@@ -319,8 +437,9 @@ export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<
       };
     }
 
-    const envelope = parseLocalEditEnvelope(outer.response);
-    if (!envelope) {
+    const patchEnvelope = parseLocalPatchEnvelope(outer.response);
+    const legacyEnvelope = patchEnvelope ? null : parseLocalEditEnvelope(outer.response);
+    if (!patchEnvelope && !legacyEnvelope) {
       return {
         success: false,
         output: redact(outer.response).slice(-3000),
@@ -331,9 +450,12 @@ export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<
 
     let validated: ValidatedLocalEdits;
     try {
+      const edits = patchEnvelope
+        ? materializeLocalPatchOperations(req.worktreePath, patchEnvelope.operations)
+        : legacyEnvelope!.edits;
       validated = validateLocalFileEdits({
         worktreePath: req.worktreePath,
-        edits: envelope.edits,
+        edits,
         allowedPaths: req.allowedPaths,
         forbiddenPaths: req.forbiddenPaths,
         maxChangedLines: req.maxChangedLines,

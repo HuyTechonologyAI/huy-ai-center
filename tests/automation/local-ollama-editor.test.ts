@@ -8,6 +8,8 @@ import {
   validateLocalFileEdits,
   applyValidatedLocalEdits,
   parseLocalEditEnvelope,
+  parseLocalPatchEnvelope,
+  materializeLocalPatchOperations,
 } from '../../automation/agent-bridge/src/local-ollama-editor.js';
 
 test('local editor parses exact structured JSON and rejects malformed payloads', () => {
@@ -89,4 +91,39 @@ test('local editor rejects a symlink component even when it points inside the re
     forbiddenPaths: [],
     maxChangedLines: 20,
   }), /LOCAL_EDIT_SYMLINK_DENIED/);
+});
+
+test('local patch envelope supports bounded append, replace and create operations', () => {
+  const parsed = parseLocalPatchEnvelope(JSON.stringify({
+    operations: [
+      { op: 'append_text', path: 'tests/safe/a.txt', text: 'three\n' },
+      { op: 'replace_text', path: 'tests/safe/b.txt', oldText: 'OLD', newText: 'NEW' },
+      { op: 'create_file', path: 'tests/safe/new.txt', content: 'created\n' },
+    ],
+  }));
+  assert.ok(parsed);
+  assert.equal(parsed.operations.length, 3);
+});
+
+test('local patch operations materialize concise edits and fail closed on ambiguous replace', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ollama-editor-patch-'));
+  mkdirSync(join(root, 'tests', 'safe'), { recursive: true });
+  writeFileSync(join(root, 'tests', 'safe', 'a.txt'), 'one\ntwo\n');
+  writeFileSync(join(root, 'tests', 'safe', 'b.txt'), 'prefix OLD suffix\n');
+
+  const edits = materializeLocalPatchOperations(root, [
+    { op: 'append_text', path: 'tests/safe/a.txt', text: 'three\n' },
+    { op: 'replace_text', path: 'tests/safe/b.txt', oldText: 'OLD', newText: 'NEW' },
+    { op: 'create_file', path: 'tests/safe/new.txt', content: 'created\n' },
+  ]);
+  assert.deepEqual(edits, [
+    { path: 'tests/safe/a.txt', content: 'one\ntwo\nthree\n' },
+    { path: 'tests/safe/b.txt', content: 'prefix NEW suffix\n' },
+    { path: 'tests/safe/new.txt', content: 'created\n' },
+  ]);
+
+  writeFileSync(join(root, 'tests', 'safe', 'ambiguous.txt'), 'OLD x OLD\n');
+  assert.throws(() => materializeLocalPatchOperations(root, [
+    { op: 'replace_text', path: 'tests/safe/ambiguous.txt', oldText: 'OLD', newText: 'NEW' },
+  ]), /LOCAL_PATCH_REPLACE_AMBIGUOUS/);
 });
