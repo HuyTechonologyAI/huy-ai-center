@@ -12,6 +12,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { processRemoteSyncQueue, runBacklog } from './backlog-runner.js';
+import { garbageCollectBridgeWorktrees } from './worktree-gc.js';
 import { redact } from './log-redactor.js';
 import {
   ALL_PROVIDER_IDS,
@@ -269,8 +270,8 @@ function providerSummary(
   }])) as ReturnType<typeof providerSummary>;
 }
 
-function hasImplementationProvider(health: Record<ProviderId, ProviderHealth>): boolean {
-  return (['codex', 'claude', 'gemini'] as ProviderId[]).some(id =>
+export function hasImplementationProvider(health: Record<ProviderId, ProviderHealth>): boolean {
+  return (['ollama', 'codex', 'antigravity', 'claude', 'gemini'] as ProviderId[]).some(id =>
     health[id].available &&
     health[id].authenticated &&
     health[id].circuit === 'CLOSED'
@@ -343,6 +344,8 @@ export async function runPersistentSupervisor(
   let lastProviderProbe = 0;
   let health = createProviderHealth();
   let tick = 0;
+  let lastWorktreeGc = 0;
+  const worktreeGcIntervalMs = 30 * 60_000;
   let stall: ReturnType<typeof classifyStall> | undefined;
   const stallThreshold = 3;
 
@@ -357,6 +360,26 @@ export async function runPersistentSupervisor(
       if (now - lastProviderProbe >= providerProbeMs || tick === 1) {
         health = probeProviders(health, now);
         lastProviderProbe = now;
+      }
+
+      if (tick === 1 || now - lastWorktreeGc >= worktreeGcIntervalMs) {
+        try {
+          const gc = garbageCollectBridgeWorktrees(root, {
+            keepNewest: 5,
+            minAgeMs: 60 * 60_000,
+            now
+          });
+          writeAtomicJson(join(stateDir, 'worktree-gc.json'), {
+            timestamp: new Date(now).toISOString(),
+            ...gc
+          });
+        } catch (error) {
+          writeAtomicJson(join(stateDir, 'worktree-gc.json'), {
+            timestamp: new Date(now).toISOString(),
+            error: redact(error instanceof Error ? error.message : String(error))
+          });
+        }
+        lastWorktreeGc = now;
       }
 
       if (!hasImplementationProvider(health)) {

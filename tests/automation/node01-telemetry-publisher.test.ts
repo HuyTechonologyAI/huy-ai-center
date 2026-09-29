@@ -5,6 +5,7 @@ import {
   buildTelemetryPayload,
   deriveWorkExecution,
   deriveRemoteSyncStatus,
+  parseGitAheadBehindCounts,
   sanitizeProviderSnapshot,
   signTelemetryEnvelope,
   summarizeBacklogState,
@@ -86,3 +87,9 @@ describe("node01 telemetry publisher", () => {
       nextAction: "IMPLEMENTATION",
     });
   });
+
+it("maps git rev-list HEAD...upstream left/right counts to ahead/behind correctly", () => {
+  assert.deepEqual(parseGitAheadBehindCounts("51\t0\n"), { ahead: 51, behind: 0 });
+  assert.deepEqual(parseGitAheadBehindCounts("0 3"), { ahead: 0, behind: 3 });
+  assert.equal(parseGitAheadBehindCounts("not-a-count"), null);
+});

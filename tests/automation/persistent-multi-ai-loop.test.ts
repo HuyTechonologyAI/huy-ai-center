@@ -21,6 +21,7 @@ import {
   classifyStall,
   buildBottleneckReport,
   decideSupervisorNextAction,
+  hasImplementationProvider,
   type BacklogCycleResult
 } from '../../automation/agent-bridge/src/persistent-supervisor.js';
 
@@ -557,4 +558,20 @@ test('local Ollama provider is selected when every cloud route is unavailable', 
   health.ollama.authenticated = true;
   assert.equal(selectProvider('IMPLEMENTER', health as never, { now })?.id, 'ollama');
   assert.equal(selectProvider('PLANNER', health as never, { now })?.id, 'ollama');
+});
+
+test('local Ollama alone is sufficient to keep the autonomous supervisor implementation-capable', () => {
+  const now = Date.parse('2026-09-29T02:00:00Z');
+  const health = createProviderHealth(now);
+  for (const id of ALL_PROVIDER_IDS) {
+    health[id].available = false;
+    health[id].authenticated = false;
+  }
+  health.ollama.available = true;
+  health.ollama.authenticated = true;
+  health.ollama.circuit = 'CLOSED';
+  assert.equal(hasImplementationProvider(health), true);
+
+  health.ollama.circuit = 'OPEN';
+  assert.equal(hasImplementationProvider(health), false);
 });

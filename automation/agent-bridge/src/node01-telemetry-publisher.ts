@@ -52,6 +52,12 @@ export function deriveRemoteSyncStatus(v:{behind:number;ahead:number}|null|undef
   if(v.behind>0) return "DIVERGED_FAIL_CLOSED";
   return v.ahead>0?"SYNC_PENDING":"SYNCED";
 }
+export function parseGitAheadBehindCounts(raw:string):{ahead:number;behind:number}|null{
+  const parts=raw.trim().split(/\s+/).map(Number);
+  if(parts.length!==2||parts.some(v=>!Number.isInteger(v)||v<0)) return null;
+  const [ahead,behind]=parts;
+  return {ahead,behind};
+}
 export function buildTelemetryPayload(input:PayloadInput){
   const m=input.metrics;
   if(!m||![m.cpu,m.ram,m.disk].every(validPct)||![m.ramFree,m.ramTotal,m.active,m.queue].every(v=>Number.isFinite(v)&&v>=0)||m.ramFree>m.ramTotal) throw Error("INVALID_METRICS");
@@ -74,7 +80,7 @@ function runtimeWorkers(){
   return Object.fromEntries(Object.entries(rules).map(([k,re])=>[k,out.split("\n").filter(x=>re.test(x)).length]));
 }
 function remoteSync(){
-  try{const [behind,ahead]=execFileSync("git",["rev-list","--left-right","--count","HEAD...@{upstream}"],{cwd:ROOT,encoding:"utf8"}).trim().split(/\s+/).map(Number);return {behind,ahead};}catch{return null;}
+  try{return parseGitAheadBehindCounts(execFileSync("git",["rev-list","--left-right","--count","HEAD...@{upstream}"],{cwd:ROOT,encoding:"utf8"}));}catch{return null;}
 }
 function latestBottleneck(){
   try{const dir=join(STATE,"bottlenecks");return readdirSync(dir).filter(f=>f.endsWith(".md")).sort().at(-1)??null;}catch{return null;}
