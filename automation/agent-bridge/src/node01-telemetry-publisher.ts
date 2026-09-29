@@ -4,9 +4,21 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { cpus, freemem, totalmem, loadavg } from "node:os";
 import { join } from "node:path";
 import { redact } from "./log-redactor.js";
+import {
+  deriveHandoffs, deriveProviderAttempts, deriveRuntimeAgents,
+  normalizeA2ATimeline, parseRuntimeWorkersFromPs,
+} from "./a2a-telemetry.js";
+export {
+  deriveHandoffs, deriveProviderAttempts, deriveRuntimeAgents,
+  normalizeA2ATimeline, parseRuntimeWorkersFromPs,
+} from "./a2a-telemetry.js";
 
 type Metrics = { cpu:number; ram:number; disk:number; ramFree:number; ramTotal:number; active:number; queue:number };
 type PayloadInput = { timestamp:string; status:"ONLINE"|"DEGRADED"; metrics:Metrics; metadata?:Record<string,unknown> };
+export type A2AEvent = { sequence:number; taskId:string; stage:string; ownerAgent:string; status:string; completedWork:string; nextStep:string; createdAt:string; checkpointId:string };
+export type RuntimeAgent = { id:string; role:string; provider?:string; state:string; taskId:string; stage:string; lastAction?:string; nextAction?:string };
+export type A2AHandoff = { sequence:number; taskId:string; fromAgent:string; toAgent:string; fromStage:string; toStage:string; timestamp:string; status:string };
+export type ProviderAttempt = { sequence:number; taskId:string; provider:string; role:string; stage:string; status:string; timestamp:string; checkpointId:string };
 const NODE_ID="huy-ai-node-01";
 const ROOT=process.env.HUY_AI_REPO ?? "/mnt/data1/HUY-AI/runtime/autonomy-control";
 const STATE="/mnt/data1/HUY-AI/state";
@@ -61,9 +73,16 @@ export function parseGitAheadBehindCounts(raw:string):{ahead:number;behind:numbe
 export function buildTelemetryPayload(input:PayloadInput){
   const m=input.metrics;
   if(!m||![m.cpu,m.ram,m.disk].every(validPct)||![m.ramFree,m.ramTotal,m.active,m.queue].every(v=>Number.isFinite(v)&&v>=0)||m.ramFree>m.ramTotal) throw Error("INVALID_METRICS");
-  const src=input.metadata??{}, allowed=["supervisorState","providerHealth","backlogTaskStatuses","runtimeWorkers","workExecution","latestBottleneck","remoteSyncStatus"];
+  const src=input.metadata??{}, allowed=[
+    "supervisorState","providerHealth","backlogTaskStatuses","runtimeWorkers","workExecution",
+    "runtimeAgents","a2aTimeline","handoffs","providerAttempts","checkpointHistory",
+    "currentOwner","lastAction","nextAction","latestBottleneck","remoteSyncStatus"
+  ];
   const metadata:any=Object.fromEntries(allowed.filter(k=>k in src).map(k=>[k,(src as any)[k]]));
   metadata.runtimeWorkers=workers(metadata.runtimeWorkers);
+  for(const key of ["runtimeAgents","a2aTimeline","handoffs","providerAttempts","checkpointHistory"]){
+    if(Array.isArray(metadata[key])) metadata[key]=metadata[key].slice(-32);
+  }
   return {version:1 as const,nodeId:NODE_ID,timestamp:input.timestamp,status:input.status,metrics:m,metadata};
 }
 export function signTelemetryEnvelope(payload:unknown,privateKey:KeyObject){
@@ -76,8 +95,7 @@ function diskPct(){
 }
 function runtimeWorkers(){
   let out=""; try{out=execFileSync("ps",["-eo","args="],{encoding:"utf8"});}catch{}
-  const rules:{[k:string]:RegExp}={codex:/\bcodex exec\b/,antigravity:/\bagy -p\b/,claude:/\bclaude -p\b/,gemini:/\bgemini -p\b/};
-  return Object.fromEntries(Object.entries(rules).map(([k,re])=>[k,out.split("\n").filter(x=>re.test(x)).length]));
+  return parseRuntimeWorkersFromPs(out);
 }
 function remoteSync(){
   try{return parseGitAheadBehindCounts(execFileSync("git",["rev-list","--left-right","--count","HEAD...@{upstream}"],{cwd:ROOT,encoding:"utf8"}));}catch{return null;}
@@ -94,6 +112,16 @@ function latestCheckpoint(taskId:string){
     return typeof id==="string"&&id?json(join(dir,id+".json")):null;
   }catch{return null;}
 }
+function checkpointHistory(taskId:string){
+  if(!taskId||taskId==="NONE") return [];
+  try{
+    const dir=join(ROOT,".artifacts","agent-bridge","checkpoints",taskId);
+    const raw=readdirSync(dir)
+      .filter(name=>name.endsWith(".json")&&name!=="latest.json"&&!name.startsWith("evidence-"))
+      .map(name=>json(join(dir,name))).filter(Boolean);
+    return normalizeA2ATimeline(raw);
+  }catch{return [];}
+}
 export async function publishOnce(){
   if(!existsSync(KEY)) throw Error("TELEMETRY_PRIVATE_KEY_MISSING");
   const hb=json(join(STATE,"supervisors","persistent-multi-ai-heartbeat.json"))??{};
@@ -105,7 +133,17 @@ export async function publishOnce(){
     ? hb.taskId
     : Object.entries(backlog as any).find(([,v]:any)=>["RUNNING","BLOCKED","HUMAN_GATE"].includes(v?.status))?.[0] ?? "NONE";
   const workExecution=deriveWorkExecution({supervisor:hb,backlog,checkpoint:latestCheckpoint(currentTask)});
-  const payload=buildTelemetryPayload({timestamp:new Date().toISOString(),status:hb.state==="RUNNING"?"ONLINE":"DEGRADED",metrics,metadata:{supervisorState:String(hb.state??"UNKNOWN"),providerHealth:providers,backlogTaskStatuses:summarizeBacklogState(backlog),runtimeWorkers:rw,workExecution,latestBottleneck:latestBottleneck(),remoteSyncStatus:deriveRemoteSyncStatus(remoteSync())}});
+  const timeline=checkpointHistory(currentTask);
+  const handoffs=deriveHandoffs(timeline);
+  const providerAttempts=deriveProviderAttempts(timeline);
+  const runtimeAgents=deriveRuntimeAgents({supervisorState:String(hb.state??"UNKNOWN"),workExecution,runtimeWorkers:rw,timeline});
+  const currentOwner=timeline.at(-1)?.ownerAgent??"COORDINATOR";
+  const payload=buildTelemetryPayload({timestamp:new Date().toISOString(),status:hb.state==="RUNNING"?"ONLINE":"DEGRADED",metrics,metadata:{
+    supervisorState:String(hb.state??"UNKNOWN"),providerHealth:providers,backlogTaskStatuses:summarizeBacklogState(backlog),
+    runtimeWorkers:rw,workExecution,runtimeAgents,a2aTimeline:timeline,handoffs,providerAttempts,checkpointHistory:timeline,
+    currentOwner,lastAction:workExecution.lastAction,nextAction:workExecution.nextAction,
+    latestBottleneck:latestBottleneck(),remoteSyncStatus:deriveRemoteSyncStatus(remoteSync())
+  }});
   const envelope=signTelemetryEnvelope(payload,createPrivateKey(readFileSync(KEY)));
   const res=await fetch(ENDPOINT,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(envelope),signal:AbortSignal.timeout(15000)});
   if(!res.ok) throw Error("TELEMETRY_HTTP_"+res.status);
