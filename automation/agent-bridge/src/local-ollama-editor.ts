@@ -267,7 +267,7 @@ export function materializeLocalPatchOperations(
 
     const before = currentContent(path);
     if (operation.op === 'append_text') {
-      const next = before + operation.text;
+      const next = before.includes(operation.text) ? before : before + operation.text;
       if (Buffer.byteLength(next, 'utf8') > MAX_EDIT_FILE_BYTES) {
         throw new Error(`LOCAL_PATCH_CONTENT_TOO_LARGE:${path}`);
       }

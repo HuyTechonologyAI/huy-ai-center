@@ -299,6 +299,9 @@ ${scopeViolation ? `[SCOPE VIOLATION DETECTED]\n${scopeViolation}\nDo NOT touch 
 ${failedVerifications ? `[FAILED VERIFICATION COMMANDS]\n${failedVerifications}\n` : ""}
 ${auditorFeedback ? `[AUDITOR FEEDBACK]\n${auditorFeedback}\n` : ""}
 ${previousDiffSummary ? `[PREVIOUS MODIFICATIONS SUMMARY]\n${previousDiffSummary}\n` : ""}
+The current worktree already contains cumulative prior attempts. Treat that state as authoritative.
+Do not re-apply additive steps that are already present. Inspect existing content before any append/create action.
+Repair incorrect prior output in place, remove duplicates, and make the correction idempotent: repeating the same correction must converge to the same diff.
 Please resolve all reported failures and strictly remain within scope.
 =============================================================
 `;

@@ -638,3 +638,23 @@ test('correction retry rotates away from the immediately failing implementer wit
   assert.deepEqual(nextCorrectionExclusions('codex'), ['codex']);
   assert.deepEqual(nextCorrectionExclusions(undefined), []);
 });
+
+
+test('correction prompt requires convergence on the existing cumulative worktree state', () => {
+  const prompt = buildImplementationPrompt({
+    taskId: 'idempotent-correction',
+    objective: 'Append a bounded acceptance record.',
+    planSteps: [{ stepIndex: 1, description: 'Append the acceptance record.' }],
+    allowedPaths: ['tests/'],
+    forbiddenPaths: ['.env'],
+    cycle: 2,
+    maxCycles: 8,
+    previousDiffSummary: 'README.md | 4 ++++',
+    failedVerifications: 'fixture test failed',
+    auditorFeedback: 'duplicate acceptance record',
+  });
+  assert.match(prompt, /current worktree.*cumulative prior attempts/i);
+  assert.match(prompt, /do not re-apply additive steps/i);
+  assert.match(prompt, /repair.*in place/i);
+  assert.match(prompt, /idempotent/i);
+});

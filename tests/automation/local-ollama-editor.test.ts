@@ -188,3 +188,24 @@ test('generated JS/TS test quality gate rejects framework drift, comments-only a
     () => validateGeneratedTestQuality('tests/x.test.ts', "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { existsSync } from 'node:fs';\ntest('x',()=>assert.equal(existsSync('config/model-gateway/routing-policy.json'),false));\n")
   );
 });
+
+
+test('append_text is idempotent when the exact requested text already exists', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ollama-editor-idempotent-'));
+  mkdirSync(join(root, 'tests', 'safe'), { recursive: true });
+  writeFileSync(join(root, 'tests', 'safe', 'a.txt'), 'baseline\nacceptance record\n');
+
+  const edits = materializeLocalPatchOperations(root, [
+    { op: 'append_text', path: 'tests/safe/a.txt', text: 'acceptance record\n' },
+  ]);
+  assert.deepEqual(edits, [
+    { path: 'tests/safe/a.txt', content: 'baseline\nacceptance record\n' },
+  ]);
+  assert.throws(() => validateLocalFileEdits({
+    worktreePath: root,
+    edits,
+    allowedPaths: ['tests/safe/'],
+    forbiddenPaths: [],
+    maxChangedLines: 20,
+  }), /LOCAL_EDIT_NO_CHANGE/);
+});
