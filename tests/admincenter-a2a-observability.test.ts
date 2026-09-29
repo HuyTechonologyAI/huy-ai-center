@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { generateKeyPairSync } from "node:crypto";
 
 import { buildAdminCenterSystemStatus } from "../apps/control-center/src/lib/admincenter-runtime.js";
+import { verifyNode01TelemetryEnvelope } from "../apps/control-center/src/lib/node01-telemetry.js";
+import { buildTelemetryPayload, signTelemetryEnvelope } from "../automation/agent-bridge/src/node01-telemetry-publisher.js";
 
 const now = "2026-09-29T06:40:00.000Z";
 const a2aMetadata = {
@@ -66,4 +69,30 @@ test("AdminCenter UI labels catalog, runtime agents, providers, and A2A flow dis
   for (const label of ["Catalog Agents", "Runtime Active Agents", "Providers", "A2A Flow"]) {
     assert.match(source, new RegExp(label, "i"));
   }
+});
+
+
+test("recovered telemetry verifier accepts the current signed Node01 publisher contract", () => {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const payload = buildTelemetryPayload({
+    timestamp: now,
+    status: "ONLINE",
+    metrics: { cpu: 12, ram: 34, disk: 56, ramFree: 4096, ramTotal: 8192, active: 1, queue: 2 },
+    metadata: a2aMetadata,
+  });
+  const envelope = signTelemetryEnvelope(payload, privateKey);
+  const pem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  const verified = verifyNode01TelemetryEnvelope(envelope, pem, Date.parse(now));
+  assert.equal(verified.ok, true);
+  if (verified.ok) {
+    assert.equal(verified.payload.metrics.cpu, 12);
+    assert.equal(verified.payload.status, "ONLINE");
+    assert.equal(verified.payload.metadata.a2aTimeline instanceof Array, true);
+  }
+});
+
+test("telemetry route defers Supabase admin initialization until request time", () => {
+  const source = readFileSync(new URL("../apps/control-center/src/app/api/admincenter/telemetry/route.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /^import\s+\{\s*supabaseAdmin\s*\}/m);
+  assert.match(source, /await import\(["']@\/lib\/supabase-admin["']\)/);
 });
