@@ -1,0 +1,369 @@
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, isAbsolute, resolve, sep } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { redact } from './log-redactor.js';
+
+const LOCAL_OLLAMA_HOST = process.env.HUY_AI_OLLAMA_HOST?? 'http://127.0.0.1:11434';
+const LOCAL_OLLAMA_MODEL = process.env.HUY_AI_LOCAL_MODEL ?? 'qwen2.5-coder:3b';
+const MAX_SNAPSHOT_BYTES = 96 * 1024;
+const MAX_FILE_BYTES = 32 * 1024;
+const MAX_EDIT_FILE_BYTES = 64 * 1024;
+
+export interface LocalFileEdit {
+  path: string;
+  content: string;
+}
+
+export interface ValidatedLocalEdits {
+  edits: LocalFileEdit[];
+  changedLines: number;
+}
+
+export interface LocalOllamaEditRequest {
+  prompt: string;
+  worktreePath: string;
+  allowedPaths: string[];
+  forbiddenPaths: string[];
+  timeoutMs: number;
+  maxChangedLines: number;
+}
+
+export interface LocalOllamaEditResult {
+  success: boolean;
+  output: string;
+  error: string;
+  changedFiles: string[];
+}
+
+function normalizeRepoPath(value: string): string {
+  return value.replace(/\\/g, '/').replace(/^\.\//, '');
+}
+
+function globToRegex(pattern: string): RegExp {
+  const normalized = normalizeRepoPath(pattern);
+  let escaped = '';
+  for (const ch of normalized) {
+    if (ch === '*') {
+      escaped += '.*';
+    } else if ('\\^$.*+?()[]{}|'.includes(ch)) {
+      escaped += '\\' + ch;
+    } else {
+      escaped += ch;
+    }
+  }
+  return new RegExp('^' + escaped + '$');
+}
+
+function matchesPattern(path: string, pattern: string): boolean {
+  const p = normalizeRepoPath(path);
+  const normalized = normalizeRepoPath(pattern);
+  if (normalized.includes('*')) return globToRegex(normalized).test(p);
+  if (normalized.endsWith('/')) return p.startsWith(normalized);
+  return p === normalized || p.startsWith(`${normalized}/`);
+}
+
+function assertSafePath(worktreePath: string, filePath: string): string {
+  const normalized = normalizeRepoPath(filePath);
+  if (
+    !normalized ||
+    normalized.includes('\\0') ||
+    isAbsolute(normalized) ||
+    normalized.split('/').some(part => part === '..' || part === '')
+  ) {
+    throw new Error(`LOCAL_EDIT_PATH_INVALID:${redact(filePath)}`);
+  }
+
+  const root = resolve(worktreePath);
+  const absolute = resolve(root, normalized);
+  if (absolute !== root && !absolute.startsWith(root + sep)) {
+    throw new Error(`LOCAL_EDIT_PATH_INVALID:${redact(filePath)}`);
+  }
+
+  const parts = normalized.split('/');
+  let cursor = root;
+  for (const part of parts) {
+    cursor = resolve(cursor, part);
+    if (!existsSync(cursor)) continue;
+    const stat = lstatSync(cursor);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`LOCAL_EDIT_SYMLINK_DENIED:${redact(filePath)}`);
+    }
+  }
+
+  return normalized;
+}
+
+export function parseLocalEditEnvelope(raw: string): { edits: LocalFileEdit[] } | null {
+  try {
+    const parsed = JSON.parse(raw) as { edits?: unknown };
+    if (!Array.isArray(parsed.edits)) return null;
+    const edits: LocalFileEdit[] = [];
+    for (const edit of parsed.edits) {
+      if (!edit || typeof edit !== 'object') return null;
+      const candidate = edit as { path?: unknown; content?: unknown };
+      if (typeof candidate.path !== 'string' || typeof candidate.content !== 'string') return null;
+      edits.push({ path: candidate.path, content: candidate.content });
+    }
+    return { edits };
+  } catch {
+    return null;
+  }
+}
+
+export function changedLineBudget(oldText: string, newText: string): number {
+  if (oldText === newText) return 0;
+  const before = oldText.split('\n');
+  const after = newText.split('\n');
+
+  let prefix = 0;
+  while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix += 1;
+
+  let suffix = 0;
+  while (
+    suffix < before.length - prefix &&
+    suffix < after.length - prefix &&
+    before[before.length - 1 - suffix] === after[after.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+
+  const removed = Math.max(0, before.length - prefix - suffix);
+  const added = Math.max(0, after.length - prefix - suffix);
+  return removed + added;
+}
+
+export function validateLocalFileEdits(params: {
+  worktreePath: string;
+  edits: LocalFileEdit[];
+  allowedPaths: string[];
+  forbiddenPaths: string[];
+  maxChangedLines: number;
+}): ValidatedLocalEdits {
+  if (!Array.isArray(params.edits) || params.edits.length === 0 || params.edits.length > 12) {
+    throw new Error('LOCAL_EDIT_COUNT_INVALID');
+  }
+
+  const seen = new Set<string>();
+  const validated: LocalFileEdit[] = [];
+  let changedLines = 0;
+
+  for (const edit of params.edits) {
+    const path = assertSafePath(params.worktreePath, edit.path);
+    if (seen.has(path)) throw new Error(`LOCAL_EDIT_DUPLICATE_PATH:${path}`);
+    seen.add(path);
+
+    if (params.forbiddenPaths.some(pattern => matchesPattern(path, pattern))) {
+      throw new Error(`LOCAL_EDIT_FORBIDDEN:${path}`);
+    }
+    if (params.allowedPaths.length > 0 && !params.allowedPaths.some(pattern => matchesPattern(path, pattern))) {
+      throw new Error(`LOCAL_EDIT_OUT_OF_SCOPE:${path}`);
+    }
+
+    const absolute = resolve(params.worktreePath, path);
+    if (Buffer.byteLength(edit.content, 'utf8') > MAX_EDIT_FILE_BYTES) {
+      throw new Error(`LOCAL_EDIT_FILE_TOO_LARGE:${path}`);
+    }
+    if (existsSync(absolute) && !lstatSync(absolute).isFile()) {
+      throw new Error(`LOCAL_EDIT_NOT_REGULAR_FILE:${path}`);
+    }
+
+    const before = existsSync(absolute) ? readFileSync(absolute, 'utf8') : '';
+    changedLines += changedLineBudget(before, edit.content);
+    if (changedLines > params.maxChangedLines) {
+      throw new Error(`LOCAL_EDIT_BUDGET_EXCEEDED:${changedLines}>${params.maxChangedLines}`);
+    }
+
+    validated.push({ path, content: edit.content });
+  }
+
+  if (changedLines === 0) throw new Error('LOCAL_EDIT_NO_CHANGE');
+  return { edits: validated, changedLines };
+}
+
+export function applyValidatedLocalEdits(worktreePath: string, edits: LocalFileEdit[]): void {
+  const originals = edits.map(edit => {
+    const absolute = resolve(worktreePath, edit.path);
+    return {
+      absolute,
+      existed: existsSync(absolute),
+      content: existsSync(absolute) ? readFileSync(absolute) : undefined,
+    };
+  });
+
+  try {
+    for (const edit of edits) {
+      const absolute = resolve(worktreePath, edit.path);
+      mkdirSync(dirname(absolute), { recursive: true });
+      writeFileSync(absolute, edit.content, { encoding: 'utf8', mode: 0o600 });
+    }
+  } catch (error) {
+    for (const original of originals.reverse()) {
+      try {
+        if (original.existed && original.content) {
+          writeFileSync(original.absolute, original.content);
+        } else if (!original.existed && existsSync(original.absolute)) {
+          rmSync(original.absolute, { force: true });
+        }
+      } catch {
+        // Best-effort rollback; downstream scope verification remains fail-closed.
+      }
+    }
+    throw error;
+  }
+}
+
+function snapshotAllowedFiles(worktreePath: string, allowedPaths: string[]): string {
+  const git = spawnSync('git', [
+    'ls-files',
+    '--cached',
+    '--others',
+    '--exclude-standard',
+    '--',
+    ...allowedPaths,
+  ], {
+    cwd: worktreePath,
+    encoding: 'utf8',
+    shell: false,
+    timeout: 10_000,
+  });
+
+  if (git.status !== 0) {
+    throw new Error(`LOCAL_EDIT_SNAPSHOT_FAILED:${redact(git.stderr || git.stdout)}`);
+  }
+
+  const files = git.stdout.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 24);
+  let used = 0;
+  const blocks: string[] = [];
+
+  for (const path of files) {
+    const normalized = assertSafePath(worktreePath, path);
+    const absolute = resolve(worktreePath, normalized);
+    if (!existsSync(absolute) || !lstatSync(absolute).isFile()) continue;
+    const buffer = readFileSync(absolute);
+    if (buffer.includes(0) || buffer.length > MAX_FILE_BYTES) continue;
+    if (used + buffer.length > MAX_SNAPSHOT_BYTES) break;
+    used += buffer.length;
+    blocks.push(`=== FILE ${normalized} ===\n${buffer.toString('utf8')}\n=== END FILE ===`);
+  }
+
+  return blocks.join('\n\n');
+}
+
+export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<LocalOllamaEditResult> {
+  let snapshot = '';
+  try {
+    snapshot = snapshotAllowedFiles(req.worktreePath, req.allowedPaths);
+  } catch (error) {
+    return { success: false, output: '', error: redact(String(error)), changedFiles: [] };
+  }
+
+  const editorPrompt = [
+    'You are a deterministic repository file editor. You have NO shell and NO tools.',
+    'Return JSON only. Do not use Markdown fences.',
+    'Output schema: {"edits":[{"path":"relative/path","content":"FULL NEW FILE CONTENT"}]}',
+    'Only edit paths explicitly inside Allowed paths. Never edit Forbidden paths.',
+    'Preserve existing file content unless the task requires a change.',
+    'Create new files only when required by the task.',
+    `Maximum changed-line budget: ${req.maxChangedLines}.`,
+    `Allowed paths: ${req.allowedPaths.join(', ') || 'none'}`,
+    `Forbidden paths: ${req.forbiddenPaths.join(', ') || 'none'}`,
+    '',
+    'TASK INSTRUCTIONS:',
+    req.prompt,
+    '',
+     'CURRENT ALLOWED-SCOPE FILE SNAPSHOTS:',
+    snapshot || '(no tracked text files currently exist in allowed scope)',
+  ].join('\n');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), req.timeoutMs);
+
+  try {
+    const response = await fetch(`${LOCAL_OLLAMA_HOST.replace(/\/$/, '')}/api/generate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: LOCAL_OLLAMA_MODEL,
+        prompt: editorPrompt,
+        stream: false,
+        format: 'json',
+        options: { temperature: 0, num_predict: 2400 },
+      }),
+      signal: controller.signal,
+    });
+
+    const raw = await response.text();
+    if (!response.ok) {
+      return {
+        success: false,
+        output: '',
+        error: `OLLAMA_EDITOR_HTTP_${response.status}:${redact(raw).slice(-1500)}`,
+        changedFiles: [],
+      };
+    }
+
+    const outer = JSON.parse(raw) as { response?: string; done?: boolean; error?: string };
+    if (outer.error || outer.done === false || typeof outer.response !== 'string') {
+      return {
+        success: false,
+        output: '',
+        error: `OLLAMA_EDITOR_INVALID_RESPONSE:${redact(outer.error ?? 'incomplete')}`,
+        changedFiles: [],
+      };
+    }
+
+    const envelope = parseLocalEditEnvelope(outer.response);
+    if (!envelope) {
+      return {
+        success: false,
+        output: redact(outer.response).slice(-3000),
+        error: 'OLLAMA_EDITOR_JSON_INVALID',
+        changedFiles: [],
+      };
+    }
+
+    let validated: ValidatedLocalEdits;
+    try {
+      validated = validateLocalFileEdits({
+        worktreePath: req.worktreePath,
+        edits: envelope.edits,
+        allowedPaths: req.allowedPaths,
+        forbiddenPaths: req.forbiddenPaths,
+        maxChangedLines: req.maxChangedLines,
+      });
+    } catch (error) {
+      return {
+        success: false,
+        output: redact(outer.response).slice(-3000),
+        error: redact(String(error)),
+        changedFiles: [],
+      };
+    }
+
+    applyValidatedLocalEdits(req.worktreePath, validated.edits);
+    return {
+      success: true,
+      output: `LOCAL_OLLAMA_EDITOR_APPLIED:${validated.edits.length} files:${validated.changedLines} changed-lines`,
+      error: '',
+      changedFiles: validated.edits.map(edit => edit.path),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      output: '',
+      error: controller.signal.aborted
+        ? 'PROVIDER_TIMEOUT:ollama-editor'
+        : `OLLAMA_EDITOR_REQUEST_FAILED:${redact(String(error))}`,
+      changedFiles: [],
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}

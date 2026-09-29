@@ -13,6 +13,7 @@ import {
   type ProviderRunResult
 } from './provider-mesh.js';
 import { execCodexTask, type CodexExecRequest } from './codex-adapter.js';
+import { runOllamaFileEditor } from './local-ollama-editor.js';
 import { redact } from './log-redactor.js';
 
 let meshHealth = createProviderHealth();
@@ -250,13 +251,18 @@ export async function executeTestDesignMulti(req: {
   taskId: string;
   prompt: string;
   worktreePath: string;
+  allowedPaths: string[];
+  forbiddenPaths: string[];
   timeoutSeconds?: number;
 }): Promise<MultiAgentExecutionResult> {
   return executeRolePrompt('TEST_DESIGNER', {
     prompt: req.prompt,
     cwd: req.worktreePath,
     mode: 'WORKSPACE_WRITE',
-    timeoutMs: (req.timeoutSeconds ?? 900) * 1000
+    timeoutMs: (req.timeoutSeconds ?? 900) * 1000,
+    allowedPaths: req.allowedPaths,
+    forbiddenPaths: req.forbiddenPaths,
+    maxChangedLines: 80,
   });
 }
 
@@ -268,6 +274,30 @@ export async function executeImplementationMulti(
   let sawAuth = false;
 
   for (const provider of candidates) {
+    if (provider === 'ollama') {
+      const local = await runOllamaFileEditor({
+        prompt: req.prompt,
+        worktreePath: req.worktreePath,
+        allowedPaths: req.allowedPaths,
+        forbiddenPaths: req.forbiddenPaths,
+        timeoutMs: providerAttemptTimeoutMs('IMPLEMENTER', providerIsProven(provider), (req.timeoutSeconds ?? 1800) * 1000, provider),
+        maxChangedLines: 200,
+      });
+      if (local.success) {
+        markProviderSuccess(meshHealth.ollama);
+        return {
+          provider,
+          success: true,
+          stdout: local.output,
+          stderr: '',
+          exitCode: 0,
+          blocked: false
+        };
+      }
+      markProviderFailure(meshHealth.ollama, local.error || 'LOCAL_OLLAMA_EDITOR_FAILED');
+      continue;
+    }
+
     if (provider === 'codex') {
       const result = await execCodexTask({
         ...req,
@@ -337,13 +367,50 @@ function normalizeProviderResult(result: ProviderRunResult): MultiAgentExecution
 
 async function executeRolePrompt(
   role: AgentRole,
-  req: { prompt: string; cwd: string; mode: 'READ_ONLY' | 'WORKSPACE_WRITE'; timeoutMs: number },
+  req: {
+    prompt: string;
+    cwd: string;
+    mode: 'READ_ONLY' | 'WORKSPACE_WRITE';
+    timeoutMs: number;
+    allowedPaths?: string[];
+    forbiddenPaths?: string[];
+    maxChangedLines?: number;
+  },
   exclude: ProviderId[] = []
 ): Promise<MultiAgentExecutionResult> {
   const candidates = orderedCandidates(role, exclude);
   let sawAuth = false;
 
   for (const provider of candidates) {
+    if (
+      provider === 'ollama' &&
+      req.mode === 'WORKSPACE_WRITE' &&
+      req.allowedPaths &&
+      req.forbiddenPaths
+    ) {
+      const local = await runOllamaFileEditor({
+        prompt: req.prompt,
+        worktreePath: req.cwd,
+        allowedPaths: req.allowedPaths,
+        forbiddenPaths: req.forbiddenPaths,
+        timeoutMs: providerAttemptTimeoutMs(role, providerIsProven(provider), req.timeoutMs, provider),
+        maxChangedLines: req.maxChangedLines ?? 80,
+      });
+      if (local.success) {
+        markProviderSuccess(meshHealth.ollama);
+        return {
+          provider,
+          success: true,
+          stdout: local.output,
+          stderr: '',
+          exitCode: 0,
+          blocked: false,
+        };
+      }
+      markProviderFailure(meshHealth.ollama, local.error || `${role}_LOCAL_EDITOR_FAILED`);
+      continue;
+    }
+
     const result = await runProviderPrompt({
       provider,
       prompt: req.prompt,

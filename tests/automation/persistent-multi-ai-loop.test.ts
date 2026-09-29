@@ -48,7 +48,8 @@ import {
   shouldRunPlanOnResume,
   shouldRunImplementationOnResume,
   coordinatorStateChanged,
-  classifyImplementationChanges
+  classifyImplementationChanges,
+  nextImplementationExclusions
 } from '../../automation/agent-bridge/src/task-runner.js';
 
 test('provider mesh registers cloud providers and prioritizes local Ollama for 24/7 continuity', () => {
@@ -574,4 +575,11 @@ test('local Ollama alone is sufficient to keep the autonomous supervisor impleme
 
   health.ollama.circuit = 'OPEN';
   assert.equal(hasImplementationProvider(health), false);
+});
+
+test('implementation no-change excludes that provider from the next retry cycle', () => {
+  assert.deepEqual(nextImplementationExclusions([], 'ollama', true), ['ollama']);
+  assert.deepEqual(nextImplementationExclusions(['ollama'], 'ollama', true), ['ollama']);
+  assert.deepEqual(nextImplementationExclusions(['ollama'], 'codex', true), ['ollama', 'codex']);
+  assert.deepEqual(nextImplementationExclusions(['ollama'], 'codex', false), ['ollama']);
 });

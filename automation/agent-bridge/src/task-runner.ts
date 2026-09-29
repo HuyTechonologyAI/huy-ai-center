@@ -81,6 +81,15 @@ export function classifyImplementationChanges(
   };
 }
 
+export function nextImplementationExclusions(
+  current: ProviderId[],
+  provider: ProviderId | undefined,
+  noChange: boolean
+): ProviderId[] {
+  if (!noChange || !provider || current.includes(provider)) return current;
+  return [...current, provider];
+}
+
 
 // ─────────────────────────────────────────────────
 // Entry point
@@ -237,6 +246,8 @@ export async function runTask(
     taskId: contract.taskId,
     prompt: testDesignPrompt,
     worktreePath: worktree.path,
+    allowedPaths: contract.scope.allowedPaths,
+    forbiddenPaths: contract.scope.forbiddenPaths,
     timeoutSeconds: Math.min(contract.execution.timeoutSeconds, 900),
   });
 
@@ -300,6 +311,7 @@ export async function runTask(
   let failedVerifications = "";
   let auditorFeedback = "";
   let scopeViolationNotes = "";
+  let implementationExclusions: ProviderId[] = [];
 
   if (!shouldRunImplementationOnResume(resumeCheckpoint)) {
     if (resumeCheckpoint?.stage === 'CROSS_REVIEW') {
@@ -352,7 +364,7 @@ export async function runTask(
       allowedPaths: contract.scope.allowedPaths,
       forbiddenPaths: contract.scope.forbiddenPaths,
       timeoutSeconds: contract.execution.timeoutSeconds,
-    });
+    }, implementationExclusions);
 
     const implementerProvider = implementationResult.provider as ProviderId | undefined;
 
@@ -428,7 +440,12 @@ export async function runTask(
       });
       state.result = result;
       writeArtifact(artifactDir, `execution-cycle-${cycle}.json`, result);
-      console.warn(`[task-runner] Cycle ${cycle} IMPLEMENTATION_NO_CHANGE, retrying with feedback...`);
+      implementationExclusions = nextImplementationExclusions(
+        implementationExclusions,
+        implementerProvider,
+        true
+      );
+      console.warn(`[task-runner] Cycle ${cycle} IMPLEMENTATION_NO_CHANGE, excluding ${implementerProvider ?? 'unknown'} and retrying...`);
       continue;
     }
 
