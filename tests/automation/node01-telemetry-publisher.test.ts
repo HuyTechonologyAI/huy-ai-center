@@ -6,6 +6,9 @@ import {
   deriveWorkExecution,
   deriveRemoteSyncStatus,
   parseGitAheadBehindCounts,
+  parseRuntimeWorkersFromPs,
+  normalizeA2ATimeline,
+  deriveRuntimeAgents,
   sanitizeProviderSnapshot,
   signTelemetryEnvelope,
   summarizeBacklogState,
@@ -92,4 +95,85 @@ it("maps git rev-list HEAD...upstream left/right counts to ahead/behind correctl
   assert.deepEqual(parseGitAheadBehindCounts("51\t0\n"), { ahead: 51, behind: 0 });
   assert.deepEqual(parseGitAheadBehindCounts("0 3"), { ahead: 0, behind: 3 });
   assert.equal(parseGitAheadBehindCounts("not-a-count"), null);
+});
+
+
+it("detects real cloud and local runtime workers from ps output", () => {
+  const workers = parseRuntimeWorkersFromPs([
+    "/usr/bin/node persistent-supervisor.ts",
+    "/home/huy/bin/codex exec --sandbox read-only task",
+    "/mnt/data1/HUY-AI/runtime/ollama/lib/ollama/llama-server --model qwen.gguf",
+    "/home/huy/.local/bin/agy -p task",
+  ].join("\n"));
+  assert.equal(workers.codex, 1);
+  assert.equal(workers.ollama, 1);
+  assert.equal(workers.antigravity, 1);
+  assert.equal(workers.claude, 0);
+  assert.equal(workers.gemini, 0);
+});
+
+it("normalizes an append-only checkpoint chain into chronological A2A events", () => {
+  const timeline = normalizeA2ATimeline([
+    {
+      checkpoint_id: "cp3", previous_checkpoint_id: "cp2", task_id: "08a-model-gateway",
+      stage: "DECOMPOSITION", owner_agent: "COORDINATOR", status: "VERIFIED",
+      completed_work: "Subtasks assigned", next_step: "TEST_DESIGN", created_at: "2026-09-29T03:39:51.901Z",
+    },
+    {
+      checkpoint_id: "cp2", previous_checkpoint_id: "cp1", task_id: "08a-model-gateway",
+      stage: "PLAN", owner_agent: "OLLAMA", status: "VERIFIED",
+      completed_work: "Plan contains steps", next_step: "DECOMPOSITION", created_at: "2026-09-29T03:39:51.899Z",
+    },
+    {
+      checkpoint_id: "cp1", previous_checkpoint_id: null, task_id: "08a-model-gateway",
+      stage: "RECEIVED", owner_agent: "COORDINATOR", status: "VERIFIED",
+      completed_work: "Eligible R0-R2 task", next_step: "PLAN", created_at: "2026-09-29T03:38:31.115Z",
+    },
+  ]);
+  assert.deepEqual(timeline.map(x => [x.sequence, x.stage, x.ownerAgent]), [
+    [1, "RECEIVED", "COORDINATOR"],
+    [2, "PLAN", "OLLAMA"],
+    [3, "DECOMPOSITION", "COORDINATOR"],
+  ]);
+  assert.equal(timeline[2].nextStep, "TEST_DESIGN");
+});
+
+it("derives logical runtime agents independently from the empty production agent registry", () => {
+  const agents = deriveRuntimeAgents({
+    supervisorState: "RUNNING",
+    workExecution: {
+      currentTask: "08a-model-gateway",
+      stage: "DECOMPOSITION",
+      checkpointStatus: "VERIFIED",
+      lastAction: "Subtasks assigned",
+      nextAction: "TEST_DESIGN",
+    },
+    runtimeWorkers: { ollama: 1, codex: 0, antigravity: 0 },
+    timeline: [
+      { sequence: 1, taskId: "08a-model-gateway", stage: "PLAN", ownerAgent: "OLLAMA", status: "VERIFIED", completedWork: "Plan", nextStep: "DECOMPOSITION", createdAt: "2026-09-29T03:39:51Z", checkpointId: "cp" }
+    ],
+  });
+  assert.ok(agents.some(x => x.id === "ollama-local" && x.provider === "ollama"));
+  assert.ok(agents.some(x => x.id === "coordinator" && x.role === "COORDINATOR"));
+  assert.ok(agents.some(x => x.role === "TEST_DESIGNER" && x.taskId === "08a-model-gateway"));
+});
+
+it("telemetry payload keeps bounded runtimeAgents and a2aTimeline while dropping secrets", () => {
+  const payload = buildTelemetryPayload({
+    timestamp: "2026-09-29T04:00:00.000Z",
+    status: "ONLINE",
+    metrics: { cpu: 25, ram: 50, disk: 70, ramFree: 4000, ramTotal: 8000, active: 1, queue: 2 },
+    metadata: {
+      runtimeAgents: [
+        { id: "ollama-local", role: "TEST_DESIGNER", provider: "ollama", state: "RUNNING", taskId: "08a", stage: "TEST_DESIGN" },
+      ],
+      a2aTimeline: [
+        { sequence: 1, taskId: "08a", stage: "PLAN", ownerAgent: "OLLAMA", status: "VERIFIED", completedWork: "Plan", nextStep: "TEST_DESIGN", createdAt: "2026-09-29T03:00:00Z", checkpointId: "abc" },
+      ],
+      secret: "DROP_ME",
+    },
+  });
+  assert.equal(payload.metadata.runtimeAgents?.[0]?.provider, "ollama");
+  assert.equal(payload.metadata.a2aTimeline?.[0]?.stage, "PLAN");
+  assert.equal("secret" in payload.metadata, false);
 });
