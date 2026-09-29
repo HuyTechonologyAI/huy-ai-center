@@ -11,6 +11,7 @@ import {
   parseLocalPatchEnvelope,
   materializeLocalPatchOperations,
   normalizeLocalPatchOperationsForPolicy,
+  validateGeneratedTestQuality,
 } from '../../automation/agent-bridge/src/local-ollama-editor.js';
 
 test('local editor parses exact structured JSON and rejects malformed payloads', () => {
@@ -145,7 +146,7 @@ test('TEST_FILES_ONLY policy rejects README edits and permits recognized test fi
 
   const allowed = validateLocalFileEdits({
     worktreePath: root,
-    edits: [{ path: 'tests/fixture/acceptance.test.mjs', content: 'export {};\n' }],
+    edits: [{ path: 'tests/fixture/acceptance.test.mjs', content: "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { existsSync } from 'node:fs';\ntest('fixture',()=>assert.equal(typeof existsSync,'function'));\n" }],
     allowedPaths: ['tests/fixture/'],
     forbiddenPaths: [],
     maxChangedLines: 20,
@@ -166,5 +167,24 @@ test('TEST_FILES_ONLY may normalize append-to-missing test file into create with
   assert.deepEqual(
     normalizeLocalPatchOperationsForPolicy(root, [op], 'ANY_ALLOWED'),
     [op]
+  );
+});
+
+
+test('generated JS/TS test quality gate rejects framework drift, comments-only assertions and tautologies', () => {
+  assert.throws(
+    () => validateGeneratedTestQuality('tests/x.test.ts', "import { describe, it, expect } from 'node:test';\nimport assert from 'node:assert/strict';\n// assert.ok(config)\n"),
+    /LOCAL_TEST_INVALID_NODE_IMPORT/
+  );
+  assert.throws(
+    () => validateGeneratedTestQuality('tests/x.test.ts', "import test from 'node:test';\nimport assert from 'node:assert/strict';\ntest('x',()=>{ \/\/ assert.ok(config)\n});\n"),
+    /LOCAL_TEST_ASSERTION_REQUIRED/
+  );
+  assert.throws(
+    () => validateGeneratedTestQuality('tests/x.test.ts', "import test from 'node:test';\nimport assert from 'node:assert/strict';\ntest('x',()=>assert.ok(true));\n"),
+    /LOCAL_TEST_TAUTOLOGY_DENIED/
+  );
+  assert.doesNotThrow(
+    () => validateGeneratedTestQuality('tests/x.test.ts', "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { existsSync } from 'node:fs';\ntest('x',()=>assert.equal(existsSync('config/model-gateway/routing-policy.json'),false));\n")
   );
 });

@@ -31,6 +31,36 @@ export interface ValidatedLocalEdits {
   changedLines: number;
 }
 
+export function validateGeneratedTestQuality(path: string, content: string): void {
+  if (!/\.(?:[cm]?[jt]sx?|mts|cts)$/i.test(path)) return;
+  if (!/from\s+['"]node:test['"]|require\(['"]node:test['"]\)/.test(content)) {
+    throw new Error(`LOCAL_TEST_NODE_RUNNER_REQUIRED:${path}`);
+  }
+  if (!/node:assert\/strict/.test(content)) {
+    throw new Error(`LOCAL_TEST_ASSERT_LIBRARY_REQUIRED:${path}`);
+  }
+  if (/from\s+['"](?:vitest|jest|mocha)['"]|require\(['"](?:vitest|jest|mocha)['"]\)/i.test(content)) {
+    throw new Error(`LOCAL_TEST_EXTERNAL_FRAMEWORK_DENIED:${path}`);
+  }
+  if (/import\s*\{[^}]*\bexpect\b[^}]*\}\s*from\s*['"]node:test['"]/s.test(content)) {
+    throw new Error(`LOCAL_TEST_INVALID_NODE_IMPORT:${path}`);
+  }
+  const executable = content
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map(line => line.replace(/\/\/.*$/, ''))
+    .join('\n');
+  if (!/\bassert(?:\.[A-Za-z_$][\w$]*)?\s*\(/.test(executable)) {
+    throw new Error(`LOCAL_TEST_ASSERTION_REQUIRED:${path}`);
+  }
+  if (/\bassert\.(?:ok)\s*\(\s*true\s*\)|\bassert\.(?:equal|strictEqual)\s*\(\s*true\s*,\s*true\s*\)/.test(executable)) {
+    throw new Error(`LOCAL_TEST_TAUTOLOGY_DENIED:${path}`);
+  }
+  if (!/(?:from\s+['"]\.\.?\/|require\(['"]\.\.?\/|import\(['"]\.\.?\/|node:fs)/.test(executable)) {
+    throw new Error(`LOCAL_TEST_IMPLEMENTATION_REFERENCE_REQUIRED:${path}`);
+  }
+}
+
 export interface LocalOllamaEditRequest {
   prompt: string;
   worktreePath: string;
@@ -308,8 +338,11 @@ export function validateLocalFileEdits(params: {
     if (params.allowedPaths.length > 0 && !params.allowedPaths.some(pattern => matchesPattern(path, pattern))) {
       throw new Error(`LOCAL_EDIT_OUT_OF_SCOPE:${path}`);
     }
-    if (params.writePolicy === 'TEST_FILES_ONLY' && !isRecognizedTestFilePath(path)) {
-      throw new Error(`LOCAL_EDIT_TEST_FILE_REQUIRED:${path}`);
+    if (params.writePolicy === 'TEST_FILES_ONLY') {
+      if (!isRecognizedTestFilePath(path)) {
+        throw new Error(`LOCAL_EDIT_TEST_FILE_REQUIRED:${path}`);
+      }
+      validateGeneratedTestQuality(path, edit.content);
     }
 
     const absolute = resolve(params.worktreePath, path);
@@ -404,10 +437,12 @@ function snapshotAllowedFiles(worktreePath: string, allowedPaths: string[]): str
 
 export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<LocalOllamaEditResult> {
   let snapshot = '';
-  try {
-    snapshot = snapshotAllowedFiles(req.worktreePath, req.allowedPaths);
-  } catch (error) {
-    return { success: false, output: '', error: redact(String(error)), changedFiles: [] };
+  if (req.writePolicy !== 'TEST_FILES_ONLY') {
+    try {
+      snapshot = snapshotAllowedFiles(req.worktreePath, req.allowedPaths);
+    } catch (error) {
+      return { success: false, output: '', error: redact(String(error)), changedFiles: [] };
+    }
   }
 
   const editorPrompt = [
@@ -431,8 +466,10 @@ export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<
     'TASK INSTRUCTIONS:',
     req.prompt,
     '',
-     'CURRENT ALLOWED-SCOPE FILE SNAPSHOTS:',
-    snapshot || '(no tracked text files currently exist in allowed scope)',
+    'CURRENT ALLOWED-SCOPE FILE SNAPSHOTS:',
+    req.writePolicy === 'TEST_FILES_ONLY'
+      ? '(omitted intentionally: test design is isolated from production source context)'
+      : snapshot || '(no tracked text files currently exist in allowed scope)',
   ].join('\n');
 
   const controller = new AbortController();

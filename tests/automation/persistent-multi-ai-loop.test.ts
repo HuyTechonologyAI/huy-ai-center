@@ -31,6 +31,8 @@ import {
   providerIsProven,
   buildPlanningPrompt,
   buildTestDesignPrompt,
+  buildLocalTestDesignerPrompt,
+  buildLocalCorrectionPrompt,
   planningPrompt,
   parseAuditDecision
 } from '../../automation/agent-bridge/src/multi-agent-adapter.js';
@@ -375,7 +377,7 @@ test('edit-budget-aware prompts enforce test designer and implementer line limit
     planSteps: [
       { stepIndex: 1, description: 'Design test fixture within pre-implementation budget' }
     ],
-    allowedPaths: ['tests/automation/persistent-multi-ai-loop.test.ts'],
+    allowedPaths: ['tests/'],
     forbiddenPaths: ['.env'],
     verification: ['npm test']
   });
@@ -383,6 +385,12 @@ test('edit-budget-aware prompts enforce test designer and implementer line limit
   assert.match(testDesignPrompt, /pre-implementation budget/i);
   assert.match(testDesignPrompt, /at most 80 changed lines/i);
   assert.match(testDesignPrompt, /hard final total edit budget is 200 lines/i);
+  assert.match(testDesignPrompt, /recognized test filename/i);
+  assert.match(testDesignPrompt, /node:test/);
+  assert.match(testDesignPrompt, /node:assert\/strict/);
+  assert.match(testDesignPrompt, /never use tautological assertions/i);
+  assert.match(testDesignPrompt, /tests\/automation\/task-budget-test\.test\.ts/);
+  assert.match(testDesignPrompt, /config\.json.*ignore.*test/i);
 
   const implementerPrompt = buildImplementationPrompt({
     taskId: 'task-budget-impl',
@@ -582,4 +590,28 @@ test('implementation no-change excludes that provider from the next retry cycle'
   assert.deepEqual(nextImplementationExclusions(['ollama'], 'ollama', true), ['ollama']);
   assert.deepEqual(nextImplementationExclusions(['ollama'], 'codex', true), ['ollama', 'codex']);
   assert.deepEqual(nextImplementationExclusions(['ollama'], 'codex', false), ['ollama']);
+});
+
+
+test('local test designer correction prompt preserves task context and exposes host rejection', () => {
+  const repaired = buildLocalCorrectionPrompt('ORIGINAL TASK', 'LOCAL_TEST_INVALID_NODE_IMPORT:tests/x.test.ts');
+  assert.match(repaired, /ORIGINAL TASK/);
+  assert.match(repaired, /LOCAL_TEST_INVALID_NODE_IMPORT/);
+  assert.match(repaired, /node:test/);
+  assert.match(repaired, /node:assert\/strict/);
+  assert.match(repaired, /real relative import or node:fs artifact/i);
+});
+
+
+test('local test designer prompt isolates implementation plan noise and pins a deterministic test artifact', () => {
+  const compact = buildLocalTestDesignerPrompt(
+    '08a-model-gateway',
+    'Task ID: 08a-model-gateway\nObjective: Implement deterministic T0-T4 model routing.\nVerification commands that will later run: npm run test:core | npm run build\nApproved plan:\n1. touch tests/model-gateway/config.json\n2. create apps/model-gateway/config.json'
+  );
+  assert.match(compact, /tests\/automation\/08a-model-gateway\.test\.ts/);
+  assert.match(compact, /deterministic T0-T4 model routing/);
+  assert.match(compact, /node:test/);
+  assert.match(compact, /node:assert\/strict/);
+  assert.doesNotMatch(compact, /touch tests\/model-gateway\/config\.json/);
+  assert.doesNotMatch(compact, /apps\/model-gateway\/config\.json/);
 });

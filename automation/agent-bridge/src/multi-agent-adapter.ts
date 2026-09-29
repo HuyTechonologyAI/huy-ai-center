@@ -222,6 +222,14 @@ export function buildTestDesignPrompt(params: {
   forbiddenPaths: string[];
   verification: string[];
 }): string {
+  const safeTaskId = params.taskId.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 80);
+  const hasTestScope = params.allowedPaths.some(path =>
+    path === 'tests' || path === 'tests/' || path.startsWith('tests/')
+  );
+  const suggestedTestPath = hasTestScope
+    ? `tests/automation/${safeTaskId}.test.ts`
+    : null;
+
   return [
     `Task ID: ${params.taskId}`,
     `Objective: ${params.objective}`,
@@ -229,7 +237,15 @@ export function buildTestDesignPrompt(params: {
     'You are the TEST_DESIGNER. This stage runs BEFORE implementation.',
     'Create or update tests only. Do not modify production implementation files.',
     'Predict failure modes, edge cases, security cases, rollback cases and malformed inputs.',
-    'Tests should fail against missing/incorrect implementation when applicable.',
+    'Tests MUST fail against missing or incorrect implementation; never use tautological assertions such as true === true.',
+    'Every generated JavaScript/TypeScript test MUST contain at least one executable assert(...) or assert.*(...) call; comments and example assertions do not count.',
+    'Every assertion must inspect a real repository artifact using a relative import or node:fs. Do not test placeholder null/object values that are created inside the test.',
+    'Do not leave empty assertion callbacks or commented-out examples.',
+    'Do not import expect from node:test.',
+    'Do not introduce a new test framework or dependency. For JavaScript/TypeScript, use node:test and node:assert/strict.',
+    'Use only a recognized test filename (*.test.*, *.spec.*, test_*.py, *_test.*, *.feature, *.snap).',
+    'If an approved plan proposes config.json or another non-test filename under tests/, ignore that filename and create a recognized test file instead.',
+    ...(suggestedTestPath ? [`Preferred deterministic test path: ${suggestedTestPath}`] : []),
     `Allowed paths: ${params.allowedPaths.join(', ')}`,
     `Forbidden paths: ${params.forbiddenPaths.join(', ')}`,
     `Verification commands that will later run: ${params.verification.join(' | ')}`,
@@ -247,6 +263,24 @@ export function buildTestDesignPrompt(params: {
   ].join('\n');
 }
 
+export function buildLocalTestDesignerPrompt(taskId: string, fullPrompt: string): string {
+  const objective = fullPrompt.match(/^Objective:\s*(.+)$/m)?.[1]?.trim() ?? 'Design regression tests for the approved task objective.';
+  const verification = fullPrompt.match(/^Verification commands that will later run:\s*(.+)$/m)?.[1]?.trim() ?? 'project verification suite';
+  const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 80);
+  return [
+    `Task ID: ${taskId}`,
+    `Objective: ${objective}`,
+    'Role: TEST_DESIGNER. Create tests only; implementation does not exist yet.',
+    `Create exactly one concise pre-implementation test file at tests/automation/${safeTaskId}.test.ts.`,
+    'Use node:test and node:assert/strict only. Do not import expect.',
+    'Tests must inspect real future repository artifacts via node:fs or relative import and must fail while the implementation/config is missing.',
+    'Cover the objective with concrete deterministic behavior, malformed inputs, policy ceilings/fail-closed behavior, and local-fallback safety when relevant.',
+    'Never create placeholder mocks, empty callbacks, commented-out examples, tautologies, config.json test files, or new dependencies.',
+    `Later verification: ${verification}`,
+    'Return only the JSON patch envelope required by the repository patch editor.',
+  ].join('\n');
+}
+
 export async function executeTestDesignMulti(req: {
   taskId: string;
   prompt: string;
@@ -257,6 +291,7 @@ export async function executeTestDesignMulti(req: {
 }): Promise<MultiAgentExecutionResult> {
   return executeRolePrompt('TEST_DESIGNER', {
     prompt: req.prompt,
+    localPrompt: buildLocalTestDesignerPrompt(req.taskId, req.prompt),
     cwd: req.worktreePath,
     mode: 'WORKSPACE_WRITE',
     timeoutMs: (req.timeoutSeconds ?? 900) * 1000,
@@ -366,6 +401,17 @@ function normalizeProviderResult(result: ProviderRunResult): MultiAgentExecution
   };
 }
 
+export function buildLocalCorrectionPrompt(prompt: string, error: string): string {
+  return [
+    prompt,
+    '',
+    'CORRECTION REQUIRED BY HOST VALIDATOR:',
+    error,
+    'Return a corrected JSON patch only.',
+    'For TEST_DESIGNER: use node:test + node:assert/strict, do not import expect, and assert against a real relative import or node:fs artifact.',
+  ].join('\n');
+}
+
 async function executeRolePrompt(
   role: AgentRole,
   req: {
@@ -377,6 +423,7 @@ async function executeRolePrompt(
     forbiddenPaths?: string[];
     maxChangedLines?: number;
     writePolicy?: 'ANY_ALLOWED' | 'TEST_FILES_ONLY';
+    localPrompt?: string;
   },
   exclude: ProviderId[] = []
 ): Promise<MultiAgentExecutionResult> {
@@ -390,15 +437,26 @@ async function executeRolePrompt(
       req.allowedPaths &&
       req.forbiddenPaths
     ) {
-      const local = await runOllamaFileEditor({
-        prompt: req.prompt,
+      const localRequest = {
         worktreePath: req.cwd,
         allowedPaths: req.allowedPaths,
         forbiddenPaths: req.forbiddenPaths,
         timeoutMs: providerAttemptTimeoutMs(role, providerIsProven(provider), req.timeoutMs, provider),
         maxChangedLines: req.maxChangedLines ?? 80,
         writePolicy: req.writePolicy,
-      });
+      };
+      const localPrompt = req.localPrompt ?? req.prompt;
+      let local = await runOllamaFileEditor({ prompt: localPrompt, ...localRequest });
+      if (
+        !local.success &&
+        role === 'TEST_DESIGNER' &&
+        /^(?:OLLAMA_EDITOR_JSON_INVALID|Error: LOCAL_TEST_|LOCAL_TEST_)/.test(local.error)
+      ) {
+        local = await runOllamaFileEditor({
+          prompt: buildLocalCorrectionPrompt(localPrompt, local.error),
+          ...localRequest,
+        });
+      }
       if (local.success) {
         markProviderSuccess(meshHealth.ollama);
         return {
