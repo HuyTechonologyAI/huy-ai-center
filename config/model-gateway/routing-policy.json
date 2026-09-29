@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "productionEnabled": false,
+  "routes": {
+    "T0": { "engine": "deterministic" },
+    "T1": { "engine": "local" },
+    "T2": { "engine": "cloud-economy" },
+    "T3": { "engine": "cloud-premium" },
+    "T4": { "engine": "human" }
+  }
+}
