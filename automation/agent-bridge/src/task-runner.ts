@@ -90,6 +90,10 @@ export function nextImplementationExclusions(
   return [...current, provider];
 }
 
+export function nextCorrectionExclusions(provider: ProviderId | undefined): ProviderId[] {
+  return provider ? [provider] : [];
+}
+
 
 // ─────────────────────────────────────────────────
 // Entry point
@@ -587,8 +591,9 @@ export async function runTask(
       break;
     }
 
-    // CORRECTION_REQUIRED / FAIL -> continue loop
-    console.log(`[task-runner] Cycle ${cycle} → ${result.status}, retrying with feedback...`);
+    // CORRECTION_REQUIRED / FAIL -> rotate away from the immediately failing implementer.
+    implementationExclusions = nextCorrectionExclusions(implementerProvider);
+    console.log(`[task-runner] Cycle ${cycle} → ${result.status}, retrying with feedback via alternate implementer...`);
   }
 
   // Max cycles exhausted

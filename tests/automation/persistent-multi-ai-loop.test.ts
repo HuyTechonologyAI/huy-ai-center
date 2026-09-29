@@ -51,7 +51,8 @@ import {
   shouldRunImplementationOnResume,
   coordinatorStateChanged,
   classifyImplementationChanges,
-  nextImplementationExclusions
+  nextImplementationExclusions,
+  nextCorrectionExclusions
 } from '../../automation/agent-bridge/src/task-runner.js';
 
 test('provider mesh registers cloud providers and prioritizes local Ollama for 24/7 continuity', () => {
@@ -629,4 +630,11 @@ test('local test designer keeps generated test inside the declared writable test
   );
   assert.match(prompt, /tests\/fixtures\/agent-bridge-dry-run\/bridge-e2e-live-12345678-1234-1234-1234-123456789abc\.test\.ts/);
   assert.doesNotMatch(prompt, /tests\/automation\/bridge-e2e-live/);
+});
+
+
+test('correction retry rotates away from the immediately failing implementer without exhausting all providers', () => {
+  assert.deepEqual(nextCorrectionExclusions('ollama'), ['ollama']);
+  assert.deepEqual(nextCorrectionExclusions('codex'), ['codex']);
+  assert.deepEqual(nextCorrectionExclusions(undefined), []);
 });
