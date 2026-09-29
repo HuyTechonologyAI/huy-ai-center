@@ -38,6 +38,7 @@ export interface LocalOllamaEditRequest {
   forbiddenPaths: string[];
   timeoutMs: number;
   maxChangedLines: number;
+  writePolicy?: 'ANY_ALLOWED' | 'TEST_FILES_ONLY';
 }
 
 export interface LocalOllamaEditResult {
@@ -72,6 +73,21 @@ function matchesPattern(path: string, pattern: string): boolean {
   if (normalized.includes('*')) return globToRegex(normalized).test(p);
   if (normalized.endsWith('/')) return p.startsWith(normalized);
   return p === normalized || p.startsWith(`${normalized}/`);
+}
+
+export function isRecognizedTestFilePath(filePath: string): boolean {
+  const normalized = normalizeRepoPath(filePath);
+  const base = normalized.split('/').at(-1)?.toLowerCase() ?? '';
+  return (
+    /\.(test|spec)\.[a-z0-9]+$/.test(base) ||
+    /^test_.+\.[a-z0-9]+$/.test(base) ||
+    /_test\.[a-z0-9]+$/.test(base) ||
+    /test\.(java|kt|kts)$/.test(base) ||
+    /tests\.(cs|fs)$/.test(base) ||
+    base === 'conftest.py' ||
+    base.endsWith('.feature') ||
+    base.endsWith('.snap')
+  );
 }
 
 function assertSafePath(worktreePath: string, filePath: string): string {
@@ -154,6 +170,21 @@ export function parseLocalPatchEnvelope(raw: string): { operations: LocalPatchOp
   } catch {
     return null;
   }
+}
+
+export function normalizeLocalPatchOperationsForPolicy(
+  worktreePath: string,
+  operations: LocalPatchOperation[],
+  writePolicy: 'ANY_ALLOWED' | 'TEST_FILES_ONLY' = 'ANY_ALLOWED'
+): LocalPatchOperation[] {
+  if (writePolicy !== 'TEST_FILES_ONLY') return operations;
+
+  return operations.map(operation => {
+    if (operation.op !== 'append_text' || !isRecognizedTestFilePath(operation.path)) return operation;
+    const path = assertSafePath(worktreePath, operation.path);
+    if (existsSync(resolve(worktreePath, path))) return operation;
+    return { op: 'create_file', path, content: operation.text };
+  });
 }
 
 function readPatchFile(worktreePath: string, path: string): string {
@@ -256,6 +287,7 @@ export function validateLocalFileEdits(params: {
   allowedPaths: string[];
   forbiddenPaths: string[];
   maxChangedLines: number;
+  writePolicy?: 'ANY_ALLOWED' | 'TEST_FILES_ONLY';
 }): ValidatedLocalEdits {
   if (!Array.isArray(params.edits) || params.edits.length === 0 || params.edits.length > 12) {
     throw new Error('LOCAL_EDIT_COUNT_INVALID');
@@ -275,6 +307,9 @@ export function validateLocalFileEdits(params: {
     }
     if (params.allowedPaths.length > 0 && !params.allowedPaths.some(pattern => matchesPattern(path, pattern))) {
       throw new Error(`LOCAL_EDIT_OUT_OF_SCOPE:${path}`);
+    }
+    if (params.writePolicy === 'TEST_FILES_ONLY' && !isRecognizedTestFilePath(path)) {
+      throw new Error(`LOCAL_EDIT_TEST_FILE_REQUIRED:${path}`);
     }
 
     const absolute = resolve(params.worktreePath, path);
@@ -386,6 +421,9 @@ export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<
     'Only edit paths explicitly inside Allowed paths. Never edit Forbidden paths.',
     'Preserve existing file content unless the task requires a change.',
     'Create new files only when required by the task.',
+    req.writePolicy === 'TEST_FILES_ONLY'
+      ? 'WRITE POLICY: TEST_FILES_ONLY. Every edited or created path MUST be a recognized test/spec filename such as *.test.*, *.spec.*, test_*.py, *_test.*, *.feature or *.snap. Do not edit README or implementation files.'
+      : 'WRITE POLICY: ANY_ALLOWED within the bounded task scope.',
     `Maximum changed-line budget: ${req.maxChangedLines}.`,
     `Allowed paths: ${req.allowedPaths.join(', ') || 'none'}`,
     `Forbidden paths: ${req.forbiddenPaths.join(', ') || 'none'}`,
@@ -451,7 +489,14 @@ export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<
     let validated: ValidatedLocalEdits;
     try {
       const edits = patchEnvelope
-        ? materializeLocalPatchOperations(req.worktreePath, patchEnvelope.operations)
+        ? materializeLocalPatchOperations(
+            req.worktreePath,
+            normalizeLocalPatchOperationsForPolicy(
+              req.worktreePath,
+              patchEnvelope.operations,
+              req.writePolicy ?? 'ANY_ALLOWED'
+            )
+          )
         : legacyEnvelope!.edits;
       validated = validateLocalFileEdits({
         worktreePath: req.worktreePath,
@@ -459,6 +504,7 @@ export async function runOllamaFileEditor(req: LocalOllamaEditRequest): Promise<
         allowedPaths: req.allowedPaths,
         forbiddenPaths: req.forbiddenPaths,
         maxChangedLines: req.maxChangedLines,
+        writePolicy: req.writePolicy,
       });
     } catch (error) {
       return {

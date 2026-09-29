@@ -10,6 +10,7 @@ import {
   parseLocalEditEnvelope,
   parseLocalPatchEnvelope,
   materializeLocalPatchOperations,
+  normalizeLocalPatchOperationsForPolicy,
 } from '../../automation/agent-bridge/src/local-ollama-editor.js';
 
 test('local editor parses exact structured JSON and rejects malformed payloads', () => {
@@ -126,4 +127,44 @@ test('local patch operations materialize concise edits and fail closed on ambigu
   assert.throws(() => materializeLocalPatchOperations(root, [
     { op: 'replace_text', path: 'tests/safe/ambiguous.txt', oldText: 'OLD', newText: 'NEW' },
   ]), /LOCAL_PATCH_REPLACE_AMBIGUOUS/);
+});
+
+test('TEST_FILES_ONLY policy rejects README edits and permits recognized test files', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ollama-editor-test-policy-'));
+  mkdirSync(join(root, 'tests', 'fixture'), { recursive: true });
+  writeFileSync(join(root, 'tests', 'fixture', 'README.md'), 'baseline\n');
+
+  assert.throws(() => validateLocalFileEdits({
+    worktreePath: root,
+    edits: [{ path: 'tests/fixture/README.md', content: 'changed\n' }],
+    allowedPaths: ['tests/fixture/'],
+    forbiddenPaths: [],
+    maxChangedLines: 20,
+    writePolicy: 'TEST_FILES_ONLY',
+  }), /LOCAL_EDIT_TEST_FILE_REQUIRED/);
+
+  const allowed = validateLocalFileEdits({
+    worktreePath: root,
+    edits: [{ path: 'tests/fixture/acceptance.test.mjs', content: 'export {};\n' }],
+    allowedPaths: ['tests/fixture/'],
+    forbiddenPaths: [],
+    maxChangedLines: 20,
+    writePolicy: 'TEST_FILES_ONLY',
+  });
+  assert.equal(allowed.edits[0].path, 'tests/fixture/acceptance.test.mjs');
+});
+
+test('TEST_FILES_ONLY may normalize append-to-missing test file into create without relaxing general edits', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ollama-editor-normalize-'));
+  mkdirSync(join(root, 'tests', 'fixture'), { recursive: true });
+  const op = { op: 'append_text' as const, path: 'tests/fixture/acceptance.test.mjs', text: 'export {};\n' };
+
+  assert.deepEqual(
+    normalizeLocalPatchOperationsForPolicy(root, [op], 'TEST_FILES_ONLY'),
+    [{ op: 'create_file', path: op.path, content: op.text }]
+  );
+  assert.deepEqual(
+    normalizeLocalPatchOperationsForPolicy(root, [op], 'ANY_ALLOWED'),
+    [op]
+  );
 });

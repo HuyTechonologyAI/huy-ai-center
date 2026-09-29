@@ -263,6 +263,7 @@ export async function executeTestDesignMulti(req: {
     allowedPaths: req.allowedPaths,
     forbiddenPaths: req.forbiddenPaths,
     maxChangedLines: 80,
+    writePolicy: 'TEST_FILES_ONLY',
   });
 }
 
@@ -375,6 +376,7 @@ async function executeRolePrompt(
     allowedPaths?: string[];
     forbiddenPaths?: string[];
     maxChangedLines?: number;
+    writePolicy?: 'ANY_ALLOWED' | 'TEST_FILES_ONLY';
   },
   exclude: ProviderId[] = []
 ): Promise<MultiAgentExecutionResult> {
@@ -395,6 +397,7 @@ async function executeRolePrompt(
         forbiddenPaths: req.forbiddenPaths,
         timeoutMs: providerAttemptTimeoutMs(role, providerIsProven(provider), req.timeoutMs, provider),
         maxChangedLines: req.maxChangedLines ?? 80,
+        writePolicy: req.writePolicy,
       });
       if (local.success) {
         markProviderSuccess(meshHealth.ollama);
