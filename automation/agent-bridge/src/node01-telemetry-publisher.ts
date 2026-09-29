@@ -122,6 +122,17 @@ function checkpointHistory(taskId:string){
     return normalizeA2ATimeline(raw);
   }catch{return [];}
 }
+export function selectTimelineTaskId(currentTask:string,currentHasHistory:boolean,latestTask?:string){
+  return currentHasHistory ? currentTask : latestTask || currentTask;
+}
+function latestCheckpointTaskId(){
+  try{
+    const root=join(ROOT,".artifacts","agent-bridge","checkpoints");
+    return readdirSync(root).map(taskId=>({taskId,cp:latestCheckpoint(taskId)}))
+      .filter((x:any)=>x.cp?.created_at)
+      .sort((a:any,b:any)=>String(b.cp.created_at).localeCompare(String(a.cp.created_at)))[0]?.taskId;
+  }catch{return undefined;}
+}
 export async function publishOnce(){
   if(!existsSync(KEY)) throw Error("TELEMETRY_PRIVATE_KEY_MISSING");
   const hb=json(join(STATE,"supervisors","persistent-multi-ai-heartbeat.json"))??{};
@@ -133,7 +144,9 @@ export async function publishOnce(){
     ? hb.taskId
     : Object.entries(backlog as any).find(([,v]:any)=>["RUNNING","BLOCKED","HUMAN_GATE"].includes(v?.status))?.[0] ?? "NONE";
   const workExecution=deriveWorkExecution({supervisor:hb,backlog,checkpoint:latestCheckpoint(currentTask)});
-  const timeline=checkpointHistory(currentTask);
+  const currentTimeline=checkpointHistory(currentTask);
+  const timelineTask=selectTimelineTaskId(currentTask,currentTimeline.length>0,latestCheckpointTaskId());
+  const timeline=timelineTask===currentTask?currentTimeline:checkpointHistory(timelineTask);
   const handoffs=deriveHandoffs(timeline);
   const providerAttempts=deriveProviderAttempts(timeline);
   const runtimeAgents=deriveRuntimeAgents({supervisorState:String(hb.state??"UNKNOWN"),workExecution,runtimeWorkers:rw,timeline});

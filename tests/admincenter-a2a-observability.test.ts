@@ -96,3 +96,32 @@ test("telemetry route defers Supabase admin initialization until request time", 
   assert.doesNotMatch(source, /^import\s+\{\s*supabaseAdmin\s*\}/m);
   assert.match(source, /await import\(["']@\/lib\/supabase-admin["']\)/);
 });
+
+
+test("AdminCenter session token is signed, expires, and rejects tampering", async () => {
+  const { signAdminSession, verifyAdminSession } = await import(
+    "../apps/control-center/src/lib/admincenter-session.js"
+  );
+  const secret = "test-secret-with-sufficient-entropy";
+  const issuedAt = Date.parse("2026-09-29T10:00:00.000Z");
+  const token = signAdminSession("SuperAdmin", secret, issuedAt, 60_000);
+  assert.equal(verifyAdminSession(token, secret, issuedAt + 30_000)?.username, "SuperAdmin");
+  assert.equal(verifyAdminSession(token + "x", secret, issuedAt + 30_000), null);
+  assert.equal(verifyAdminSession(token, secret, issuedAt + 60_001), null);
+});
+
+test("AdminCenter server routes no longer trust the literal authenticated cookie", () => {
+  const auth = readFileSync(new URL("../apps/control-center/src/app/api/admincenter/auth/route.ts", import.meta.url), "utf8");
+  const system = readFileSync(new URL("../apps/control-center/src/app/api/admincenter/system/route.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(auth, /sessionCookie\s*===\s*["']authenticated["']/);
+  assert.doesNotMatch(system, /sessionCookie\s*!==\s*["']authenticated["']/);
+  assert.match(auth, /verifyAdminSession/);
+  assert.match(system, /verifyAdminSession/);
+});
+
+test("AdminCenter password state persists through Supabase instead of serverless filesystem", () => {
+  const auth = readFileSync(new URL("../apps/control-center/src/app/api/admincenter/auth/route.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(auth, /writeFileSync|AUTH_FILE_PATH/);
+  assert.match(auth, /cms_settings/);
+  assert.match(auth, /admincenter_auth/);
+});

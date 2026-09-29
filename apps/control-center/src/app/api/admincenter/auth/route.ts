@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import {
+  adminSessionSecret,
+  signAdminSession,
+  verifyAdminSession,
+} from "@/lib/admincenter-session";
+
+export const runtime = "nodejs";
 
 interface StoredAuth {
   username: string;
@@ -12,225 +17,172 @@ interface StoredAuth {
   updatedAt: string;
 }
 
-const AUTH_FILE_PATH = join(process.cwd(), "src", "data", "admincenter-auth.json");
 const DEFAULT_USERNAME = "SuperAdmin";
-const INITIAL_DEFAULT_PASSWORD = "admin2026";
-
+const AUTH_SETTING_KEY = "admincenter_auth";
 function hashPassword(password: string, salt: string): string {
-  return createHash("sha256").update(password + salt + "huy-ai-center-salt-2026").digest("hex");
+  return scryptSync(password, salt, 32).toString("hex");
 }
 
-function getStoredAuth(): StoredAuth | null {
+function safeHashEqual(left: string, right: string): boolean {
   try {
-    if (existsSync(AUTH_FILE_PATH)) {
-      const data = readFileSync(AUTH_FILE_PATH, "utf8");
-      return JSON.parse(data);
-    }
-  } catch (err) {
-    console.error("Error reading auth file:", err);
-  }
-  return null;
-}
-
-function saveStoredAuth(auth: StoredAuth) {
-  try {
-    const dir = join(process.cwd(), "src", "data");
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-    writeFileSync(AUTH_FILE_PATH, JSON.stringify(auth, null, 2), "utf8");
-  } catch (err) {
-    console.error("Error saving auth file:", err);
+    const a = Buffer.from(left, "hex");
+    const b = Buffer.from(right, "hex");
+    return a.length === b.length && a.length > 0 && timingSafeEqual(a, b);
+  } catch {
+    return false;
   }
 }
 
-// GET /api/admincenter/auth - Check current session
-export async function GET() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("admincenter_session")?.value;
-  const mustChangeCookie = cookieStore.get("admincenter_must_change")?.value;
+function isStoredAuth(value: unknown): value is StoredAuth {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Partial<StoredAuth>;
+  return typeof row.username === "string" &&
+    typeof row.salt === "string" &&
+    typeof row.hash === "string" &&
+    typeof row.isInitialDefault === "boolean" &&
+    typeof row.updatedAt === "string";
+}
+async function getStoredAuth(): Promise<StoredAuth | null> {
+  const { supabaseAdmin } = await import("@/lib/supabase-admin");
+  const { data, error } = await supabaseAdmin
+    .schema("public")
+    .from("cms_settings")
+    .select("setting_value")
+    .eq("key_name", AUTH_SETTING_KEY)
+    .maybeSingle();
+  if (error) throw new Error("ADMINCENTER_AUTH_READ_FAILED");
+  return isStoredAuth(data?.setting_value) ? data.setting_value : null;
+}
 
-  if (sessionCookie === "authenticated") {
-    return NextResponse.json({
-      authenticated: true,
-      user: DEFAULT_USERNAME,
-      mustChangePassword: mustChangeCookie === "true",
-    });
-  }
-
-  return NextResponse.json({
-    authenticated: false,
-    user: null,
-    mustChangePassword: false,
+async function saveStoredAuth(auth: StoredAuth): Promise<void> {
+  const { supabaseAdmin } = await import("@/lib/supabase-admin");
+  const { error } = await supabaseAdmin
+    .schema("public")
+    .from("cms_settings")
+    .upsert({
+      key_name: AUTH_SETTING_KEY,
+      setting_value: auth,
+      updated_at: auth.updatedAt,
+    }, { onConflict: "key_name" });
+  if (error) throw new Error("ADMINCENTER_AUTH_WRITE_FAILED");
+}
+function setSessionCookie(response: NextResponse, username: string) {
+  const token = signAdminSession(username, adminSessionSecret());
+  response.cookies.set("admincenter_session", token, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
   });
 }
 
-// POST /api/admincenter/auth - Login / Change Password / Logout
+async function currentSession() {
+  try {
+    const token = (await cookies()).get("admincenter_session")?.value;
+    return verifyAdminSession(token, adminSessionSecret());
+  } catch {
+    return null;
+  }
+}
+
+export async function GET() {
+  const session = await currentSession();
+  if (!session) {
+    return NextResponse.json({ authenticated: false, user: null, mustChangePassword: false });
+  }
+  const stored = await getStoredAuth();
+  return NextResponse.json({
+    authenticated: true,
+    user: session.username,
+    mustChangePassword: Boolean(stored?.isInitialDefault),
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const action = body.action || "login";
-    const cookieStore = await cookies();
 
-    // 1. LOGOUT ACTION
     if (action === "logout") {
       const response = NextResponse.json({ success: true, message: "Đăng xuất thành công" });
       response.cookies.set("admincenter_session", "", {
         path: "/",
         maxAge: 0,
         httpOnly: true,
-        sameSite: "lax",
-      });
-      response.cookies.set("admincenter_must_change", "", {
-        path: "/",
-        maxAge: 0,
-        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
       });
       return response;
     }
 
-    // 2. CHANGE PASSWORD ACTION
     if (action === "change_password") {
+      const session = await currentSession();
+      if (!session) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
       const { currentPassword, newPassword } = body;
-
       if (!newPassword || newPassword.length < 8) {
         return NextResponse.json(
-          { error: "Mật khẩu mới phải có tối thiểu 8 ký tự bao gồm chữ và số" },
-          { status: 400 }
+          { error: "Mật khẩu mới phải có tối thiểu 8 ký tự" },
+          { status: 400 },
         );
       }
 
-      const stored = getStoredAuth();
-      let isCurrentValid = false;
-
-      if (stored && !stored.isInitialDefault) {
-        const verifyHash = hashPassword(currentPassword, stored.salt);
-        isCurrentValid = verifyHash === stored.hash;
-      } else {
-        // Initial setup validation
-        isCurrentValid = currentPassword === INITIAL_DEFAULT_PASSWORD;
+      const stored = await getStoredAuth();
+      if (!stored) return NextResponse.json({ error: "AUTH_NOT_INITIALIZED" }, { status: 503 });
+      const currentValid = safeHashEqual(
+        hashPassword(currentPassword, stored.salt),
+        stored.hash,
+      );
+      if (!currentValid) {
+        return NextResponse.json({ error: "Mật khẩu hiện tại không chính xác" }, { status: 400 });
       }
 
-      if (!isCurrentValid) {
-        return NextResponse.json(
-          { error: "Mật khẩu hiện tại không chính xác" },
-          { status: 400 }
-        );
-      }
-
-      // Generate new salt and hash
-      const newSalt = randomBytes(16).toString("hex");
-      const newHash = hashPassword(newPassword, newSalt);
-
+      const salt = randomBytes(16).toString("hex");
       const updatedAuth: StoredAuth = {
         username: DEFAULT_USERNAME,
-        salt: newSalt,
-        hash: newHash,
+        salt,
+        hash: hashPassword(newPassword, salt),
         isInitialDefault: false,
         updatedAt: new Date().toISOString(),
       };
-
-      saveStoredAuth(updatedAuth);
-
+      await saveStoredAuth(updatedAuth);
       const response = NextResponse.json({
         success: true,
-        message: "Thiết lập mật khẩu mới thành công! Hệ thống đã ghi nhận.",
+        message: "Thiết lập mật khẩu mới thành công.",
         mustChangePassword: false,
       });
-
-      // Update cookies
-      response.cookies.set("admincenter_session", "authenticated", {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-      response.cookies.set("admincenter_must_change", "false", {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-
+      setSessionCookie(response, DEFAULT_USERNAME);
       return response;
     }
 
-    // 3. LOGIN ACTION
     if (action === "login") {
       const { username, password } = body;
-
       if (!username || !password) {
-        return NextResponse.json(
-          { error: "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Vui lòng nhập đầy đủ thông tin" }, { status: 400 });
       }
-
       if (username.trim().toLowerCase() !== DEFAULT_USERNAME.toLowerCase()) {
-        return NextResponse.json(
-          { error: "Tên đăng nhập không hợp lệ" },
-          { status: 401 }
-        );
+        return NextResponse.json({ error: "Tên đăng nhập không hợp lệ" }, { status: 401 });
       }
 
-      const stored = getStoredAuth();
-      let isValid = false;
-      let mustChange = false;
-
-      if (stored && !stored.isInitialDefault) {
-        const inputHash = hashPassword(password, stored.salt);
-        isValid = inputHash === stored.hash;
-        mustChange = false;
-      } else {
-        // Fallback or Initial state
-        if (password === INITIAL_DEFAULT_PASSWORD) {
-          isValid = true;
-          mustChange = true;
-        }
-      }
-
+      const stored = await getStoredAuth();
+      if (!stored) return NextResponse.json({ error: "AUTH_NOT_INITIALIZED" }, { status: 503 });
+      const isValid = safeHashEqual(hashPassword(password, stored.salt), stored.hash);
       if (!isValid) {
-        return NextResponse.json(
-          { error: "Mật khẩu không chính xác" },
-          { status: 401 }
-        );
+        return NextResponse.json({ error: "Mật khẩu không chính xác" }, { status: 401 });
       }
-
       const response = NextResponse.json({
         success: true,
         message: "Đăng nhập thành công!",
         user: DEFAULT_USERNAME,
-        mustChangePassword: mustChange,
+        mustChangePassword: stored.isInitialDefault,
       });
-
-      response.cookies.set("admincenter_session", "authenticated", {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-
-      response.cookies.set("admincenter_must_change", mustChange ? "true" : "false", {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-
+      setSessionCookie(response, DEFAULT_USERNAME);
       return response;
     }
 
     return NextResponse.json({ error: "Thao tác không được hỗ trợ" }, { status: 400 });
-  } catch (err: any) {
-    console.error("Auth endpoint error:", err);
-    return NextResponse.json(
-      { error: "Lỗi xử lý xác thực: " + (err.message || "Unknown") },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error("AdminCenter auth error:", error);
+    return NextResponse.json({ error: "AUTH_SERVICE_UNAVAILABLE" }, { status: 503 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { buildAdminCenterSystemStatus } from "@/lib/admincenter-runtime";
+import { adminSessionSecret, verifyAdminSession } from "@/lib/admincenter-session";
 
 function telemetryResponse(
   system: ReturnType<typeof buildAdminCenterSystemStatus>,
@@ -84,7 +85,13 @@ function telemetryResponse(
 
 export async function GET() {
   const sessionCookie = (await cookies()).get("admincenter_session")?.value;
-  if (sessionCookie !== "authenticated") {
+  let session = null;
+  try {
+    session = verifyAdminSession(sessionCookie, adminSessionSecret());
+  } catch {
+    session = null;
+  }
+  if (!session) {
     return NextResponse.json(
       { error: "UNAUTHORIZED" },
       { status: 401, headers: { "Cache-Control": "no-store" } },

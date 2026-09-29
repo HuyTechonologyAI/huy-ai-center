@@ -11,6 +11,7 @@ import {
   deriveRuntimeAgents,
   deriveHandoffs,
   deriveProviderAttempts,
+  selectTimelineTaskId,
   sanitizeProviderSnapshot,
   signTelemetryEnvelope,
   summarizeBacklogState,
@@ -195,4 +196,11 @@ it("derives verified handoffs and provider-attempt history from checkpoint evide
   assert.equal(attempts[0].provider, "ollama");
   assert.equal(attempts[0].role, "PLANNER");
   assert.equal(attempts[0].status, "VERIFIED");
+});
+
+
+it("keeps current Human Gate task while falling back to the latest verified A2A history", () => {
+  assert.equal(selectTimelineTaskId("08b-ollama-dell", false, "08a-model-gateway"), "08a-model-gateway");
+  assert.equal(selectTimelineTaskId("08a-model-gateway", true, "07c-e2e"), "08a-model-gateway");
+  assert.equal(selectTimelineTaskId("08b-ollama-dell", false, undefined), "08b-ollama-dell");
 });
