@@ -1,0 +1,26 @@
+{
+  "channels": [
+    {
+      "name": "Website EduViet (gvcncdsai.io.vn)",
+      "status": "ONLINE_ACTIVE",
+      "type": "INBOUND_SELF_SERVE",
+      "conversion_path": "/#pricing"
+    },
+    {
+      "name": "Website AdminCenter (huycncdsai.io.vn)",
+      "status": "ONLINE_ACTIVE",
+      "type": "INBOUND_ENTERPRISE",
+      "conversion_path": "/admincenter"
+    },
+    {
+      "name": "Zalo OA",
+      "status": "READY_FOR_ENGAGEMENT",
+      "type": "TWO_WAY_CHAT"
+    },
+    {
+      "name": "VietQR Banking Direct",
+      "status": "ONLINE_ACTIVE",
+      "type": "ACB_37780997"
+    }
+  ]
+}

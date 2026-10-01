@@ -1,0 +1,17 @@
+{
+  "mode": "FIRST_ORDER_WAR_ROOM",
+  "north_star": "FIRST_VERIFIED_PAID_ORDER",
+  "target_paid_orders": 1,
+  "first_revenue_offer": "EduViet Teacher VIP 1 Plan (39k trial / 349k year)",
+  "verified_prospects": 0,
+  "qualified_leads": 0,
+  "real_conversations": 0,
+  "meetings": 0,
+  "proposals": 0,
+  "payment_pending": 0,
+  "verified_paid_orders": 0,
+  "verified_revenue_vnd": 0,
+  "current_bottleneck": "AWAITING_FIRST_INBOUND_PAYMENT_CONVERSION",
+  "last_verified_event": "SYSTEM_INITIALIZED",
+  "last_updated": "2026-10-01T11:27:07.417Z"
+}
