@@ -1,0 +1,25 @@
+{
+  "objectives": [
+    {
+      "id": "OBJ-01",
+      "title": "Establish Canonical AI Agency V3 Context & Skill Engine",
+      "owner": "ANTIGRAVITY_L1",
+      "status": "IN_PROGRESS",
+      "priority": "CRITICAL"
+    },
+    {
+      "id": "OBJ-02",
+      "title": "Conserve Cloud Token & Quota via Node01 / Local AI Execution",
+      "owner": "L2_SRE_MANAGER",
+      "status": "ACTIVE",
+      "priority": "HIGH"
+    },
+    {
+      "id": "OBJ-03",
+      "title": "Standardize Anti-Forgetting Context Hydration across all sessions",
+      "owner": "L2_KNOWLEDGE_MANAGER",
+      "status": "ACTIVE",
+      "priority": "CRITICAL"
+    }
+  ]
+}

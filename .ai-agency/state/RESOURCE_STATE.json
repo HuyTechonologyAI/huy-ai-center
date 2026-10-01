@@ -1,0 +1,22 @@
+{
+  "node01": {
+    "hostname": "huy-ai-node-01",
+    "mount": "/mnt/data1",
+    "disk_total_gb": 466,
+    "disk_avail_gb": 447,
+    "ollama_status": "ACTIVE",
+    "active_local_models": [
+      "qwen2.5-coder:3b"
+    ]
+  },
+  "supabase": {
+    "ref": "bdeluacbzbdflxubhpha",
+    "status": "HEALTHY",
+    "features": [
+      "pgvector",
+      "pgmq",
+      "auth",
+      "storage"
+    ]
+  }
+}

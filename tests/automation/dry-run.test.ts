@@ -187,7 +187,7 @@ describe("C. ORCHESTRATOR_CLI_INVOCATION_TEST", () => {
     const res = spawnSync("npx", ["tsx", cliPath, "--preflight"], {
       cwd: process.cwd(),
       encoding: "utf-8",
-      shell: false,
+      shell: true,
       timeout: 15000,
     });
     assert.equal(res.status, 0, `cli.ts --preflight failed: ${res.stderr || res.stdout}`);
@@ -202,7 +202,7 @@ describe("C. ORCHESTRATOR_CLI_INVOCATION_TEST", () => {
       const res = spawnSync("npx", ["tsx", cliPath, tempFile], {
         cwd: process.cwd(),
         encoding: "utf-8",
-        shell: false,
+        shell: true,
         timeout: 10000,
       });
       assert.equal(res.status, 2, "Invalid contract must return exit code 2");
@@ -221,7 +221,7 @@ describe("C. ORCHESTRATOR_CLI_INVOCATION_TEST", () => {
       const res = spawnSync("npx", ["tsx", cliPath, tempFile], {
         cwd: process.cwd(),
         encoding: "utf-8",
-        shell: false,
+        shell: true,
         timeout: 10000,
       });
       assert.equal(res.status, 2, "Contract missing fields must return exit code 2");

@@ -1,0 +1,20 @@
+{
+  "providers": [
+    {
+      "name": "Ollama (Node01)",
+      "type": "LOCAL",
+      "status": "READY",
+      "cost_per_1k": 0
+    },
+    {
+      "name": "Antigravity CLI (agy)",
+      "type": "L1_SUPERVISOR",
+      "status": "READY"
+    },
+    {
+      "name": "Gemini Cloud API",
+      "type": "CLOUD_REASONING",
+      "status": "CONFIGURED"
+    }
+  ]
+}
