@@ -91,14 +91,14 @@ export default async function WarRoomPage() {
 
             <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
               <div className="text-xs text-slate-400 font-semibold uppercase">Đơn hàng mục tiêu (Offer)</div>
-              <div className="text-lg font-bold text-emerald-400">HUY-AUTO-PILOT-4900</div>
-              <div className="text-xs text-slate-400">Giá: 4.900.000 VNĐ · SME Cơ khí</div>
+              <div className="text-lg font-bold text-emerald-400">VIP 1 GIÁO VIÊN</div>
+              <div className="text-xs text-slate-400">Giá: 39.000 VNĐ · Phễu Sư phạm EduViet</div>
             </div>
 
             <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
-              <div className="text-xs text-slate-400 font-semibold uppercase">Kênh độc quyền</div>
-              <div className="text-lg font-bold text-blue-400">GOOGLE SEARCH</div>
-              <div className="text-xs text-slate-400">Đã khóa các kênh khác để bảo vệ nguồn lực</div>
+              <div className="text-xs text-slate-400 font-semibold uppercase">Kênh tiếp cận tối ưu</div>
+              <div className="text-lg font-bold text-blue-400">CỘNG ĐỒNG 0 ĐỒNG</div>
+              <div className="text-xs text-slate-400">Tiết kiệm tối đa ngân sách theo lệnh Thầy Huy</div>
             </div>
           </div>
         </div>

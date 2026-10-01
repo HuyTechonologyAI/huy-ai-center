@@ -67,33 +67,47 @@ export class RevenueAgentCore {
     const unknowns: string[] = [];
     const automationOpportunities: string[] = [];
 
-    // Analyze problem statement for manufacturing / mechanical signals
+    // Analyze problem statement for Teacher/EdTech or Manufacturing signals
     const lowerProb = (lead.problem || '').toLowerCase();
     const lowerCompany = (lead.company || '').toLowerCase();
+    const lowerRole = (lead.role || '').toLowerCase();
+
+    const isTeacher = lowerProb.includes('giáo án') || lowerProb.includes('5512') || lowerProb.includes('bài giảng') ||
+                      lowerProb.includes('trắc nghiệm') || lowerProb.includes('đề thi') || lowerProb.includes('thời khóa biểu') ||
+                      lowerProb.includes('giáo viên') || lowerProb.includes('học sinh') || lowerProb.includes('trường') ||
+                      lowerCompany.includes('trường') || lowerCompany.includes('thpt') || lowerCompany.includes('thcs') ||
+                      lowerCompany.includes('tiểu học') || lowerCompany.includes('mầm non') || lowerCompany.includes('đại học') ||
+                      lowerRole.includes('giáo viên') || lowerRole.includes('giảng viên') || lowerRole.includes('thầy') || lowerRole.includes('cô');
 
     const isMechOrMfg = lowerProb.includes('cơ khí') || lowerProb.includes('xưởng') || lowerProb.includes('sản xuất') ||
                         lowerProb.includes('báo giá') || lowerProb.includes('bản vẽ') || lowerProb.includes('vật liệu') ||
                         lowerCompany.includes('cơ khí') || lowerCompany.includes('chế tạo') || lowerCompany.includes('nhà máy');
 
-    if (isMechOrMfg) {
-      facts.push('Ngành nghề khớp với Primary ICP: SME Cơ khí / Sản xuất');
+    let icpFit: 'FIT' | 'NOT_FIT' | 'BORDERLINE' = 'BORDERLINE';
+    let confidence = 0.65;
+
+    if (isTeacher) {
+      facts.push('Ngành nghề khớp với Primary ICP: Giáo viên & Giáo dục (EdTech Funnel)');
+      automationOpportunities.push('Trợ lý AI soạn giáo án chuẩn Công văn 5512 & CV 2634 tự động');
+      automationOpportunities.push('Sinh ma trận trắc nghiệm & đề kiểm tra 4 mức độ nhận thức');
+      automationOpportunities.push('Đồng bộ thời khóa biểu và sổ điểm cá nhân (Gói VIP 1: 39.000 VNĐ)');
+      icpFit = 'FIT';
+      confidence = 0.95;
+    } else if (isMechOrMfg) {
+      facts.push('Ngành nghề khớp với Secondary ICP: SME Cơ khí / Sản xuất');
       automationOpportunities.push('Tự động hóa luồng tiếp nhận yêu cầu và trích xuất thông số bản vẽ PDF');
       automationOpportunities.push('Bảng tự động tính toán báo giá phôi và gia công cơ bản');
+      icpFit = 'FIT';
+      confidence = 0.85;
     } else {
-      hypotheses.push('Doanh nghiệp có thể thuộc ngành dịch vụ hoặc bán lẻ kỹ thuật');
+      hypotheses.push('Khách hàng có thể thuộc khối dịch vụ hoặc bán lẻ');
     }
 
     if (!lead.current_tools) {
-      unknowns.push('Chưa rõ phần mềm hoặc bảng tính khách đang dùng cụ thể (Excel, ERP, hay phần mềm kế toán)');
+      unknowns.push('Chưa rõ phần mềm hoặc công cụ đang dùng hiện tại');
     } else {
       facts.push(`Công cụ hiện dùng: ${lead.current_tools}`);
     }
-
-    unknowns.push('Số lượng nhân sự tham gia quy trình hàng ngày');
-    unknowns.push('Khối lượng chứng từ / đơn hàng xử lý trung bình mỗi tuần');
-
-    const icpFit: 'FIT' | 'NOT_FIT' | 'BORDERLINE' = isMechOrMfg ? 'FIT' : 'BORDERLINE';
-    const confidence = isMechOrMfg ? 0.85 : 0.65;
 
     const result: IntentQualificationOutput = {
       facts,
@@ -133,9 +147,13 @@ export class RevenueAgentCore {
       .eq('id', leadId)
       .single();
 
-    const brief = `# HỒ SƠ KHẢO SÁT 15 PHÚT — THẦY NGÔ QUỐC HUY CHỦ TRÌ
-**Khách hàng:** ${lead?.name} (${lead?.role || 'Đại diện'})  
-**Doanh nghiệp:** ${lead?.company}  
+    const isEdu = qualification.facts.some(f => f.includes('Giáo viên'));
+    const offerName = isEdu ? 'Gói VIP 1 (Cá Nhân Giáo Viên - 1 Tháng)' : 'AI Automation Pilot';
+    const offerPrice = isEdu ? '39.000 VNĐ / tháng (hoặc 399.000 VNĐ / năm)' : '4.900.000 VNĐ';
+
+    const brief = `# HỒ SƠ KHẢO SÁT & TƯ VẤN — THẦY NGÔ QUỐC HUY CHỦ TRÌ
+**Khách hàng:** ${lead?.name} (${lead?.role || 'Khách hàng'})  
+**Tổ chức / Trường học:** ${lead?.company}  
 **Liên hệ:** ${lead?.phone} | ${lead?.email}  
 **Thời gian hẹn:** ${lead?.preferred_contact_time || 'Giờ hành chính'}  
 
@@ -144,7 +162,7 @@ export class RevenueAgentCore {
 ### 1. DỮ LIỆU ĐÃ XÁC MINH (FACTS)
 ${qualification.facts.map(f => `- ${f}`).join('\n')}
 
-### 2. GIẢ THUYẾT KỸ THUẬT (HYPOTHESES)
+### 2. GIẢ THUYẾT & NHU CẦU (HYPOTHESES)
 ${qualification.hypotheses.map(h => `- ${h}`).join('\n')}
 
 ### 3. ĐIỂM CHƯA RÕ CẦN HỎI THÊM (UNKNOWNS)
@@ -153,10 +171,10 @@ ${qualification.unknowns.map(u => `- ${u}`).join('\n')}
 ### 4. CÂU HỎI TRỌNG TÂM CẦN HỎI TRONG CUỘC GỌI
 ${qualification.missing_questions.map(q => `- ${q}`).join('\n')}
 
-### 5. ĐỀ XUẤT GÓI THÍ ĐIỂM (OFFER)
-- **Gói:** AI Automation Pilot (4.900.000 VNĐ)
-- **Quy trình mục tiêu:** ${qualification.automation_opportunities[0] || 'Tự động hóa báo giá xưởng'}
-- **Thời gian bàn giao cam kết:** 07 ngày làm việc sau khi nhận quyền truy cập dữ liệu.
+### 5. ĐỀ XUẤT GÓI PHÙ HỢP (OFFER)
+- **Gói:** ${offerName} (${offerPrice})
+- **Quy trình mục tiêu:** ${qualification.automation_opportunities[0] || 'Tự động hóa giáo án & bài giảng'}
+- **Hình thức thanh toán:** Quét mã VietQR ngân hàng ACB STK 37780997 - NGO QUOC HUY
 `;
 
     // Save brief to workstream evidence
