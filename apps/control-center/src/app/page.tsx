@@ -25,11 +25,11 @@ export default function DashboardPage() {
 
   const aiApps = [
     {
-      name: 'Teacher AI',
+      name: 'Smart Teacher AI',
       category: 'Giáo dục & Sư phạm',
-      desc: 'Soạn giáo án CV 5512, tạo slide thuyết trình, ngân hàng trắc nghiệm và video script.',
-      href: '/apps/teacher-ai',
-      badge: 'Đang hoạt động',
+      desc: 'Soạn giáo án CV 5512, tạo slide thuyết trình, ngân hàng trắc nghiệm và thời khóa biểu thông minh.',
+      href: 'https://www.gvcncdsai.io.vn/',
+      badge: 'Cổng chính thức',
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       icon: '🎓',
     },
@@ -115,12 +115,14 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <Link
-              href="/apps/teacher-ai"
+            <a
+              href="https://www.gvcncdsai.io.vn/"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-md transition"
             >
-              🎓 Dùng Ngay Teacher AI
-            </Link>
+              🎓 Cổng Sư Phạm Smart Teacher
+            </a>
             <Link
               href="/history"
               className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm border border-slate-700 transition"
