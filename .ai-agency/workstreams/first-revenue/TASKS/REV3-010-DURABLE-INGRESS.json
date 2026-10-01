@@ -1,0 +1,16 @@
+{
+  "task_id": "REV3-010-DURABLE-INGRESS",
+  "campaign_id": "FIRST-REVENUE-V3",
+  "objective": "Implement durable write-first API route /api/automation-pilot/submit writing to Supabase and PGMQ",
+  "task_type": "FIRST_REVENUE.INGRESS",
+  "owner_agent": "L3-02_SENIOR_DEVELOPER",
+  "capability": "durable_ingress",
+  "input_refs": [
+    "supabase/migrations/20261001000001_first_revenue_v3.sql"
+  ],
+  "expected_output": [
+    "apps/control-center/src/app/api/automation-pilot/submit/route.ts"
+  ],
+  "risk_class": "R2",
+  "status": "READY"
+}

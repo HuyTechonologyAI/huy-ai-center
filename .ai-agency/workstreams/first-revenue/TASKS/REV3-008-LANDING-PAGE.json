@@ -1,0 +1,16 @@
+{
+  "task_id": "REV3-008-LANDING-PAGE",
+  "campaign_id": "FIRST-REVENUE-V3",
+  "objective": "Implement Next.js /automation-pilot landing page with hero, problem, scope, and single CTA",
+  "task_type": "FIRST_REVENUE.LANDING",
+  "owner_agent": "L3-02_SENIOR_DEVELOPER",
+  "capability": "web_nextjs_build",
+  "input_refs": [
+    "campaigns/first-revenue/OFFER.md"
+  ],
+  "expected_output": [
+    "apps/control-center/src/app/automation-pilot/page.tsx"
+  ],
+  "risk_class": "R2",
+  "status": "READY"
+}

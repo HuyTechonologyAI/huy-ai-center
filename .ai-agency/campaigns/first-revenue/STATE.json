@@ -1,0 +1,23 @@
+{
+  "campaign_id": "FIRST-REVENUE-V3",
+  "campaign_mode": "PRODUCTION",
+  "status": "EXECUTING",
+  "offer_id": "HUY-AUTO-PILOT-4900",
+  "entry_offer": "Đánh giá cơ hội tự động hóa 15 phút (0 VND)",
+  "paid_offer": "AI Automation Pilot (4,900,000 VND)",
+  "icp_primary": "SME Cơ khí / Sản xuất",
+  "primary_channel": "GOOGLE_SEARCH",
+  "funnel_actual": {
+    "impressions": 0,
+    "clicks": 0,
+    "form_submits": 0,
+    "consented_leads": 0,
+    "qualified_leads": 0,
+    "audits_booked": 0,
+    "proposals_sent": 0,
+    "customer_acceptances": 0,
+    "verified_paid_orders": 0
+  },
+  "last_checkpoint": "CHK-REV3-BOOTSTRAP",
+  "last_updated": "2026-10-01T12:16:03.190Z"
+}

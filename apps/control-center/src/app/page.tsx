@@ -64,6 +64,40 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
+      {/* FIRST REVENUE WAR ROOM BANNER (V3.0) */}
+      <div className="bg-gradient-to-r from-red-950/50 via-slate-900 to-blue-950/50 border border-red-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+              CHIẾN DỊCH TÁC CHIẾN DOANH THU 24/7 (V3.0)
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              First Revenue War Room — Mục tiêu: 1 Paid Order Thực Tế
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+              Chiến dịch AI Automation Pilot (4.900.000 đ) cho khối SME Cơ khí / Sản xuất. Tích hợp cổng Ingress ghi bền vững Supabase, xác thực thanh toán SePay và 3 Agent Hot Path tinh gọn.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <Link
+              href="/war-room"
+              className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm shadow-lg shadow-red-900/30 transition"
+            >
+              🔴 Vào War Room Cockpit
+            </Link>
+            <Link
+              href="/automation-pilot"
+              target="_blank"
+              className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm border border-slate-700 transition"
+            >
+              Xem Landing Page ↗
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* Banner / Welcome */}
       <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/30 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
