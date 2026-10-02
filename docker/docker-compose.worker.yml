@@ -83,7 +83,27 @@ services:
       - huy-ai-internal
 
   # ----------------------------------------------------------------------------
-  # 5. LiteLLM Proxy [DEFERRED IN V1.1 - UNCOMMENT IN V2 IF REQUIRED]
+  # 5. Media Worker (Media-Compute Plane: Video/Image Transcoding, 9:16 Crop, TTS)
+  # ----------------------------------------------------------------------------
+  media-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.media-worker
+    container_name: huy-ai-media-worker
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:8090"
+    environment:
+      - NODE_ENV=production
+      - MEDIA_WORKER_PORT=8090
+      - MEDIA_WORKER_HOST=0.0.0.0
+    volumes:
+      - media_cache:/app/.ai-agency/media-cache
+    networks:
+      - huy-ai-internal
+
+  # ----------------------------------------------------------------------------
+  # 6. LiteLLM Proxy [DEFERRED IN V1.1 - UNCOMMENT IN V2 IF REQUIRED]
   # ----------------------------------------------------------------------------
   # litellm:
   #   image: ghcr.io/berriai/litellm:main-latest
@@ -104,3 +124,4 @@ volumes:
   ollama_data:
   langflow_data:
   n8n_data:
+  media_cache:

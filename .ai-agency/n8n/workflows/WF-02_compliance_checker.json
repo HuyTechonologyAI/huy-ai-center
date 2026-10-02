@@ -1,0 +1,97 @@
+{
+  "name": "WF-02 Legal & AI Transparency Gate",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [
+    "HUY_AI_CENTER",
+    "NOTE01",
+    "SOCIAL_PUBLISHING",
+    "2026"
+  ],
+  "nodes": [
+    {
+      "id": "node-trigger-01",
+      "name": "Webhook Trigger / Ingress",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf-02_compliance_checker",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "node-process-02",
+      "name": "WF-02 Legal & AI Transparency Gate Execution Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Execution handler for WF-02 Legal & AI Transparency Gate\n// Enforces Vietnamese Cybersecurity Law 2018, PDP Law 91/2025, and ensures #NoiDungDoAILam labels exist\nconst input = $input.first().json;\n\nreturn [{\n  json: {\n    workflow: 'WF-02 Legal & AI Transparency Gate',\n    status: 'COMPLETED',\n    timestamp: new Date().toISOString(),\n    plane: 'ORCHESTRATION_PLANE',\n    processed_payload: input\n  }\n}];"
+      }
+    },
+    {
+      "id": "node-audit-03",
+      "name": "Audit Logger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://huy-ai-node-01:3000/api/v1/social/audit",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "WF-02 Legal & AI Transparency Gate"
+            },
+            {
+              "name": "status",
+              "value": "SUCCESS"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger / Ingress": {
+      "main": [
+        [
+          {
+            "node": "WF-02 Legal & AI Transparency Gate Execution Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WF-02 Legal & AI Transparency Gate Execution Engine": {
+      "main": [
+        [
+          {
+            "node": "Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,5 +1,5 @@
 # FIRST REVENUE SCHEMA MAP — REV3-002
-**Generated at:** 2026-10-01T12:15:40.166Z  
+**Generated at:** 2026-10-01T14:04:21.576Z  
 **Target Database:** Supabase HuyAI Singapore (`bdeluacbzbdflxubhpha`)  
 **Principle:** REUSE > EXTEND > CREATE (No duplicate CRM)  
 

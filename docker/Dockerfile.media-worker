@@ -1,0 +1,36 @@
+# ==============================================================================
+# Production Dockerfile for HUY TECHNOLOGY AI Media Worker Service
+# Target: Note-01 (Dell Precision M4800 / Lenovo E450) / CPU-Optimized
+# ==============================================================================
+
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+COPY package.json tsconfig.base.json tsconfig.json ./
+COPY packages/ ./packages/
+COPY apps/media-worker/ ./apps/media-worker/
+
+RUN npm install
+RUN npm run build --workspace=@huy-ai/contracts
+RUN npm run build --workspace=@huy-ai/media-worker
+
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV MEDIA_WORKER_PORT=8090
+ENV MEDIA_WORKER_HOST=0.0.0.0
+
+# Install ffmpeg and dumb-init for CPU media processing
+RUN apk add --no-cache dumb-init ffmpeg
+
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/contracts ./packages/contracts
+COPY --from=builder /app/apps/media-worker ./apps/media-worker
+
+EXPOSE 8090
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["node", "apps/media-worker/dist/index.js"]

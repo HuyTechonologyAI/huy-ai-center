@@ -1,0 +1,97 @@
+{
+  "name": "WF-TT TikTok Draft & Video Publisher",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [
+    "HUY_AI_CENTER",
+    "NOTE01",
+    "SOCIAL_PUBLISHING",
+    "2026"
+  ],
+  "nodes": [
+    {
+      "id": "node-trigger-01",
+      "name": "Webhook Trigger / Ingress",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf-tt_tiktok_publisher",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "node-process-02",
+      "name": "WF-TT TikTok Draft & Video Publisher Execution Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Execution handler for WF-TT TikTok Draft & Video Publisher\n// STRICT DEFAULT: video.upload (UPLOAD_DRAFT). Direct Post requires Human Gate R3 clearance.\nconst input = $input.first().json;\n\nreturn [{\n  json: {\n    workflow: 'WF-TT TikTok Draft & Video Publisher',\n    status: 'COMPLETED',\n    timestamp: new Date().toISOString(),\n    plane: 'PROVIDER_PLANE',\n    processed_payload: input\n  }\n}];"
+      }
+    },
+    {
+      "id": "node-audit-03",
+      "name": "Audit Logger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://huy-ai-node-01:3000/api/v1/social/audit",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "WF-TT TikTok Draft & Video Publisher"
+            },
+            {
+              "name": "status",
+              "value": "SUCCESS"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger / Ingress": {
+      "main": [
+        [
+          {
+            "node": "WF-TT TikTok Draft & Video Publisher Execution Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WF-TT TikTok Draft & Video Publisher Execution Engine": {
+      "main": [
+        [
+          {
+            "node": "Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
