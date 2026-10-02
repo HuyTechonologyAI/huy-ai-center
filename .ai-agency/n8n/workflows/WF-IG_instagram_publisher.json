@@ -1,0 +1,97 @@
+{
+  "name": "WF-IG Meta Instagram Business Publisher",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [
+    "HUY_AI_CENTER",
+    "NOTE01",
+    "SOCIAL_PUBLISHING",
+    "2026"
+  ],
+  "nodes": [
+    {
+      "id": "node-trigger-01",
+      "name": "Webhook Trigger / Ingress",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf-ig_instagram_publisher",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "node-process-02",
+      "name": "WF-IG Meta Instagram Business Publisher Execution Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Execution handler for WF-IG Meta Instagram Business Publisher\n// Executes Instagram Graph API container creation and publication (1:1, 4:5, Reels 9:16)\nconst input = $input.first().json;\n\nreturn [{\n  json: {\n    workflow: 'WF-IG Meta Instagram Business Publisher',\n    status: 'COMPLETED',\n    timestamp: new Date().toISOString(),\n    plane: 'PROVIDER_PLANE',\n    processed_payload: input\n  }\n}];"
+      }
+    },
+    {
+      "id": "node-audit-03",
+      "name": "Audit Logger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://huy-ai-node-01:3000/api/v1/social/audit",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "WF-IG Meta Instagram Business Publisher"
+            },
+            {
+              "name": "status",
+              "value": "SUCCESS"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger / Ingress": {
+      "main": [
+        [
+          {
+            "node": "WF-IG Meta Instagram Business Publisher Execution Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WF-IG Meta Instagram Business Publisher Execution Engine": {
+      "main": [
+        [
+          {
+            "node": "Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

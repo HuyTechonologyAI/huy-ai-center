@@ -1,0 +1,457 @@
+[
+  {
+    "id": "SKILL-00",
+    "level": "L0_FOUNDATION",
+    "name": "group_governance_charter",
+    "risk": "R0",
+    "path": "skills/L0_FOUNDATION/SKILL-00_group_governance_charter/SKILL.md"
+  },
+  {
+    "id": "SKILL-01",
+    "level": "L0_FOUNDATION",
+    "name": "context_hydrator",
+    "risk": "R0",
+    "path": "skills/L0_FOUNDATION/SKILL-01_context_hydrator/SKILL.md"
+  },
+  {
+    "id": "SKILL-02",
+    "level": "L0_FOUNDATION",
+    "name": "task_contract_manager",
+    "risk": "R1",
+    "path": "skills/L0_FOUNDATION/SKILL-02_task_contract_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-03",
+    "level": "L0_FOUNDATION",
+    "name": "risk_policy_gate",
+    "risk": "R0",
+    "path": "skills/L0_FOUNDATION/SKILL-03_risk_policy_gate/SKILL.md"
+  },
+  {
+    "id": "SKILL-04",
+    "level": "L0_FOUNDATION",
+    "name": "capability_router",
+    "risk": "R0",
+    "path": "skills/L0_FOUNDATION/SKILL-04_capability_router/SKILL.md"
+  },
+  {
+    "id": "SKILL-05",
+    "level": "L0_FOUNDATION",
+    "name": "checkpoint_manager",
+    "risk": "R1",
+    "path": "skills/L0_FOUNDATION/SKILL-05_checkpoint_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-06",
+    "level": "L0_FOUNDATION",
+    "name": "deterministic_verifier",
+    "risk": "R1",
+    "path": "skills/L0_FOUNDATION/SKILL-06_deterministic_verifier/SKILL.md"
+  },
+  {
+    "id": "SKILL-07",
+    "level": "L0_FOUNDATION",
+    "name": "recovery_supervisor",
+    "risk": "R2",
+    "path": "skills/L0_FOUNDATION/SKILL-07_recovery_supervisor/SKILL.md"
+  },
+  {
+    "id": "SKILL-08",
+    "level": "L0_FOUNDATION",
+    "name": "cost_quota_guard",
+    "risk": "R0",
+    "path": "skills/L0_FOUNDATION/SKILL-08_cost_quota_guard/SKILL.md"
+  },
+  {
+    "id": "SKILL-09",
+    "level": "L0_FOUNDATION",
+    "name": "knowledge_memory_writer",
+    "risk": "R1",
+    "path": "skills/L0_FOUNDATION/SKILL-09_knowledge_memory_writer/SKILL.md"
+  },
+  {
+    "id": "SKILL-10",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_ceo_strategy",
+    "risk": "R1",
+    "path": "skills/L1_EXECUTIVE/SKILL-10_ai_ceo_strategy/SKILL.md"
+  },
+  {
+    "id": "SKILL-11",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_coo_operations",
+    "risk": "R2",
+    "path": "skills/L1_EXECUTIVE/SKILL-11_ai_coo_operations/SKILL.md"
+  },
+  {
+    "id": "SKILL-12",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_cto_architecture",
+    "risk": "R2",
+    "path": "skills/L1_EXECUTIVE/SKILL-12_ai_cto_architecture/SKILL.md"
+  },
+  {
+    "id": "SKILL-13",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_cfo_finance",
+    "risk": "R1",
+    "path": "skills/L1_EXECUTIVE/SKILL-13_ai_cfo_finance/SKILL.md"
+  },
+  {
+    "id": "SKILL-14",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_cmo_marketing",
+    "risk": "R2",
+    "path": "skills/L1_EXECUTIVE/SKILL-14_ai_cmo_marketing/SKILL.md"
+  },
+  {
+    "id": "SKILL-15",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_cro_revenue",
+    "risk": "R2",
+    "path": "skills/L1_EXECUTIVE/SKILL-15_ai_cro_revenue/SKILL.md"
+  },
+  {
+    "id": "SKILL-16",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_chro_workforce",
+    "risk": "R1",
+    "path": "skills/L1_EXECUTIVE/SKILL-16_ai_chro_workforce/SKILL.md"
+  },
+  {
+    "id": "SKILL-17",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_cpo_product",
+    "risk": "R2",
+    "path": "skills/L1_EXECUTIVE/SKILL-17_ai_cpo_product/SKILL.md"
+  },
+  {
+    "id": "SKILL-18",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_ciso_security",
+    "risk": "R2",
+    "path": "skills/L1_EXECUTIVE/SKILL-18_ai_ciso_security/SKILL.md"
+  },
+  {
+    "id": "SKILL-19",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_cdo_data",
+    "risk": "R2",
+    "path": "skills/L1_EXECUTIVE/SKILL-19_ai_cdo_data/SKILL.md"
+  },
+  {
+    "id": "SKILL-20",
+    "level": "L1_EXECUTIVE",
+    "name": "ai_legal_compliance",
+    "risk": "R1",
+    "path": "skills/L1_EXECUTIVE/SKILL-20_ai_legal_compliance/SKILL.md"
+  },
+  {
+    "id": "SKILL-21",
+    "level": "L2_MANAGEMENT",
+    "name": "engineering_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-21_engineering_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-22",
+    "level": "L2_MANAGEMENT",
+    "name": "qa_test_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-22_qa_test_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-23",
+    "level": "L2_MANAGEMENT",
+    "name": "sre_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-23_sre_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-24",
+    "level": "L2_MANAGEMENT",
+    "name": "security_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-24_security_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-25",
+    "level": "L2_MANAGEMENT",
+    "name": "data_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-25_data_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-26",
+    "level": "L2_MANAGEMENT",
+    "name": "knowledge_rag_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-26_knowledge_rag_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-27",
+    "level": "L2_MANAGEMENT",
+    "name": "product_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-27_product_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-28",
+    "level": "L2_MANAGEMENT",
+    "name": "pmo_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-28_pmo_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-29",
+    "level": "L2_MANAGEMENT",
+    "name": "marketing_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-29_marketing_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-30",
+    "level": "L2_MANAGEMENT",
+    "name": "seo_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-30_seo_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-31",
+    "level": "L2_MANAGEMENT",
+    "name": "content_media_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-31_content_media_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-32",
+    "level": "L2_MANAGEMENT",
+    "name": "growth_cro_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-32_growth_cro_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-33",
+    "level": "L2_MANAGEMENT",
+    "name": "sales_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-33_sales_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-34",
+    "level": "L2_MANAGEMENT",
+    "name": "customer_success_manager",
+    "risk": "R2",
+    "path": "skills/L2_MANAGEMENT/SKILL-34_customer_success_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-35",
+    "level": "L2_MANAGEMENT",
+    "name": "hr_operations_manager",
+    "risk": "R1",
+    "path": "skills/L2_MANAGEMENT/SKILL-35_hr_operations_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-36",
+    "level": "L2_MANAGEMENT",
+    "name": "finance_operations_manager",
+    "risk": "R1",
+    "path": "skills/L2_MANAGEMENT/SKILL-36_finance_operations_manager/SKILL.md"
+  },
+  {
+    "id": "SKILL-37",
+    "level": "L3_WORKERS",
+    "name": "research_worker",
+    "risk": "R0",
+    "path": "skills/L3_WORKERS/SKILL-37_research_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-38",
+    "level": "L3_WORKERS",
+    "name": "senior_developer",
+    "risk": "R2",
+    "path": "skills/L3_WORKERS/SKILL-38_senior_developer/SKILL.md"
+  },
+  {
+    "id": "SKILL-39",
+    "level": "L3_WORKERS",
+    "name": "developer",
+    "risk": "R2",
+    "path": "skills/L3_WORKERS/SKILL-39_developer/SKILL.md"
+  },
+  {
+    "id": "SKILL-40",
+    "level": "L3_WORKERS",
+    "name": "test_designer",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-40_test_designer/SKILL.md"
+  },
+  {
+    "id": "SKILL-41",
+    "level": "L3_WORKERS",
+    "name": "test_runner",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-41_test_runner/SKILL.md"
+  },
+  {
+    "id": "SKILL-42",
+    "level": "L3_WORKERS",
+    "name": "code_reviewer",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-42_code_reviewer/SKILL.md"
+  },
+  {
+    "id": "SKILL-43",
+    "level": "L3_WORKERS",
+    "name": "browser_operator",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-43_browser_operator/SKILL.md"
+  },
+  {
+    "id": "SKILL-44",
+    "level": "L3_WORKERS",
+    "name": "web_crawler",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-44_web_crawler/SKILL.md"
+  },
+  {
+    "id": "SKILL-45",
+    "level": "L3_WORKERS",
+    "name": "security_scanner",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-45_security_scanner/SKILL.md"
+  },
+  {
+    "id": "SKILL-46",
+    "level": "L3_WORKERS",
+    "name": "secret_scanner",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-46_secret_scanner/SKILL.md"
+  },
+  {
+    "id": "SKILL-47",
+    "level": "L3_WORKERS",
+    "name": "prompt_security_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-47_prompt_security_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-48",
+    "level": "L3_WORKERS",
+    "name": "data_analyst",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-48_data_analyst/SKILL.md"
+  },
+  {
+    "id": "SKILL-49",
+    "level": "L3_WORKERS",
+    "name": "db_engineer",
+    "risk": "R2",
+    "path": "skills/L3_WORKERS/SKILL-49_db_engineer/SKILL.md"
+  },
+  {
+    "id": "SKILL-50",
+    "level": "L3_WORKERS",
+    "name": "rag_builder",
+    "risk": "R2",
+    "path": "skills/L3_WORKERS/SKILL-50_rag_builder/SKILL.md"
+  },
+  {
+    "id": "SKILL-51",
+    "level": "L3_WORKERS",
+    "name": "memory_curator",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-51_memory_curator/SKILL.md"
+  },
+  {
+    "id": "SKILL-52",
+    "level": "L3_WORKERS",
+    "name": "devops_worker",
+    "risk": "R2",
+    "path": "skills/L3_WORKERS/SKILL-52_devops_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-53",
+    "level": "L3_WORKERS",
+    "name": "monitoring_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-53_monitoring_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-54",
+    "level": "L3_WORKERS",
+    "name": "seo_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-54_seo_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-55",
+    "level": "L3_WORKERS",
+    "name": "content_writer",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-55_content_writer/SKILL.md"
+  },
+  {
+    "id": "SKILL-56",
+    "level": "L3_WORKERS",
+    "name": "social_publisher",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-56_social_publisher/SKILL.md"
+  },
+  {
+    "id": "SKILL-57",
+    "level": "L3_WORKERS",
+    "name": "crm_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-57_crm_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-58",
+    "level": "L3_WORKERS",
+    "name": "sales_research_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-58_sales_research_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-59",
+    "level": "L3_WORKERS",
+    "name": "customer_support_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-59_customer_support_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-60",
+    "level": "L3_WORKERS",
+    "name": "creative_image_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-60_creative_image_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-61",
+    "level": "L3_WORKERS",
+    "name": "voice_transcription_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-61_voice_transcription_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-62",
+    "level": "L3_WORKERS",
+    "name": "ocr_document_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-62_ocr_document_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-63",
+    "level": "L3_WORKERS",
+    "name": "document_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-63_document_worker/SKILL.md"
+  },
+  {
+    "id": "SKILL-64",
+    "level": "L3_WORKERS",
+    "name": "reporting_worker",
+    "risk": "R1",
+    "path": "skills/L3_WORKERS/SKILL-64_reporting_worker/SKILL.md"
+  }
+]

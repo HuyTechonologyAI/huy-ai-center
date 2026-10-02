@@ -1,0 +1,103 @@
+{
+  "version": "3.0.0",
+  "shortlist": [
+    {
+      "repo": "ollama/ollama",
+      "tier": "A",
+      "license": "MIT",
+      "status": "CORE_ACTIVE",
+      "role": "Local inference runtime"
+    },
+    {
+      "repo": "ggml-org/llama.cpp",
+      "tier": "A",
+      "license": "MIT",
+      "status": "CORE_BACKEND",
+      "role": "Low-level inference"
+    },
+    {
+      "repo": "microsoft/playwright",
+      "tier": "A",
+      "license": "Apache-2.0",
+      "status": "ADOPT",
+      "role": "E2E testing"
+    },
+    {
+      "repo": "gitleaks/gitleaks",
+      "tier": "A",
+      "license": "MIT",
+      "status": "ADOPT",
+      "role": "Secret detection"
+    },
+    {
+      "repo": "aquasecurity/trivy",
+      "tier": "A",
+      "license": "Apache-2.0",
+      "status": "ADOPT",
+      "role": "Vulnerability scan"
+    },
+    {
+      "repo": "promptfoo/promptfoo",
+      "tier": "A",
+      "license": "MIT",
+      "status": "ADOPT",
+      "role": "Prompt security eval"
+    },
+    {
+      "repo": "microsoft/markitdown",
+      "tier": "A",
+      "license": "MIT",
+      "status": "ADOPT",
+      "role": "Document conversion"
+    },
+    {
+      "repo": "ggml-org/whisper.cpp",
+      "tier": "A",
+      "license": "MIT",
+      "status": "ADOPT",
+      "role": "Voice transcription"
+    },
+    {
+      "repo": "umami-software/umami",
+      "tier": "A",
+      "license": "MIT",
+      "status": "ADOPT",
+      "role": "Web analytics"
+    },
+    {
+      "repo": "OpenHands/OpenHands",
+      "tier": "B",
+      "license": "MIT",
+      "status": "PILOT",
+      "role": "Autonomous dev pilot"
+    },
+    {
+      "repo": "anomalyco/opencode",
+      "tier": "B",
+      "license": "MIT",
+      "status": "PILOT",
+      "role": "Local/multi-provider dev"
+    },
+    {
+      "repo": "HKUDS/LightRAG",
+      "tier": "B",
+      "license": "MIT",
+      "status": "PILOT",
+      "role": "Lightweight Graph RAG"
+    },
+    {
+      "repo": "mem0ai/mem0",
+      "tier": "B",
+      "license": "Apache-2.0",
+      "status": "PILOT",
+      "role": "Semantic memory"
+    },
+    {
+      "repo": "PaddlePaddle/PaddleOCR",
+      "tier": "B",
+      "license": "Apache-2.0",
+      "status": "PILOT",
+      "role": "Local OCR"
+    }
+  ]
+}

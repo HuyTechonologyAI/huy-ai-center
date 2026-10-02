@@ -16,7 +16,7 @@ import type {
 } from "./types.js";
 import { classifyTask, maxRisk, requiresHuman } from "./risk-classifier.js";
 import { evaluateGate, buildApprovalRequest } from "./approval-gate.js";
-import { generatePlan, auditResult } from "./antigravity-adapter.js";
+import { generatePlan, auditResultDetailed } from "./antigravity-adapter.js";
 import {
   checkCodex,
   execCodexTask,
@@ -25,6 +25,8 @@ import {
 import { createWorktree } from "./worktree-manager.js";
 import {
   collectDiffStat,
+  collectReviewDiff,
+  enforceEditBudget,
   collectChangedFiles,
   runVerificationCommands,
   summarizeVerification,
@@ -32,6 +34,7 @@ import {
   allVerificationsPassed,
 } from "./result-auditor.js";
 import { safeJsonStringify } from "./log-redactor.js";
+import { checkpointStage } from './checkpoints.js';
 
 const ARTIFACTS_ROOT = ".artifacts/agent-bridge";
 const MAX_CYCLES = 3;
@@ -42,7 +45,8 @@ const MAX_CYCLES = 3;
 
 export async function runTask(
   contract: TaskContract,
-  repositoryRoot: string
+  repositoryRoot: string,
+  checkpoint = false
 ): Promise<BridgeTaskState> {
   const state: BridgeTaskState = {
     contract,
@@ -94,6 +98,8 @@ export async function runTask(
   // ── 3. Planning (Antigravity with retry) ────────────────────────
   state.status = "PLANNING";
 
+  const coordinatorBeforePlan = gitPorcelain(repositoryRoot);
+
   const plan = await generatePlan({
     taskId: contract.taskId,
     title: contract.title,
@@ -103,6 +109,7 @@ export async function runTask(
     repositoryRoot,
     timeoutSeconds: 120,
   });
+  if (gitPorcelain(repositoryRoot) !== coordinatorBeforePlan) throw new Error("PLANNER_MODIFIED_COORDINATOR");
 
   state.plan = { ...plan, approvedByGate: true };
   writeArtifact(artifactDir, "plan.json", plan);
@@ -125,13 +132,50 @@ export async function runTask(
     return state;
   }
 
+  if (plan.rawOutput === "ANTIGRAVITY_UNAVAILABLE") {
+    state.status = "BLOCKED";
+    writeArtifact(artifactDir, "audit.json", { finalStatus: "ANTIGRAVITY_UNAVAILABLE" });
+    return state;
+  }
+
+  if (checkpoint) {
+    if (!plan.steps.length) throw Error('PLAN_WITHOUT_STEPS');
+    for (const step of plan.steps) {
+      if (step.targetFiles?.some(file => !contract.scope.allowedPaths.some(path => file === path || file.startsWith(path)))) {
+        throw Error('PLAN_SCOPE_INVALID');
+      }
+    }
+    checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'PLAN', owner: 'ANTIGRAVITY',
+      objective: contract.objective, evidence: plan, method: 'validated planner steps', result: 'Plan contains steps', next: 'DECOMPOSITION' });
+    const subtasks = plan.steps.map((step, index) => ({ subtask_id: `${contract.taskId}-${index + 1}`,
+      task_id: contract.taskId, owner_agent: 'CODEX', objective: step.description,
+      input: contract.objective, output: step.targetFiles ?? contract.scope.allowedPaths,
+      depends_on: index ? [`${contract.taskId}-${index}`] : [],
+      allowed_paths: contract.scope.allowedPaths, acceptance: contract.verification.commands,
+      test_commands: contract.verification.commands, cross_review_agent: 'ANTIGRAVITY',
+      source_checkpoint: 'PLAN_VERIFIED' }));
+    checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'DECOMPOSITION', owner: 'COORDINATOR',
+      objective: contract.objective, evidence: { contract, subtasks }, method: 'contract scope and plan steps',
+      result: 'Subtasks assigned to Codex within allowed paths', next: 'IMPLEMENTATION' });
+  }
+
   // ── 4. Worktree isolation (taskBranch authoritative) ───────────
-  const worktree = createWorktree({
-    taskId: contract.taskId,
-    baseBranch: contract.repository.baseRef,
-    repositoryRoot,
-    taskBranch: contract.repository.taskBranch,
-  });
+  let worktree: ReturnType<typeof createWorktree>;
+  try {
+    worktree = createWorktree({
+      taskId: contract.taskId,
+      baseBranch: contract.repository.baseRef,
+      repositoryRoot,
+      taskBranch: contract.repository.taskBranch,
+    });
+  } catch (error) {
+    state.status = "BLOCKED";
+    writeArtifact(artifactDir, "audit.json", {
+      finalStatus: "TASK_WORKTREE_UNAVAILABLE",
+      reason: String(error),
+    });
+    return state;
+  }
   state.worktree = worktree;
 
   // ── 5. Self-correction implementation loop ─────────────────────
@@ -192,8 +236,21 @@ export async function runTask(
 
     if (codexResult.blocked) {
       lastStatus = (codexResult.blockReason as AgentResultStatus) ?? "FAIL";
+      writeArtifact(artifactDir, `codex-cycle-${cycle}-blocked.json`, {
+        blockReason: codexResult.blockReason,
+        exitCode: codexResult.exitCode,
+        stdoutTail: codexResult.stdout.slice(-4000),
+        stderrTail: codexResult.stderr.slice(-4000),
+      });
       if (lastStatus === "HUMAN_AUTH_REQUIRED") {
         state.status = "HUMAN_GATE";
+        writeArtifact(artifactDir, "audit.json", {
+          finalStatus: "HUMAN_AUTH_REQUIRED",
+          source: "CODEX",
+          cycle,
+          exitCode: codexResult.exitCode,
+          stderr: codexResult.stderr,
+        });
         return state;
       }
       break;
@@ -248,28 +305,40 @@ export async function runTask(
     const diffStat = collectDiffStat(worktree.path);
     const changedFiles = collectChangedFiles(worktree.path);
     previousDiffSummary = diffStat;
+    const reviewDiff = collectReviewDiff(worktree.path);
+    if (checkpoint) enforceEditBudget(reviewDiff);
 
-    const auditDecision = await auditResult({
+    const audit = await auditResultDetailed({
       taskId: contract.taskId,
       objective: contract.objective,
+      planSummary: plan.steps.map(step => step.description).join('\n'),
       diffStat,
+      reviewDiff,
       verificationSummary: verSummary,
       repositoryRoot,
     });
+    const auditDecision = audit.decision;
+    writeArtifact(artifactDir, `auditor-cycle-${cycle}.json`, audit);
+    if (gitPorcelain(repositoryRoot) !== coordinatorBeforePlan) throw new Error("AUDITOR_MODIFIED_COORDINATOR");
 
     if (auditDecision === "HUMAN_AUTH_REQUIRED") {
       state.status = "HUMAN_GATE";
       lastStatus = "HUMAN_AUTH_REQUIRED";
+      writeArtifact(artifactDir, "audit.json", {
+        finalStatus: "HUMAN_AUTH_REQUIRED",
+        source: "ANTIGRAVITY_AUDIT",
+        cycle,
+      });
       return state;
     }
 
-    auditorFeedback = `Auditor returned: ${auditDecision}`;
+    auditorFeedback = `Auditor returned: ${auditDecision}. ${audit.reason}`;
 
     const effectiveStatus: AgentResultStatus =
       auditDecision === "PASS" && verPass
         ? "PASS"
         : auditDecision === "ANTIGRAVITY_UNAVAILABLE"
-        ? (verPass ? "PASS" : "FAIL")
+        ? "ANTIGRAVITY_UNAVAILABLE"
         : (auditDecision as AgentResultStatus);
 
     const result = buildAgentResult({
@@ -280,7 +349,7 @@ export async function runTask(
       changedFiles,
       diffStat,
       verificationResults: verifications,
-      auditNotes: `Audit cycle ${cycle}: ${auditDecision} (verifications: ${verPass ? "PASS" : "FAIL"})`,
+      auditNotes: `Audit cycle ${cycle}: ${auditDecision}; ${audit.reason} (verifications: ${verPass ? "PASS" : "FAIL"})`,
     });
 
     state.result = result;
@@ -289,6 +358,15 @@ export async function runTask(
     lastStatus = result.status;
 
     if (result.status === "PASS") {
+      if (checkpoint) {
+        if (!verifications.length || !verPass) throw Error('VERIFICATION_EVIDENCE_REQUIRED');
+        checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'IMPLEMENTATION', owner: 'CODEX',
+          objective: contract.objective, evidence: { changedFiles, reviewDiff, verifications },
+          method: 'guarded verification', result: 'All required commands passed', next: 'CROSS_REVIEW' });
+        checkpointStage(repositoryRoot, { taskId: contract.taskId, stage: 'CROSS_REVIEW', owner: 'ANTIGRAVITY',
+          objective: contract.objective, evidence: { reviewDiff, auditDecision, verifications },
+          method: 'independent patch audit', result: 'PASS', next: 'DELIVERY' });
+      }
       // ── 9. Safe Scoped Staging & Commit ────────────────────────
       state.status = "COMMITTING";
 
@@ -312,6 +390,10 @@ export async function runTask(
       break;
     }
 
+    if (result.status === 'AUDIT_INVALID' || result.status === 'ANTIGRAVITY_UNAVAILABLE') {
+      break;
+    }
+
     // CORRECTION_REQUIRED / FAIL -> continue loop
     console.log(`[task-runner] Cycle ${cycle} → ${result.status}, retrying with feedback...`);
   }
@@ -322,6 +404,7 @@ export async function runTask(
     finalStatus: "AUTOMATION_BLOCKED",
     cycles: state.cycles,
     lastStatus,
+    auditorFeedback,
   });
 
   return state;
@@ -395,6 +478,7 @@ export function safeScopedCommit(params: {
     cwd: worktreePath,
     encoding: "utf-8",
   });
+  if (statusResult.status !== 0) throw new Error("GIT_STATUS_FAILED");
 
   const stagedFiles: string[] = [];
   const rejectedFiles: string[] = [];
@@ -440,19 +524,22 @@ export function safeScopedCommit(params: {
 
     // File is safe to stage
     if (status.includes("D")) {
-      spawnSync("git", ["rm", filePath], { cwd: worktreePath, encoding: "utf-8" });
+      const removed = spawnSync("git", ["rm", "--", filePath], { cwd: worktreePath, encoding: "utf-8" });
+      if (removed.status !== 0) throw new Error("GIT_RM_FAILED");
     } else {
-      spawnSync("git", ["add", filePath], { cwd: worktreePath, encoding: "utf-8" });
+      const added = spawnSync("git", ["add", "--", filePath], { cwd: worktreePath, encoding: "utf-8" });
+      if (added.status !== 0) throw new Error("GIT_ADD_FAILED");
     }
     stagedFiles.push(filePath);
   }
 
   if (stagedFiles.length > 0) {
     const message = `automation(bridge): ${title} [${taskId}]`;
-    spawnSync("git", ["commit", "-m", message], {
+    const committed = spawnSync("git", ["commit", "-m", message], {
       cwd: worktreePath,
       encoding: "utf-8",
     });
+    if (committed.status !== 0) throw new Error("GIT_COMMIT_FAILED");
     console.log(`[task-runner] Committed ${stagedFiles.length} file(s): ${message}`);
   } else {
     console.log("[task-runner] No eligible scoped files to commit.");
@@ -469,6 +556,12 @@ function ensureDir(path: string): void {
   if (!existsSync(path)) {
     mkdirSync(path, { recursive: true });
   }
+}
+
+function gitPorcelain(cwd: string): string {
+  const result = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd, encoding: "utf-8" });
+  if (result.status !== 0) throw new Error("GIT_STATUS_FAILED");
+  return result.stdout;
 }
 
 function writeArtifact(dir: string, filename: string, data: unknown): void {

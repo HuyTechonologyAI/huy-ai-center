@@ -1,0 +1,20 @@
+{
+  "funnel": {
+    "targets": {
+      "verified_prospects": 100,
+      "qualified_leads": 30,
+      "real_conversations": 10,
+      "demos_or_discovery": 3,
+      "proposals": 2,
+      "paid_orders": 1
+    },
+    "actual": {
+      "verified_prospects": 0,
+      "qualified_leads": 0,
+      "real_conversations": 0,
+      "demos_or_discovery": 0,
+      "proposals": 0,
+      "paid_orders": 0
+    }
+  }
+}

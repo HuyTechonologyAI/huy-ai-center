@@ -1,0 +1,51 @@
+[
+  {
+    "id": "POST_2026-10-01_LUNCH",
+    "slot": "LUNCH_11H30",
+    "targetAudience": "Giáo viên Mầm non, Tiểu học, THCS, THPT",
+    "platforms": [
+      "Facebook",
+      "Instagram",
+      "Threads"
+    ],
+    "title": "Bí quyết soạn giáo án chuẩn Công văn 5512 trong 1 phút nghỉ trưa",
+    "hook": "🔥 THẦY CÔ CÒN PHẢI THỨC ĐẾN 1H SÁNG ĐỂ GÕ GIÁO ÁN 4 HOẠT ĐỘNG?",
+    "body": "Mỗi mùa thi hay thao giảng, khâu nặng nề nhất của giáo viên không phải là đứng lớp, mà là hàng giờ ngồi căn chỉnh từng mục:\n1. Hoạt động Khởi động (Xác định vấn đề)\n2. Hoạt động Hình thành kiến thức mới\n3. Hoạt động Luyện tập (Ma trận trắc nghiệm Thông tư 22)\n4. Hoạt động Vận dụng thực tiễn\n\nĐội ngũ EdTech AI của Thầy Ngô Quốc Huy đã ra mắt công cụ giúp thầy cô:\n✨ Nhập tên bài dạy -> AI sinh trọn bộ Kế hoạch bài dạy chuẩn mẫu BGD&ĐT.\n✨ Xuất thẳng file Word (.docx) và Slide PowerPoint (.pptx).\n✨ Đồng bộ thời khóa biểu trực tiếp trên máy tính và điện thoại.",
+    "cta": "👉 Trải nghiệm MIỄN PHÍ ngay tại: https://www.gvcncdsai.io.vn/ hoặc https://www.huycncdsai.io.vn/apps/teacher-ai",
+    "hashtags": [
+      "#SmartTeacher",
+      "#GiaoAn5512",
+      "#CongVan5512",
+      "#GiaoVienVietNam",
+      "#AIEdTech",
+      "#HuyTechnologyAI"
+    ],
+    "suggestedImagePrompt": "Clean modern classroom, a smiling Vietnamese female teacher holding a tablet displaying lesson plan workflow, photorealistic, soft lighting, 4k",
+    "scheduledTime": "2026-10-01 11:30:00",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "POST_2026-10-01_EVENING",
+    "slot": "EVENING_19H30",
+    "targetAudience": "Giáo viên đang chuẩn bị bài dạy ngày mai",
+    "platforms": [
+      "Facebook",
+      "Instagram",
+      "Threads"
+    ],
+    "title": "Tạo ma trận đặc tả đề kiểm tra 4 mức độ nhận thức chỉ với 1 cú click",
+    "hook": "⚡ MA TRẬN ĐỀ THI THÔNG TƯ 22 LÀM THẦY CÔ ĐAU ĐẦU? HÃY ĐỂ AI LÀM TRỢ LÝ CHO THẦY CÔ!",
+    "body": "Việc phân chia 4 mức độ nhận thức:\n- Nhận biết (40%)\n- Thông hiểu (30%)\n- Vận dụng (20%)\n- Vận dụng cao (10%)\nThường tốn của thầy cô từ 2 đến 3 tiếng rà soát từng câu hỏi.\n\nVới Smart Teacher Schedule & Teacher AI:\n🎯 AI tự động sinh ngân hàng câu hỏi chuẩn đặc tả theo từng bài học.\n🎯 Đầy đủ đáp án chi tiết và hướng dẫn giải thích.\n🎯 Nâng cấp gói VIP 1 chỉ 39.000 đ/tháng (chưa bằng 1 ly cà phê) để tải trọn bộ file không giới hạn.",
+    "cta": "👉 Thầy cô bấm dùng thử ngay: https://www.gvcncdsai.io.vn/",
+    "hashtags": [
+      "#DeThiThongTu22",
+      "#SmartTeacherSchedule",
+      "#GiaoAnDienTu",
+      "#TroLyGiaoVienAI",
+      "#ThayNgoQuocHuy"
+    ],
+    "suggestedImagePrompt": "Modern digital educational dashboard with test matrix graphs and lesson plan cards on a sleek laptop screen, high resolution, neon cyan accents",
+    "scheduledTime": "2026-10-01 19:30:00",
+    "status": "SCHEDULED"
+  }
+]

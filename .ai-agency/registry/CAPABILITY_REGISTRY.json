@@ -1,0 +1,15 @@
+{
+  "version": "3.0.0",
+  "capabilities": [
+    "orchestration",
+    "context_hydration",
+    "task_contract_enforcement",
+    "risk_classification",
+    "deterministic_verification",
+    "local_code_compilation",
+    "android_apk_signing",
+    "web_nextjs_build",
+    "secret_scanning",
+    "safe_two_way_reconciliation"
+  ]
+}

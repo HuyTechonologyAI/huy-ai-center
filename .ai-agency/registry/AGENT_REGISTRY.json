@@ -1,0 +1,201 @@
+{
+  "version": "3.0.0",
+  "agents": [
+    {
+      "id": "L0-00",
+      "role": "HUMAN_OWNER",
+      "level": "L0",
+      "status": "ACTIVE",
+      "risk_ceiling": "R4"
+    },
+    {
+      "id": "L1-00",
+      "role": "ANTIGRAVITY_GROUP_SUPERVISOR",
+      "level": "L1",
+      "status": "ACTIVE",
+      "risk_ceiling": "R2_AUTO_R4_GATE"
+    },
+    {
+      "id": "L1-01",
+      "role": "AI_CEO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R1"
+    },
+    {
+      "id": "L1-02",
+      "role": "AI_COO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L1-03",
+      "role": "AI_CTO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L1-04",
+      "role": "AI_CFO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R1_FINANCE_R4"
+    },
+    {
+      "id": "L1-05",
+      "role": "AI_CMO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L1-06",
+      "role": "AI_CRO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L1-07",
+      "role": "AI_CHRO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R1"
+    },
+    {
+      "id": "L1-08",
+      "role": "AI_CPO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L1-09",
+      "role": "AI_CISO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L1-10",
+      "role": "AI_CDO",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L1-11",
+      "role": "AI_LEGAL_COMPLIANCE",
+      "level": "L1E",
+      "status": "STANDBY",
+      "risk_ceiling": "R1"
+    },
+    {
+      "id": "L2-01",
+      "role": "ENGINEERING_MANAGER",
+      "level": "L2",
+      "status": "ACTIVE",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L2-02",
+      "role": "QA_TEST_MANAGER",
+      "level": "L2",
+      "status": "ACTIVE",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L2-03",
+      "role": "SRE_MANAGER",
+      "level": "L2",
+      "status": "ACTIVE",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L2-04",
+      "role": "SECURITY_MANAGER",
+      "level": "L2",
+      "status": "ACTIVE",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L2-05",
+      "role": "DATA_MANAGER",
+      "level": "L2",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L2-06",
+      "role": "KNOWLEDGE_RAG_MANAGER",
+      "level": "L2",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L2-07",
+      "role": "PRODUCT_MANAGER",
+      "level": "L2",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L2-08",
+      "role": "PMO_MANAGER",
+      "level": "L2",
+      "status": "STANDBY",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L3-01",
+      "role": "RESEARCH_WORKER",
+      "level": "L3",
+      "status": "ACTIVE",
+      "risk_ceiling": "R1"
+    },
+    {
+      "id": "L3-02",
+      "role": "SENIOR_DEVELOPER",
+      "level": "L3",
+      "status": "ACTIVE",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L3-03",
+      "role": "DEVELOPER",
+      "level": "L3",
+      "status": "ACTIVE",
+      "risk_ceiling": "R2"
+    },
+    {
+      "id": "L3-04",
+      "role": "TEST_DESIGNER",
+      "level": "L3",
+      "status": "ACTIVE",
+      "risk_ceiling": "R1"
+    },
+    {
+      "id": "L3-05",
+      "role": "TEST_RUNNER",
+      "level": "L3",
+      "status": "ACTIVE",
+      "risk_ceiling": "R1"
+    },
+    {
+      "id": "L3-06",
+      "role": "CODE_REVIEWER",
+      "level": "L3",
+      "status": "ACTIVE",
+      "risk_ceiling": "R1"
+    },
+    {
+      "id": "L3-07",
+      "role": "LOCAL_EXECUTION_WORKER",
+      "level": "L3",
+      "status": "ACTIVE",
+      "risk_ceiling": "R1"
+    }
+  ]
+}

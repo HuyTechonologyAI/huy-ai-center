@@ -1,0 +1,29 @@
+{
+  "tools": [
+    {
+      "name": "run_command",
+      "mode": "POWERSHELL/BASH",
+      "permission": "R1-R2"
+    },
+    {
+      "name": "view_file",
+      "mode": "READ",
+      "permission": "R0"
+    },
+    {
+      "name": "replace_file_content",
+      "mode": "WRITE",
+      "permission": "R2"
+    },
+    {
+      "name": "write_to_file",
+      "mode": "WRITE",
+      "permission": "R2"
+    },
+    {
+      "name": "manage_task",
+      "mode": "PROCESS_CTRL",
+      "permission": "R1"
+    }
+  ]
+}

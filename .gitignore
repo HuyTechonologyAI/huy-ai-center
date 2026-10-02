@@ -54,3 +54,5 @@ Thumbs.db
 # Agent Bridge — isolation & audit artifacts (never commit)
 .agent-worktrees/
 .artifacts/
+.ai-agency/media-cache/
+.ai-agency/social-state/*.json

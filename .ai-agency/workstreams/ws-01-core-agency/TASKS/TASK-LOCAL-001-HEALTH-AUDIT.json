@@ -1,0 +1,29 @@
+{
+  "task_id": "TASK-LOCAL-001-HEALTH-AUDIT",
+  "objective": "Run automated governance bridge tests and verify clean git status locally",
+  "organization_id": "org-01-group-core",
+  "department_id": "dept-01-engineering",
+  "owner_agent": "L3-07_LOCAL_EXECUTION_WORKER",
+  "required_capability": [
+    "deterministic_verification",
+    "test_runner"
+  ],
+  "scope": [
+    "automation/agent-bridge",
+    "tests/automation"
+  ],
+  "write_scope": [
+    ".ai-agency/workstreams/ws-01-core-agency"
+  ],
+  "forbidden_scope": [
+    "packages/*",
+    "apps/*",
+    ".env*"
+  ],
+  "risk_level": "R1",
+  "verification_commands": [
+    "git status --porcelain",
+    "npm run test:bridge"
+  ],
+  "status": "READY"
+}

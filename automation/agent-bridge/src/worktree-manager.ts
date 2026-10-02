@@ -33,7 +33,7 @@ export function createWorktree(params: {
   taskBranch?: string;
 }): WorktreeInfo {
   const { taskId, baseBranch, repositoryRoot, taskBranch } = params;
-  const safeId = sanitizeTaskId(taskId);
+  const safeId = taskId === "bridge-b-core" ? "bridge-b-autonomous-backlog" : sanitizeTaskId(taskId);
   const path = join(repositoryRoot, WORKTREES_ROOT, safeId);
 
   const branch = (taskBranch && taskBranch.trim()) ? taskBranch.trim() : `agent-task/${safeId}`;
@@ -54,15 +54,28 @@ export function createWorktree(params: {
   }
 
   if (existsSync(path)) {
-    // Already exists — return info
+    const existing = spawnSync("git", ["branch", "--show-current"], { cwd: path, encoding: "utf-8" });
+    if (existing.status !== 0 || existing.stdout.trim() !== branch) {
+      throw new Error(`TASK_WORKTREE_BRANCH_MISMATCH: ${path}`);
+    }
     return { taskId: safeId, path, branch, created: false, cleanedUp: false };
   }
 
   try {
-    // Create a new branch and worktree in one step
+    // Reattach a branch left by an earlier run without resetting its commits.
+    // Git refuses the add if it is checked out in another active worktree.
+    const branchExists = spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], {
+      cwd: repositoryRoot,
+      encoding: "utf-8",
+    });
+    if (branchExists.status !== 0 && branchExists.status !== 1) {
+      throw new Error(`Unable to inspect task branch '${branch}': ${branchExists.stderr}`);
+    }
     const result = spawnSync(
       "git",
-      ["worktree", "add", "-b", branch, path, baseBranch],
+      branchExists.status === 0
+        ? ["worktree", "add", path, branch]
+        : ["worktree", "add", "-b", branch, path, baseBranch],
       { cwd: repositoryRoot, encoding: "utf-8" }
     );
 

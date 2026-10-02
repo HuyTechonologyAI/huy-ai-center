@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "id": "ollama_local",
+      "type": "LOCAL_INFERENCE",
+      "host": "node01",
+      "verified": true
+    },
+    {
+      "id": "supabase_cloud",
+      "type": "DB_CONTROL_PLANE",
+      "verified": true
+    },
+    {
+      "id": "github_remotes",
+      "type": "SOURCE_CONTROL",
+      "verified": true
+    },
+    {
+      "id": "vercel_edge",
+      "type": "EDGE_DEPLOYMENT",
+      "verified": true
+    }
+  ]
+}

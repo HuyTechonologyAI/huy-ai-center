@@ -14,6 +14,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const navItems = [
     { label: 'Bảng Điều Khiển', href: '/', icon: '📊' },
+    { label: 'Mạng Xã Hội 24/7', href: '/social-publishing', icon: '📢' },
+    { label: 'War Room Doanh Thu', href: '/war-room', icon: '🎯' },
     { label: 'Kho Ứng Dụng AI', href: '/apps', icon: '🤖' },
     { label: 'Dự Án Giáo Dục', href: '/projects', icon: '📁' },
     { label: 'Tài Liệu & Tệp', href: '/files', icon: '📄' },

@@ -1,0 +1,56 @@
+{
+  "campaign": "EDUTECH-TEACHER-FUNNEL",
+  "version": "1.0",
+  "status": "ACTIVE_24_7",
+  "supervisor": "ANTIGRAVITY_L1",
+  "local_worker": "NODE01_OLLAMA_DELL_M4800",
+  "teams": {
+    "ai_marketing": {
+      "lead": "AGENT_MARKETING_LEAD",
+      "model": "local_qwen2.5_32b_ollama",
+      "schedule": [
+        {
+          "slot": "LUNCH_11H30",
+          "cron": "30 11 * * *",
+          "type": "SOCIAL_POST",
+          "platforms": ["Facebook", "Instagram", "Threads"],
+          "golden_hour_rationale": "Khung giờ giáo viên kết thúc tiết 4-5 buổi sáng, nghỉ trưa lướt tin tức trên điện thoại."
+        },
+        {
+          "slot": "EVENING_19H30",
+          "cron": "30 19 * * *",
+          "type": "SOCIAL_POST",
+          "platforms": ["Facebook", "Instagram", "Threads"],
+          "golden_hour_rationale": "Khung giờ giáo viên chuẩn bị giáo án và học liệu cho ngày dạy tiếp theo."
+        }
+      ]
+    },
+    "ai_seo_video": {
+      "lead": "AGENT_SEO_VIDEO_LEAD",
+      "model": "local_deepseek_r1_ollama",
+      "schedule": [
+        {
+          "slot": "LUNCH_11H45",
+          "cron": "45 11 * * *",
+          "type": "SHORT_FORM_VIDEO",
+          "platforms": ["TikTok", "Facebook Reels", "YouTube Shorts", "Instagram Reels"],
+          "format": "9:16 Vertical Video (30 - 45s)",
+          "style": "Fast-paced Problem & Solution (Soạn bài 5512 30s)"
+        },
+        {
+          "slot": "EVENING_20H00",
+          "cron": "0 20 * * *",
+          "type": "SHORT_FORM_VIDEO",
+          "platforms": ["TikTok", "Facebook Reels", "YouTube Shorts", "Instagram Reels"],
+          "format": "9:16 Vertical Video (30 - 45s)",
+          "style": "Tutorial & Live Screen Demo (Ma trận trắc nghiệm TT22 & VIP 1 39k)"
+        }
+      ]
+    }
+  },
+  "canonical_links": {
+    "smart_teacher_portal": "https://www.gvcncdsai.io.vn/",
+    "teacher_ai_app": "https://www.huycncdsai.io.vn/apps/teacher-ai",
+    "payment_gateway": "VietQR / SePay ACB STK 37780997 NGO QUOC HUY"
+  }
+}

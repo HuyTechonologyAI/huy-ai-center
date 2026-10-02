@@ -1,0 +1,21 @@
+{
+  "name": "@huy-ai/media-worker",
+  "version": "1.0.0",
+  "description": "Media-Compute Plane for HUY AI Center: Video/Image Transcoding, Aspect Ratio Processing, Vietnamese TTS",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "dev": "tsc -w"
+  },
+  "dependencies": {
+    "@huy-ai/contracts": "*",
+    "@huy-ai/config": "*",
+    "@huy-ai/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.3"
+  }
+}

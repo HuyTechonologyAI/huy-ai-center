@@ -1,0 +1,11 @@
+{
+  "war_room_status": "ACTIVE",
+  "order_target": 1,
+  "verified_paid_orders": 0,
+  "top_prospects": [],
+  "top_leads": [],
+  "top_conversations": [],
+  "top_opportunities": [],
+  "closest_to_payment": null,
+  "stop_condition_met": false
+}

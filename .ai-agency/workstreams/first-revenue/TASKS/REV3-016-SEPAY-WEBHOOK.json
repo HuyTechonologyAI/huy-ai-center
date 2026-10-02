@@ -1,0 +1,16 @@
+{
+  "task_id": "REV3-016-SEPAY-WEBHOOK",
+  "campaign_id": "FIRST-REVENUE-V3",
+  "objective": "Implement SePay webhook handler with signature check, idempotency, order matching, and audit logging",
+  "task_type": "FIRST_REVENUE.PAYMENT_WEBHOOK",
+  "owner_agent": "L3-02_SENIOR_DEVELOPER",
+  "capability": "payment_verification",
+  "input_refs": [
+    "campaigns/first-revenue/PAYMENT_POLICY.md"
+  ],
+  "expected_output": [
+    "apps/control-center/src/app/api/payment/sepay/webhook/route.ts"
+  ],
+  "risk_class": "R2",
+  "status": "READY"
+}

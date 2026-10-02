@@ -1,0 +1,7 @@
+{
+  "priorities": [
+    "Materialize 65 canonical skills into .ai-agency/skills",
+    "Deploy Context Hydrator and Task Contract Manager scripts",
+    "Dispatch initial local verification tasks to Node01 Local AI worker"
+  ]
+}
