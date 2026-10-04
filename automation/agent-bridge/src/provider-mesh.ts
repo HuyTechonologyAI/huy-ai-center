@@ -232,21 +232,7 @@ export function providerCommandSpec(
       };
 
     case 'ollama':
-      return {
-        command: 'codex',
-        args: [
-          'exec',
-          '--oss',
-          '--local-provider',
-          'ollama',
-          '-m',
-          LOCAL_OLLAMA_MODEL,
-          '--sandbox',
-          request.mode === 'READ_ONLY' ? 'read-only' : 'workspace-write',
-          '--ephemeral',
-          request.prompt
-        ]
-      };
+      return { command: 'ollama-http', args: [], virtual: true };
 
     case 'chatgpt':
       return {
@@ -569,12 +555,28 @@ async function runChatGptApi(prompt: string, timeoutMs: number): Promise<Provide
   });
 }
 
+function ollamaRejected(error: string): ProviderRunResult {
+  return { provider: 'ollama', success: false, output: '', error,
+    exitCode: null, authRequired: false, retryable: false };
+}
+
 async function runOllamaReadOnly(prompt: string, timeoutMs: number): Promise<ProviderRunResult> {
+  if (Buffer.byteLength(prompt, 'utf8') > 65536) return ollamaRejected('OLLAMA_PROMPT_TOO_LARGE');
+  let endpoint: URL;
+  try {
+    endpoint = new URL(LOCAL_OLLAMA_HOST);
+    if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1' ||
+        endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.pathname !== '/') {
+      return ollamaRejected('OLLAMA_ENDPOINT_NOT_LOCAL');
+    }
+  } catch { return ollamaRejected('OLLAMA_ENDPOINT_INVALID'); }
+  const boundedTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.min(timeoutMs, 120000) : 120000;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), boundedTimeout);
 
   try {
-    const response = await fetch(`${LOCAL_OLLAMA_HOST.replace(/\/$/, '')}/api/generate`, {
+    const response = await fetch(new URL('/api/generate', endpoint), {
+      redirect: 'error',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -604,6 +606,10 @@ async function runOllamaReadOnly(prompt: string, timeoutMs: number): Promise<Pro
 
     try {
       const parsed = JSON.parse(body) as { response?: string; done?: boolean; error?: string };
+      if (!parsed || typeof parsed !== 'object' || parsed.done !== true ||
+          typeof parsed.response !== 'string' || !parsed.response.trim()) {
+        return ollamaRejected('OLLAMA_RESPONSE_INVALID');
+      }
       if (parsed.error) {
         return {
           provider: 'ollama',
@@ -617,12 +623,12 @@ async function runOllamaReadOnly(prompt: string, timeoutMs: number): Promise<Pro
       }
       return {
         provider: 'ollama',
-        success: parsed.done !== false,
+        success: true,
         output: redact(parsed.response ?? ''),
-        error: parsed.done === false ? 'OLLAMA_INCOMPLETE_RESPONSE' : '',
-        exitCode: parsed.done === false ? 1 : 0,
+        error: '',
+        exitCode: 0,
         authRequired: false,
-        retryable: parsed.done === false
+        retryable: false
       };
     } catch {
       return {
@@ -654,7 +660,9 @@ async function runOllamaReadOnly(prompt: string, timeoutMs: number): Promise<Pro
 export async function runProviderPrompt(req: ProviderRunRequest): Promise<ProviderRunResult> {
   const timeoutMs = req.timeoutMs ?? 20 * 60_000;
 
-  if (req.provider === 'ollama' && req.mode === 'READ_ONLY') {
+  if (req.provider === 'ollama') {
+    // Writes require the allowlisted, validated local-ollama-editor entry point.
+    if (req.mode !== 'READ_ONLY') return ollamaRejected('OLLAMA_EDIT_SCOPE_REQUIRED');
     return runOllamaReadOnly(req.prompt, timeoutMs);
   }
 

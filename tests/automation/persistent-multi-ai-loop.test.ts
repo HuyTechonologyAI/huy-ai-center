@@ -535,26 +535,13 @@ test('deterministic fallback reviewer passes only bounded R0-R2 evidence with gr
   assert.equal(deterministicFallbackAudit({ ...base, changedFiles: ['secrets/key.txt'] }).decision, 'AUDIT_INVALID');
 });
 
-test('local Ollama fallback uses Codex OSS sandbox without cloud auth or permission bypass', () => {
-  const read = providerCommandSpec('ollama' as never, {
-    prompt: 'plan safely', cwd: '/tmp/worktree', mode: 'READ_ONLY'
-  }) as { command: string; args: string[]; env?: Record<string, string> };
-  assert.equal(read.command, 'codex');
-  assert.ok(read.args.includes('exec'));
-  assert.ok(read.args.includes('--oss'));
-  assert.ok(read.args.includes('--local-provider'));
-  assert.ok(read.args.includes('ollama'));
-  assert.ok(read.args.includes('-m'));
-  assert.ok(read.args.includes('qwen2.5-coder:3b'));
-  assert.ok(read.args.includes('read-only'));
-  assert.equal(read.env, undefined);
-
-  const write = providerCommandSpec('ollama' as never, {
-    prompt: 'edit safely', cwd: '/tmp/worktree', mode: 'WORKSPACE_WRITE'
-  }) as { command: string; args: string[]; env?: Record<string, string> };
-  const joined = write.args.join(' ');
-  assert.match(joined, /workspace-write/);
-  assert.doesNotMatch(joined, /dangerously-skip-permissions|bypassPermissions|--yolo/i);
+test('local Ollama provider uses native HTTP without executable dependency', () => {
+  for (const mode of ['READ_ONLY', 'WORKSPACE_WRITE'] as const) {
+    const spec = providerCommandSpec('ollama', {prompt: 'plan safely', cwd: '/tmp', mode});
+    assert.equal(spec.virtual, true);
+    assert.equal(spec.command, 'ollama-http');
+    assert.deepEqual(spec.args, []);
+  }
 });
 
 test('local Ollama provider is selected when every cloud route is unavailable', () => {
