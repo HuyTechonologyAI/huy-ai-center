@@ -204,3 +204,10 @@ it("keeps current Human Gate task while falling back to the latest verified A2A 
   assert.equal(selectTimelineTaskId("08a-model-gateway", true, "07c-e2e"), "08a-model-gateway");
   assert.equal(selectTimelineTaskId("08b-ollama-dell", false, undefined), "08b-ollama-dell");
 });
+
+it("historical provider checkpoint and resident process do not prove execution", () => {
+ const agents=deriveRuntimeAgents({supervisorState:'WAITING_HUMAN',workExecution:{currentTask:'current',stage:'HUMAN_GATE'},runtimeWorkers:{ollama:1},timeline:[]});
+ assert.equal(agents.some(a=>a.state==='RUNNING'),false);
+ assert.equal(agents.find(a=>a.provider==='ollama')?.kind,'PROVIDER_WORKER');
+ assert.equal(agents.find(a=>a.id==='coordinator')?.kind,'ORCHESTRATION_ROLE');
+});

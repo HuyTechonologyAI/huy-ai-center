@@ -76,7 +76,8 @@ export function buildTelemetryPayload(input:PayloadInput){
   const src=input.metadata??{}, allowed=[
     "supervisorState","providerHealth","backlogTaskStatuses","runtimeWorkers","workExecution",
     "runtimeAgents","a2aTimeline","handoffs","providerAttempts","checkpointHistory",
-    "currentOwner","lastAction","nextAction","latestBottleneck","remoteSyncStatus"
+    "currentOwner","lastAction","nextAction","latestBottleneck","remoteSyncStatus",
+    "currentTaskId","timelineTaskId","timelineSource","isHistorical"
   ];
   const metadata:any=Object.fromEntries(allowed.filter(k=>k in src).map(k=>[k,(src as any)[k]]));
   metadata.runtimeWorkers=workers(metadata.runtimeWorkers);
@@ -150,9 +151,10 @@ export async function publishOnce(){
   const handoffs=deriveHandoffs(timeline);
   const providerAttempts=deriveProviderAttempts(timeline);
   const runtimeAgents=deriveRuntimeAgents({supervisorState:String(hb.state??"UNKNOWN"),workExecution,runtimeWorkers:rw,timeline});
-  const currentOwner=timeline.at(-1)?.ownerAgent??"COORDINATOR";
-  const payload=buildTelemetryPayload({timestamp:new Date().toISOString(),status:hb.state==="RUNNING"?"ONLINE":"DEGRADED",metrics,metadata:{
+  const currentOwner=currentTimeline.at(-1)?.ownerAgent??"COORDINATOR";
+  const payload=buildTelemetryPayload({timestamp:new Date().toISOString(),status:["RUNNING","IDLE","WAITING_HUMAN","WAITING_PROVIDER"].includes(hb.state)?"ONLINE":"DEGRADED",metrics,metadata:{
     supervisorState:String(hb.state??"UNKNOWN"),providerHealth:providers,backlogTaskStatuses:summarizeBacklogState(backlog),
+    currentTaskId:currentTask,timelineTaskId:timelineTask,timelineSource:"VERIFIED_CHECKPOINTS",isHistorical:timelineTask!==currentTask,
     runtimeWorkers:rw,workExecution,runtimeAgents,a2aTimeline:timeline,handoffs,providerAttempts,checkpointHistory:timeline,
     currentOwner,lastAction:workExecution.lastAction,nextAction:workExecution.nextAction,
     latestBottleneck:latestBottleneck(),remoteSyncStatus:deriveRemoteSyncStatus(remoteSync())

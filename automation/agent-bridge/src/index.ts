@@ -37,18 +37,9 @@ export interface PreflightReport {
   missingRequired: string[];
 }
 
-import { spawnSync } from "node:child_process";
+import { probeCli as checkCli } from './cli-probe.js';
 
 export function preflight(): PreflightReport {
-  function checkCli(cmd: string, args: string[] = ["--version"]): { installed: boolean; version?: string } {
-    const r = spawnSync(cmd, args, { encoding: "utf-8", timeout: 5000, shell: true });
-    if (r.error || r.status === null || r.status !== 0) return { installed: false };
-    return {
-      installed: true,
-      version: (r.stdout || r.stderr || "").trim().split("\n")[0],
-    };
-  }
-
   const git = checkCli("git", ["--version"]);
   const node = checkCli("node", ["--version"]);
   const npm = checkCli("npm", ["--version"]);

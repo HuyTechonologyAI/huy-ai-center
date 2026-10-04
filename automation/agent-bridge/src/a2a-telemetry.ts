@@ -6,7 +6,7 @@ export type A2AEvent = {
   createdAt: string; checkpointId: string;
 };
 export type RuntimeAgent = {
-  id: string; role: string; provider?: string; state: string;
+  id: string; role: string; provider?: string; state: string; kind?: string;
   taskId: string; stage: string; lastAction?: string; nextAction?: string;
 };
 export type A2AHandoff = {
@@ -112,14 +112,15 @@ export function deriveRuntimeAgents(input: {
   const logical = roles.map(role => ({
     id: role === "COORDINATOR" ? "coordinator" : role.toLowerCase().replaceAll("_", "-"),
     role,
-    state: role === currentRole ? "RUNNING" : role === nextRole ? "READY" : "IDLE",
+    kind: "ORCHESTRATION_ROLE",
+    state: input.supervisorState === "WAITING_HUMAN" ? "WAITING_HUMAN" : role === currentRole ? "ORCHESTRATING" : role === nextRole ? "READY" : "IDLE",
     taskId,
     stage,
     lastAction: text(input.workExecution?.lastAction, ""),
     nextAction: text(input.workExecution?.nextAction, ""),
   }));
   const lastProvider = [...input.timeline].reverse()
-    .find(event => PROVIDERS.has(event.ownerAgent.toLowerCase()));
+    .find(event => event.taskId === taskId && PROVIDERS.has(event.ownerAgent.toLowerCase()));
   const providerRole = lastProvider
     ? stageRole(lastProvider.stage)
     : nextRole !== "COORDINATOR" ? nextRole : currentRole;
@@ -129,7 +130,8 @@ export function deriveRuntimeAgents(input: {
       id: provider === "ollama" ? "ollama-local" : provider + "-worker",
       role: providerRole,
       provider,
-      state: input.supervisorState === "RUNNING" ? "RUNNING" : "DEGRADED",
+      kind: "PROVIDER_WORKER",
+      state: "PROCESS_PRESENT",
       taskId,
       stage,
     }));
