@@ -1,0 +1,8 @@
+[Unit]
+Description=HUY AI production worker polling (install only after R3 approval)
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=15
+Unit=huy-ai-production-worker.service
+[Install]
+WantedBy=timers.target

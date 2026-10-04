@@ -20,7 +20,7 @@
     "verify:safety": "powershell.exe -ExecutionPolicy Bypass -File ./scripts/verify-safety.ps1",
     "bridge:preflight": "powershell.exe -ExecutionPolicy Bypass -File ./automation/agent-bridge/preflight.ps1",
     "bridge:test": "npm run test:bridge",
-    "test:bridge": "npx tsx --test tests/automation/risk-classifier.test.ts tests/automation/command-guard.test.ts tests/automation/approval-gate.test.ts tests/automation/log-redactor.test.ts tests/automation/task-contract.test.ts tests/automation/dry-run.test.ts tests/automation/security-cases.test.ts tests/automation/backlog-runner.test.ts tests/automation/checkpoints.test.ts tests/automation/persistent-multi-ai-loop.test.ts tests/automation/node01-telemetry-publisher.test.ts tests/automation/worktree-gc.test.ts tests/automation/local-ollama-editor.test.ts tests/automation/native-ollama.test.ts",
+    "test:bridge": "npx tsx --test tests/automation/risk-classifier.test.ts tests/automation/command-guard.test.ts tests/automation/approval-gate.test.ts tests/automation/log-redactor.test.ts tests/automation/task-contract.test.ts tests/automation/dry-run.test.ts tests/automation/security-cases.test.ts tests/automation/backlog-runner.test.ts tests/automation/checkpoints.test.ts tests/automation/persistent-multi-ai-loop.test.ts tests/automation/node01-telemetry-publisher.test.ts tests/automation/worktree-gc.test.ts tests/automation/local-ollama-editor.test.ts tests/automation/native-ollama.test.ts tests/recovery-reconciler.test.mjs tests/recovery-production.test.mjs",
     "test:security": "npx tsx --test tests/security/multi-org-isolation.test.ts",
     "test:db:clean": "node scripts/clean_test_db.js",
     "verify:06k-b": "node scripts/verify_06k_b_dryrun.js",
@@ -35,7 +35,8 @@
     "test:autonomy-loop": "npx tsx --test tests/automation/persistent-multi-ai-loop.test.ts",
     "autonomy:once": "npx tsx automation/agent-bridge/src/persistent-supervisor.ts --once",
     "autonomy:daemon": "npx tsx automation/agent-bridge/src/persistent-supervisor.ts",
-    "test:bridge-fixture": "node --test tests/fixtures/agent-bridge-dry-run/acceptance.test.mjs"
+    "test:bridge-fixture": "node --test tests/fixtures/agent-bridge-dry-run/acceptance.test.mjs",
+    "pretest:bridge": "npm run build:shared && npm run build --workspace=@huy-ai/dispatcher"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

@@ -1,0 +1,13 @@
+[Unit]
+Description=HUY AI production local analysis worker (explicit R3 activation required)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/mnt/data1/HUY-AI/runtime/autonomy-control
+EnvironmentFile=%h/.config/huy-ai/production-worker.env
+ExecStart=/home/huyadmin/.nvm/versions/node/v24.21.0/bin/node deploy/node01/production-worker.mjs
+TimeoutStartSec=180
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
