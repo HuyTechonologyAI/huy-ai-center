@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HAIPAgentCard",
+  "type": "object",
+  "required": [
+    "agent_id",
+    "full_name",
+    "department_id",
+    "business_unit",
+    "role_title",
+    "tier",
+    "assigned_model",
+    "capabilities",
+    "allowed_tools",
+    "workspace_path"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "pattern": "^emp_[0-9]{2}$"
+    },
+    "full_name": {
+      "type": "string"
+    },
+    "department_id": {
+      "type": "string",
+      "pattern": "^dept_[0-9]{2}$"
+    },
+    "business_unit": {
+      "type": "string"
+    },
+    "role_title": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "LEADERSHIP",
+        "ENGINEERING",
+        "SPECIALIST",
+        "SUPPORT"
+      ]
+    },
+    "assigned_model": {
+      "type": "string"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowed_tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "workspace_path": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "IDLE",
+        "BUSY",
+        "MAINTENANCE"
+      ]
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HAIPHandoffContract",
+  "type": "object",
+  "required": [
+    "handoff_id",
+    "timestamp",
+    "source_agent",
+    "target_agent",
+    "context_summary",
+    "transferred_artifacts"
+  ],
+  "properties": {
+    "handoff_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_agent": {
+      "type": "string"
+    },
+    "target_agent": {
+      "type": "string"
+    },
+    "context_summary": {
+      "type": "string"
+    },
+    "transferred_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "file_path",
+          "sha256"
+        ],
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "file_path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

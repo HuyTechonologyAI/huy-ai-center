@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HAIPTaskContract",
+  "type": "object",
+  "required": [
+    "task_id",
+    "created_at",
+    "initiator",
+    "title",
+    "execution_mode",
+    "target_system",
+    "dag_nodes"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "initiator": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "execution_mode": {
+      "type": "string",
+      "enum": [
+        "PLAN_ONLY",
+        "SIMULATION",
+        "FULL_EXECUTION"
+      ]
+    },
+    "target_system": {
+      "type": "string"
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "default": 300
+    },
+    "max_retries": {
+      "type": "integer",
+      "default": 3
+    },
+    "dag_nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "subtask_id",
+          "assigned_agent",
+          "title",
+          "dependencies"
+        ],
+        "properties": {
+          "subtask_id": {
+            "type": "string"
+          },
+          "assigned_agent": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "artifact_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
